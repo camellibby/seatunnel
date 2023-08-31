@@ -46,6 +46,28 @@ public class ConfigShadeTest {
     private static final String PASSWORD = "seatunnel_password";
 
     @Test
+    public void testParseJsonConfig() throws URISyntaxException {
+        URL resource = ConfigShadeTest.class.getResource("/config.shade.json");
+        Assertions.assertNotNull(resource);
+        Config config = ConfigBuilder.of(Paths.get(resource.toURI()));
+        Config fields =
+                config.getConfigList("source").get(0).getConfig("schema").getConfig("fields");
+        log.info("Schema fields: {}", fields.root().render(CONFIG_RENDER_OPTIONS));
+        ObjectNode jsonNodes = JsonUtils.parseObject(fields.root().render(CONFIG_RENDER_OPTIONS));
+        List<String> field = new ArrayList<>();
+        jsonNodes.fieldNames().forEachRemaining(field::add);
+        Assertions.assertEquals(field.size(), jsonNodes.size());
+        Assertions.assertEquals(field.get(0), "name");
+        Assertions.assertEquals(field.get(1), "age");
+        Assertions.assertEquals(field.get(2), "sex");
+        log.info("Decrypt config: {}", config.root().render(CONFIG_RENDER_OPTIONS));
+        Assertions.assertEquals(
+                config.getConfigList("source").get(0).getString("username"), USERNAME);
+        Assertions.assertEquals(
+                config.getConfigList("source").get(0).getString("password"), PASSWORD);
+    }
+
+    @Test
     public void testParseConfig() throws URISyntaxException {
         URL resource = ConfigShadeTest.class.getResource("/config.shade.conf");
         Assertions.assertNotNull(resource);

@@ -87,6 +87,10 @@ public class FlinkStarter implements Starter {
         if (flinkCommandArgs.isDecrypt()) {
             command.add("--decrypt");
         }
+        // set db
+        if (flinkCommandArgs.isDb()) {
+            command.add("--db");
+        }
         // set extra system properties
         flinkCommandArgs.getVariables().stream()
                 .filter(Objects::nonNull)

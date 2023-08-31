@@ -68,5 +68,11 @@ public abstract class AbstractCommandArgs extends CommandArgs {
                     "Decrypt config file, When both --decrypt and --encrypt are specified, only --encrypt will take effect")
     protected boolean decrypt = false;
 
+    @Parameter(
+            names = {"--db"},
+            description =
+                    "Identify whether get config from database or file")
+    protected boolean db = false;
+
     public abstract DeployMode getDeployMode();
 }
