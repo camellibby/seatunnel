@@ -1,7 +1,7 @@
 FROM flink:1.13
 
 ENV SEATUNNEL_VERSION="2.3.2"
-ENV SEATUNNEL_HOME = "/opt/seatunnel"
+ENV SEATUNNEL_HOME="/opt/seatunnel"
 
 RUN mkdir -p $SEATUNNEL_HOME
 
