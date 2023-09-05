@@ -77,7 +77,7 @@ public class FlinkTaskFromDbExecuteCommand implements Command<FlinkCommandArgs> 
         String config = null;
         try (Connection connection = new com.mysql.cj.jdbc.Driver().connect(url, info);
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setInt(1, NumberUtils.toInt(flinkCommandArgs.getConfigFile()));
+            statement.setString(1, flinkCommandArgs.getConfigFile());
             ResultSet resultSet = statement.executeQuery();
             if (resultSet.next()) {
                 config = resultSet.getString("job_config");
