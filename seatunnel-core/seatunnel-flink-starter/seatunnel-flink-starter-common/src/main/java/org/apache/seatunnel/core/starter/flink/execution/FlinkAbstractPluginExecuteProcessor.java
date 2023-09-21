@@ -72,11 +72,12 @@ public abstract class FlinkAbstractPluginExecuteProcessor<T>
         this.flinkRuntimeEnvironment = flinkRuntimeEnvironment;
     }
 
-    protected Optional<DataStream<Row>> fromSourceTable(Config pluginConfig) {
+    protected Optional<DataStream<Row>> fromSourceTable(Config pluginConfig,int index) {
         if (pluginConfig.hasPath(SOURCE_TABLE_NAME)) {
             StreamTableEnvironment tableEnvironment =
                     flinkRuntimeEnvironment.getStreamTableEnvironment();
-            Table table = tableEnvironment.from(pluginConfig.getString(SOURCE_TABLE_NAME));
+            List<String> stringList = pluginConfig.getStringList(SOURCE_TABLE_NAME);
+            Table table = tableEnvironment.from(stringList.get(index));
             return Optional.ofNullable(TableUtil.tableToDataStream(tableEnvironment, table, true));
         }
         return Optional.empty();

@@ -96,7 +96,7 @@ public class TransformExecuteProcessor
             try {
                 SeaTunnelTransform<SeaTunnelRow> transform = plugins.get(i);
                 Config pluginConfig = pluginConfigs.get(i);
-                DataStream<Row> stream = fromSourceTable(pluginConfig).orElse(input);
+                DataStream<Row> stream = fromSourceTable(pluginConfig, i).orElse(input);
                 input = flinkTransform(transform, stream);
                 registerResultTable(pluginConfig, input);
                 result.add(input);
