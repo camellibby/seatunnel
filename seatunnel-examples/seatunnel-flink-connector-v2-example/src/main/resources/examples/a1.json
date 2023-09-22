@@ -1,0 +1,74 @@
+{
+  "env": {
+    "job.mode": "BATCH",
+    "execution.parallelism": 2,
+    "job.name": "合流"
+  },
+  "source": [
+    {
+      "plugin_name": "JDBC",
+      "url": "jdbc:mysql://124.220.134.47:30083/seatunnel_test",
+      "driver": "com.mysql.cj.jdbc.Driver",
+      "user": "root",
+      "password": "XIJIAgreat2023!$",
+      "table_name": "test2",
+      "query": "select  *from  test2",
+      "partition_column": "id",
+      "partition_num": 2,
+      "result_table_name": "t7"
+    },
+    {
+      "plugin_name": "JDBC",
+      "url": "jdbc:mysql://124.220.134.47:30083/seatunnel_test",
+      "driver": "com.mysql.cj.jdbc.Driver",
+      "user": "root",
+      "password": "XIJIAgreat2023!$",
+      "table_name": "test1",
+      "query": "select  * from  test1",
+      "partition_column": "id",
+      "partition_num": 2,
+      "result_table_name": "t5"
+    }
+  ],
+  "transform": [
+    {
+      "plugin_name": "FieldMapper",
+      "field_mapper": {
+        "id": "id",
+        "name": "name",
+        "age": "age"
+      },
+      "source_table_name": "t5",
+      "result_table_name": "t6"
+    },
+    {
+      "plugin_name": "FieldMapper",
+      "field_mapper": {
+        "id": "id",
+        "name": "name",
+        "age": "age"
+      },
+      "source_table_name": "t7",
+      "result_table_name": "t8"
+    }
+  ],
+  "sink": [
+    {
+      "plugin_name": "XJJDBC",
+      "primary_keys": [
+        "id",
+        "name",
+        "age"
+      ],
+      "url": "jdbc:mysql://124.220.134.47:30083/seatunnel_test",
+      "driver": "com.mysql.cj.jdbc.Driver",
+      "user": "root",
+      "password": "XIJIAgreat2023!$",
+      "table": "test3",
+      "source_table_name": [
+        "t6",
+        "t8"
+      ]
+    }
+  ]
+}
