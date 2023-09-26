@@ -1,0 +1,39 @@
+{
+  "env": {
+    "job.mode": "STREAMING",
+    "execution.parallelism": 1,
+    "job.name": "mysql_cdc"
+  },
+  "source": [
+    {
+      "plugin_name": "MySQL-CDC",
+      "result_table_name": "t6",
+      "username": "root",
+      "password": "oracle",
+      "table-names": [
+        "test_mysql.stu_info"
+      ],
+      "base-url": "jdbc:mysql://192.168.10.71:3306/test_mysql"
+    }
+  ],
+  "transform": [
+  ],
+  "sink": [
+    {
+      "plugin_name": "jdbc",
+      "primary_keys": [
+        "id"
+      ],
+      "url": "jdbc:mysql://124.220.134.47:30083/seatunnel_test",
+      "driver": "com.mysql.cj.jdbc.Driver",
+      "user": "root",
+      "generate_sink_sql": true,
+      "password": "XIJIAgreat2023!$",
+      "database": "seatunnel_test",
+      "table": "stu_info",
+      "source_table_name": [
+        "t6"
+      ]
+    }
+  ]
+}

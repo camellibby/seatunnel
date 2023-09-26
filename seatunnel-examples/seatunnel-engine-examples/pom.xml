@@ -63,7 +63,7 @@
         </dependency>
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
-            <artifactId>connector-assert</artifactId>
+            <artifactId>connector-cdc-mysql</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>
