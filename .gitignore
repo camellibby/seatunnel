@@ -50,6 +50,4 @@ spark-warehouse
 /connectors
 /lib
 /seatunnel-examples/seatunnel-engine-examples/src/main/resources/rebel.xml
-
-
-
+/seatunnel-examples/seatunnel-flink-connector-v2-example/src/main/resources/examples/a2.json
