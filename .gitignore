@@ -50,10 +50,6 @@ spark-warehouse
 /connectors
 /lib
 /seatunnel-examples/seatunnel-engine-examples/src/main/resources/rebel.xml
-/seatunnel-examples/seatunnel-engine-examples/src/main/resources/examples/a2.json
-/seatunnel-examples/seatunnel-engine-examples/src/main/resources/examples/a1.json
-/seatunnel-examples/seatunnel-engine-examples/src/main/resources/examples/fake_to_console.conf
-/seatunnel-examples/seatunnel-engine-examples/src/main/resources/examples/fake_to_console.conf.conf
 
 
 
