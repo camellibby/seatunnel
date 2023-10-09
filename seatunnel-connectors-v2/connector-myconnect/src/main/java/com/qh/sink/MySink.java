@@ -1,6 +1,7 @@
 package com.qh.sink;
 
 import com.google.auto.service.AutoService;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.seatunnel.api.common.PrepareFailException;
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.sink.SeaTunnelSink;
@@ -12,10 +13,16 @@ import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSimpleSink;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+
+
 import java.io.IOException;
 import java.sql.SQLException;
 
 @AutoService(SeaTunnelSink.class)
+@Slf4j
 public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
     private SeaTunnelRowType seaTunnelRowType;
     private ReadonlyConfig config;
@@ -24,7 +31,8 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
         this.seaTunnelRowType = seaTunnelRowType;
         this.config = config;
     }
-    public MySink(){
+
+    public MySink() {
 
     }
 

@@ -56,6 +56,8 @@ public class MySinkFactory implements TableSinkFactory {
                         GENERATE_SINK_SQL,
                         AUTO_COMMIT,
                         SUPPORT_UPSERT_BY_QUERY_PRIMARY_KEY_EXIST,
+                        FIELD_MAPPER,
+                        PRE_CONFIG,
                         PRIMARY_KEYS)
                 .conditional(
                         IS_EXACTLY_ONCE,

@@ -60,6 +60,10 @@
             <groupId>org.apache.seatunnel</groupId>
             <artifactId>connector-console</artifactId>
             <version>${project.version}</version>
+        </dependency>        <dependency>
+            <groupId>org.apache.seatunnel</groupId>
+            <artifactId>connector-myconnect</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
