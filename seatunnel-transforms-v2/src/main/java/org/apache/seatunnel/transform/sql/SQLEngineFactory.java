@@ -35,6 +35,7 @@ public class SQLEngineFactory {
 
     public enum EngineType {
         ZETA,
-        INTERNAL
+        INTERNAL,
+        FLINK
     }
 }

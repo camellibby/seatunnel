@@ -72,7 +72,7 @@ import java.util.stream.Stream;
 
 @NoArgsConstructor
 public abstract class IncrementalSource<T, C extends SourceConfig>
-        implements SeaTunnelSource<T, SourceSplitBase, PendingSplitsState>,SupportCoordinate {
+        implements SeaTunnelSource<T, SourceSplitBase, PendingSplitsState>, SupportCoordinate {
 
     protected ReadonlyConfig readonlyConfig;
     protected SourceConfig.Factory<C> configFactory;

@@ -44,6 +44,7 @@ import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.apache.seatunnel.transform.sql.SQLEngineFactory.EngineType.ZETA;
@@ -80,9 +81,9 @@ public class SQLTransform extends AbstractCatalogSupportTransform {
 
         List<String> sourceTableNames = config.get(CommonOptions.SOURCE_TABLE_NAME);
         if (sourceTableNames != null && !sourceTableNames.isEmpty()) {
-            this.inputTableName = sourceTableNames.get(0);
+            this.inputTableName = sourceTableNames;
         } else {
-            this.inputTableName = catalogTable.getTableId().getTableName();
+            this.inputTableName = Collections.singletonList(catalogTable.getTableId().getTableName());
         }
         List<Column> columns = catalogTable.getTableSchema().getColumns();
         String[] fieldNames = new String[columns.size()];

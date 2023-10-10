@@ -27,6 +27,7 @@ import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.api.transform.SeaTunnelTransform;
 
+import java.util.List;
 import java.util.Objects;
 
 public abstract class AbstractSeaTunnelTransform implements SeaTunnelTransform<SeaTunnelRow> {
@@ -34,7 +35,7 @@ public abstract class AbstractSeaTunnelTransform implements SeaTunnelTransform<S
     private static final String RESULT_TABLE_NAME = CommonOptions.RESULT_TABLE_NAME.key();
     private static final String SOURCE_TABLE_NAME = CommonOptions.SOURCE_TABLE_NAME.key();
 
-    protected String inputTableName;
+    protected List<String> inputTableName;
     protected SeaTunnelRowType inputRowType;
 
     protected String outputTableName;
@@ -51,7 +52,7 @@ public abstract class AbstractSeaTunnelTransform implements SeaTunnelTransform<S
                     "The configuration missing key: " + RESULT_TABLE_NAME);
         }
 
-        this.inputTableName = pluginConfig.getString(SOURCE_TABLE_NAME);
+        this.inputTableName = pluginConfig.getStringList(SOURCE_TABLE_NAME);
         this.outputTableName = pluginConfig.getString(RESULT_TABLE_NAME);
         if (Objects.equals(inputTableName, outputTableName)) {
             throw new IllegalArgumentException(

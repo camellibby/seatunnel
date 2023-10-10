@@ -31,12 +31,9 @@ public final class TableUtil {
     private TableUtil() {}
 
     public static DataStream<Row> tableToDataStream(
-            StreamTableEnvironment tableEnvironment, Table table, boolean isAppend) {
+            StreamTableEnvironment tableEnvironment, Table table) {
 
         TypeInformation<Row> typeInfo = table.getSchema().toRowType();
-        if (isAppend) {
-            return tableEnvironment.toAppendStream(table, typeInfo);
-        }
         return tableEnvironment
                 .toRetractStream(table, typeInfo)
                 .filter(row -> row.f0)

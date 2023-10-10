@@ -47,7 +47,7 @@ import java.util.stream.Collectors;
 
 public class SinkExecuteProcessor
         extends FlinkAbstractPluginExecuteProcessor<
-                SeaTunnelSink<SeaTunnelRow, Serializable, Serializable, Serializable>> {
+        SeaTunnelSink<SeaTunnelRow, Serializable, Serializable, Serializable>> {
 
     private static final String PLUGIN_TYPE = PluginType.SINK.getType();
 
@@ -58,7 +58,7 @@ public class SinkExecuteProcessor
 
     @Override
     protected List<SeaTunnelSink<SeaTunnelRow, Serializable, Serializable, Serializable>>
-            initializePlugins(List<URL> jarPaths, List<? extends Config> pluginConfigs) {
+    initializePlugins(List<URL> jarPaths, List<? extends Config> pluginConfigs) {
         SeaTunnelSinkPluginDiscovery sinkPluginDiscovery =
                 new SeaTunnelSinkPluginDiscovery(ADD_URL_TO_CLASSLOADER);
         List<URL> pluginJars = new ArrayList<>();
@@ -75,13 +75,13 @@ public class SinkExecuteProcessor
                                             sinkPluginDiscovery.getPluginJarPaths(
                                                     Lists.newArrayList(pluginIdentifier)));
                                     SeaTunnelSink<
-                                                    SeaTunnelRow,
-                                                    Serializable,
-                                                    Serializable,
-                                                    Serializable>
+                                            SeaTunnelRow,
+                                            Serializable,
+                                            Serializable,
+                                            Serializable>
                                             seaTunnelSink =
-                                                    sinkPluginDiscovery.createPluginInstance(
-                                                            pluginIdentifier);
+                                            sinkPluginDiscovery.createPluginInstance(
+                                                    pluginIdentifier);
                                     seaTunnelSink.prepare(sinkConfig);
                                     seaTunnelSink.setJobContext(jobContext);
                                     if (SupportDataSaveMode.class.isAssignableFrom(
@@ -103,28 +103,29 @@ public class SinkExecuteProcessor
             throws TaskExecuteException {
         for (int i = 0; i < plugins.size(); i++) {
             Config sinkConfig = pluginConfigs.get(i);
-            List<String> stringList = sinkConfig.getStringList(SOURCE_TABLE_NAME);
-            for (int ii = 0; ii < stringList.size(); ii++) {
-                DataStream<Row> input = upstreamDataStreams.get(ii);
-                SeaTunnelSink<SeaTunnelRow, Serializable, Serializable, Serializable> seaTunnelSink =
-                        plugins.get(i);
-                DataStream<Row> stream = fromSourceTable(sinkConfig, ii).orElse(input);
-                seaTunnelSink.setTypeInfo(
-                        (SeaTunnelRowType) TypeConverterUtils.convert(stream.getType()));
-                if (SupportDataSaveMode.class.isAssignableFrom(seaTunnelSink.getClass())) {
-                    SupportDataSaveMode saveModeSink = (SupportDataSaveMode) seaTunnelSink;
-                    DataSaveMode dataSaveMode = saveModeSink.getDataSaveMode();
-                    saveModeSink.handleSaveMode(dataSaveMode);
-                }
-                DataStreamSink<Row> dataStreamSink =
-                        stream.sinkTo(new FlinkSink<>(seaTunnelSink))
-                                .name(seaTunnelSink.getPluginName());
-                if (sinkConfig.hasPath(CommonOptions.PARALLELISM.key())) {
-                    int parallelism = sinkConfig.getInt(CommonOptions.PARALLELISM.key());
-                    dataStreamSink.setParallelism(parallelism);
+            SeaTunnelSink<SeaTunnelRow, Serializable, Serializable, Serializable> seaTunnelSink = plugins.get(i);
+            List<DataStream<Row>> dataStreamList = fromSourceTable(sinkConfig).orElse(upstreamDataStreams);
+            DataStream<Row> stream = null;
+            for (DataStream<Row> item : dataStreamList) {
+                if (stream == null) {
+                    stream = item;
+                } else {
+                    stream = stream.union(item);
                 }
             }
-
+            seaTunnelSink.setTypeInfo((SeaTunnelRowType) TypeConverterUtils.convert(stream.getType()));
+            if (SupportDataSaveMode.class.isAssignableFrom(seaTunnelSink.getClass())) {
+                SupportDataSaveMode saveModeSink = (SupportDataSaveMode) seaTunnelSink;
+                DataSaveMode dataSaveMode = saveModeSink.getDataSaveMode();
+                saveModeSink.handleSaveMode(dataSaveMode);
+            }
+            DataStreamSink<Row> dataStreamSink =
+                    stream.sinkTo(new FlinkSink<>(seaTunnelSink))
+                            .name(seaTunnelSink.getPluginName());
+            if (sinkConfig.hasPath(CommonOptions.PARALLELISM.key())) {
+                int parallelism = sinkConfig.getInt(CommonOptions.PARALLELISM.key());
+                dataStreamSink.setParallelism(parallelism);
+            }
         }
         // the sink is the last stream
         return null;

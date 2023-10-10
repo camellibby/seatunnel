@@ -31,6 +31,8 @@ import org.apache.flink.types.Row;
 
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -72,20 +74,23 @@ public abstract class FlinkAbstractPluginExecuteProcessor<T>
         this.flinkRuntimeEnvironment = flinkRuntimeEnvironment;
     }
 
-    protected Optional<DataStream<Row>> fromSourceTable(Config pluginConfig,int index) {
+    protected Optional<List<DataStream<Row>>> fromSourceTable(Config pluginConfig) {
         if (pluginConfig.hasPath(SOURCE_TABLE_NAME)) {
-            StreamTableEnvironment tableEnvironment =
-                    flinkRuntimeEnvironment.getStreamTableEnvironment();
-            List<String> stringList = null;
-            Table table=null;
+            StreamTableEnvironment tableEnvironment = flinkRuntimeEnvironment.getStreamTableEnvironment();
+            List<String> tableNameList;
             try {
-                stringList = pluginConfig.getStringList(SOURCE_TABLE_NAME);
-                table = tableEnvironment.from(stringList.get(index));
-            } catch (Exception e) {
-                table=tableEnvironment.from(pluginConfig.getString(SOURCE_TABLE_NAME));
-//                throw new RuntimeException(e);
+                tableNameList = pluginConfig.getStringList(SOURCE_TABLE_NAME);
+            } catch (Exception ex) {
+                tableNameList = Collections.singletonList(pluginConfig.getString(SOURCE_TABLE_NAME));
             }
-            return Optional.ofNullable(TableUtil.tableToDataStream(tableEnvironment, table, true));
+            List<DataStream<Row>> dataStreamList = new ArrayList<>(tableNameList.size());
+            for (String tableName : tableNameList) {
+                Table table = tableEnvironment.from(tableName);
+                DataStream<Row> dataStream = TableUtil.tableToDataStream(tableEnvironment, table);
+                dataStreamList.add(dataStream);
+            }
+
+            return Optional.ofNullable(dataStreamList);
         }
         return Optional.empty();
     }
