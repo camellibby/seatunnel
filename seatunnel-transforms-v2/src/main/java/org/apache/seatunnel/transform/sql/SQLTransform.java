@@ -81,9 +81,9 @@ public class SQLTransform extends AbstractCatalogSupportTransform {
 
         List<String> sourceTableNames = config.get(CommonOptions.SOURCE_TABLE_NAME);
         if (sourceTableNames != null && !sourceTableNames.isEmpty()) {
-            this.inputTableName = sourceTableNames;
+            this.inputTableNames = sourceTableNames;
         } else {
-            this.inputTableName = Collections.singletonList(catalogTable.getTableId().getTableName());
+            this.inputTableNames = Collections.singletonList(catalogTable.getTableId().getTableName());
         }
         List<Column> columns = catalogTable.getTableSchema().getColumns();
         String[] fieldNames = new String[columns.size()];
@@ -116,7 +116,7 @@ public class SQLTransform extends AbstractCatalogSupportTransform {
     @Override
     public void open() {
         sqlEngine = SQLEngineFactory.getSQLEngine(engineType);
-        sqlEngine.init(inputTableName, inputRowType, query);
+        sqlEngine.init(inputTableNames, inputRowType, query);
     }
 
     private void tryOpen() {

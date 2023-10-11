@@ -28,6 +28,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
+import org.apache.seatunnel.shade.com.typesafe.config.ConfigException;
 
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -80,7 +81,7 @@ public abstract class FlinkAbstractPluginExecuteProcessor<T>
             List<String> tableNameList;
             try {
                 tableNameList = pluginConfig.getStringList(SOURCE_TABLE_NAME);
-            } catch (Exception ex) {
+            } catch (ConfigException.WrongType ex) {
                 tableNameList = Collections.singletonList(pluginConfig.getString(SOURCE_TABLE_NAME));
             }
             List<DataStream<Row>> dataStreamList = new ArrayList<>(tableNameList.size());

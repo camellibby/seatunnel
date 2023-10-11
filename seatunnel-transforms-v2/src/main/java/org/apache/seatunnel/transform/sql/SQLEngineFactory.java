@@ -27,6 +27,8 @@ public class SQLEngineFactory {
             case ZETA:
             case INTERNAL:
                 return new ZetaSQLEngine();
+            case FLINK:
+                return new FlinkSQLEngine();
         }
         throw new TransformException(
                 CommonErrorCode.UNSUPPORTED_OPERATION,

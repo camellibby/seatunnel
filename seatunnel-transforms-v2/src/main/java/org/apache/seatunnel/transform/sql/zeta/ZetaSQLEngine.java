@@ -44,7 +44,7 @@ import java.util.ServiceLoader;
 import java.util.stream.Collectors;
 
 public class ZetaSQLEngine implements SQLEngine {
-    private List<String> inputTableName;
+    private List<String> inputTableNames;
     private SeaTunnelRowType inputRowType;
 
     private String sql;
@@ -57,8 +57,8 @@ public class ZetaSQLEngine implements SQLEngine {
     public ZetaSQLEngine() {}
 
     @Override
-    public void init(List<String> inputTableName, SeaTunnelRowType inputRowType, String sql) {
-        this.inputTableName = inputTableName;
+    public void init(List<String> inputTableNames, SeaTunnelRowType inputRowType, String sql) {
+        this.inputTableNames = inputTableNames;
         this.inputRowType = inputRowType;
         this.sql = sql;
 
@@ -107,7 +107,7 @@ public class ZetaSQLEngine implements SQLEngine {
                     throw new IllegalArgumentException("Unsupported table alias name syntax");
                 }
                 String tableName = table.getName();
-                if (!inputTableName.contains(tableName)) {
+                if (!inputTableNames.contains(tableName)) {
                     throw new IllegalArgumentException(
                             String.format("Table name: %s not found", tableName));
                 }

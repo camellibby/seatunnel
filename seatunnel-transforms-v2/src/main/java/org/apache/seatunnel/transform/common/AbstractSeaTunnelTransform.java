@@ -35,7 +35,7 @@ public abstract class AbstractSeaTunnelTransform implements SeaTunnelTransform<S
     private static final String RESULT_TABLE_NAME = CommonOptions.RESULT_TABLE_NAME.key();
     private static final String SOURCE_TABLE_NAME = CommonOptions.SOURCE_TABLE_NAME.key();
 
-    protected List<String> inputTableName;
+    protected List<String> inputTableNames;
     protected SeaTunnelRowType inputRowType;
 
     protected String outputTableName;
@@ -52,12 +52,12 @@ public abstract class AbstractSeaTunnelTransform implements SeaTunnelTransform<S
                     "The configuration missing key: " + RESULT_TABLE_NAME);
         }
 
-        this.inputTableName = pluginConfig.getStringList(SOURCE_TABLE_NAME);
+        this.inputTableNames = pluginConfig.getStringList(SOURCE_TABLE_NAME);
         this.outputTableName = pluginConfig.getString(RESULT_TABLE_NAME);
-        if (Objects.equals(inputTableName, outputTableName)) {
+        if (Objects.equals(inputTableNames, outputTableName)) {
             throw new IllegalArgumentException(
                     "source and result cannot be equals: "
-                            + inputTableName
+                            + inputTableNames
                             + ", "
                             + outputTableName);
         }
