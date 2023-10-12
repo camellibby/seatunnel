@@ -17,6 +17,9 @@
 
 package org.apache.seatunnel.core.starter.flink.execution;
 
+import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.api.Table;
+import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import org.apache.seatunnel.api.env.EnvCommonOptions;
@@ -318,11 +321,16 @@ public class FlinkRuntimeEnvironment implements RuntimeEnvironment {
             String name = config.getString(RESULT_TABLE_NAME);
             StreamTableEnvironment tableEnvironment = this.getStreamTableEnvironment();
             if (!TableUtil.tableExists(tableEnvironment, name)) {
+                Schema schema = Schema.newBuilder().build();
+                Table table = tableEnvironment.fromChangelogStream(dataStream, schema, ChangelogMode.all());
                 if (config.hasPath("field_name")) {
+                    // TODO: 后期处理这里的字段过滤
                     String fieldName = config.getString("field_name");
-                    tableEnvironment.registerDataStream(name, dataStream, fieldName);
+//                    tableEnvironment.createTemporaryView(name, dataStream, fieldName);
+                    tableEnvironment.createTemporaryView(name, table);
                 } else {
-                    tableEnvironment.registerDataStream(name, dataStream);
+//                    tableEnvironment.createTemporaryView(name, dataStream);
+                    tableEnvironment.createTemporaryView(name, table);
                 }
             }
         }

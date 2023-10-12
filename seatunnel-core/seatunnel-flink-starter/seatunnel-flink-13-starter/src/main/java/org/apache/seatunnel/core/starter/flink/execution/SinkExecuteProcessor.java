@@ -105,14 +105,7 @@ public class SinkExecuteProcessor
             Config sinkConfig = pluginConfigs.get(i);
             SeaTunnelSink<SeaTunnelRow, Serializable, Serializable, Serializable> seaTunnelSink = plugins.get(i);
             List<DataStream<Row>> dataStreamList = fromSourceTable(sinkConfig).orElse(upstreamDataStreams);
-            DataStream<Row> stream = null;
-            for (DataStream<Row> item : dataStreamList) {
-                if (stream == null) {
-                    stream = item;
-                } else {
-                    stream = stream.union(item);
-                }
-            }
+            DataStream<Row> stream = union(dataStreamList);
             seaTunnelSink.setTypeInfo((SeaTunnelRowType) TypeConverterUtils.convert(stream.getType()));
             if (SupportDataSaveMode.class.isAssignableFrom(seaTunnelSink.getClass())) {
                 SupportDataSaveMode saveModeSink = (SupportDataSaveMode) seaTunnelSink;

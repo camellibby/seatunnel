@@ -75,6 +75,21 @@ public abstract class FlinkAbstractPluginExecuteProcessor<T>
         this.flinkRuntimeEnvironment = flinkRuntimeEnvironment;
     }
 
+    protected DataStream<Row> union(List<DataStream<Row>> streamList) {
+        if (streamList == null || streamList.size() == 0) {
+            return null;
+        }
+        DataStream<Row> output = null;
+        for (DataStream<Row> stream : streamList) {
+            if (output == null) {
+                output = stream;
+            } else {
+                output.union(stream);
+            }
+        }
+        return output;
+    }
+
     protected Optional<List<DataStream<Row>>> fromSourceTable(Config pluginConfig) {
         if (pluginConfig.hasPath(SOURCE_TABLE_NAME)) {
             StreamTableEnvironment tableEnvironment = flinkRuntimeEnvironment.getStreamTableEnvironment();

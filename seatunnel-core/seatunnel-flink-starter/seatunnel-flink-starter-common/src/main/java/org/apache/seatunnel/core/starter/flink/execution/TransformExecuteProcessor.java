@@ -117,7 +117,9 @@ public class TransformExecuteProcessor
     protected DataStream<Row> flinkTransform(Config pluginConfig, SeaTunnelTransform transform, List<DataStream<Row>> streamList) {
         DataStream<Row> output = null;
         // TODO: 需要后期优化代码的判断
-        if ("Sql".equals(transform.getPluginName()) && "flink".equals(pluginConfig.getString("engine"))) {
+        if ("Sql".equals(transform.getPluginName())
+                && pluginConfig.hasPath("engine")
+                && "flink".equals(pluginConfig.getString("engine"))) {
             StreamTableEnvironment tableEnv = flinkRuntimeEnvironment.getStreamTableEnvironment();
             Table joinTable = tableEnv.sqlQuery(pluginConfig.getString("query"));
             TypeInformation<Row> typeInfo = joinTable.getSchema().toRowType();
@@ -147,7 +149,7 @@ public class TransformExecuteProcessor
                             }
                         },
                         rowTypeInfo);
-                if (output != null) {
+                if (output == null) {
                     output = outputStream;
                 } else {
                     output.union(outputStream);

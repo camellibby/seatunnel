@@ -17,6 +17,12 @@
 
 package org.apache.seatunnel.translation.flink.utils;
 
+import org.apache.flink.table.runtime.typeutils.ExternalTypeInfo;
+import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.FieldsDataType;
+import org.apache.flink.table.types.KeyValueDataType;
+import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.RowType;
 import org.apache.seatunnel.api.table.type.ArrayType;
 import org.apache.seatunnel.api.table.type.BasicType;
 import org.apache.seatunnel.api.table.type.DecimalType;
@@ -41,6 +47,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @SuppressWarnings("checkstyle:MagicNumber")
@@ -152,6 +159,25 @@ public class TypeConverterUtils {
                             .map(TypeConverterUtils::convert)
                             .toArray(SeaTunnelDataType[]::new);
             return new SeaTunnelRowType(fieldNames, seaTunnelDataTypes);
+        }
+        if (dataType instanceof ExternalTypeInfo) {
+            ExternalTypeInfo externalTypeInfo = (ExternalTypeInfo) dataType;
+            LogicalType logicalType = externalTypeInfo.getDataType().getLogicalType();
+            RowType rowType = (RowType) logicalType;
+            List<String> fieldNames = rowType.getFieldNames();
+            SeaTunnelDataType<?>[] seaTunnelDataTypes =
+                    externalTypeInfo.getDataType().getChildren().stream()
+                            .map(TypeConverterUtils::convert)
+                            .toArray(SeaTunnelDataType[]::new);
+            return new SeaTunnelRowType(fieldNames.toArray(new String[0]), seaTunnelDataTypes);
+        }
+        throw new IllegalArgumentException("Unsupported Flink's data type: " + dataType);
+    }
+
+    private static SeaTunnelDataType<?> convert(DataType dataType) {
+        BridgedType bridgedType = BRIDGED_TYPES.get(dataType.getConversionClass());
+        if (bridgedType != null) {
+            return bridgedType.getSeaTunnelType();
         }
         throw new IllegalArgumentException("Unsupported Flink's data type: " + dataType);
     }

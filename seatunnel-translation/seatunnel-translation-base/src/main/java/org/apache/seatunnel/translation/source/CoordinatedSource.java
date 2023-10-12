@@ -169,6 +169,7 @@ public class CoordinatedSource<T, SplitT extends SourceSplit, StateT extends Ser
                                             } catch (Exception e) {
                                                 running = false;
                                                 flag.set(false);
+                                                log.error(e.getMessage(), e);
                                                 throw new RuntimeException(e);
                                             }
                                         }

@@ -19,26 +19,28 @@ package org.apache.seatunnel.core.starter.flink.utils;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.Row;
 
 import java.util.Arrays;
+import java.util.List;
 
 public final class TableUtil {
 
-    private TableUtil() {}
+    private TableUtil() {
+    }
 
     public static DataStream<Row> tableToDataStream(
             StreamTableEnvironment tableEnvironment, Table table) {
 
-        TypeInformation<Row> typeInfo = table.getSchema().toRowType();
-        return tableEnvironment
-                .toRetractStream(table, typeInfo)
-                .filter(row -> row.f0)
-                .map(row -> row.f1)
-                .returns(typeInfo);
+        DataType dataType = table.getResolvedSchema().toSourceRowDataType();
+        Schema schema = Schema.newBuilder().fromRowDataType(dataType).build();
+        return tableEnvironment.toChangelogStream(table, schema, ChangelogMode.all());
     }
 
     public static boolean tableExists(TableEnvironment tableEnvironment, String name) {
