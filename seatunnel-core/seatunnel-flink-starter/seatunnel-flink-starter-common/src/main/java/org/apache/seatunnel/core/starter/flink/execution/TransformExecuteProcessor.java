@@ -122,11 +122,7 @@ public class TransformExecuteProcessor
                 && "flink".equals(pluginConfig.getString("engine"))) {
             StreamTableEnvironment tableEnv = flinkRuntimeEnvironment.getStreamTableEnvironment();
             Table joinTable = tableEnv.sqlQuery(pluginConfig.getString("query"));
-            TypeInformation<Row> typeInfo = joinTable.getSchema().toRowType();
-            DataStream<Row> joinStream = tableEnv.toRetractStream(joinTable, typeInfo)
-                    .filter(row -> row.f0)
-                    .map(row -> row.f1)
-                    .returns(typeInfo);
+            DataStream<Row> joinStream = tableEnv.toChangelogStream(joinTable);
             return joinStream;
         } else {
             for (DataStream<Row> stream : streamList) {
