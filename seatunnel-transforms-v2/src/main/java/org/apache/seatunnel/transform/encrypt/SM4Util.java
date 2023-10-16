@@ -184,13 +184,9 @@ public class SM4Util {
 
     public static void main(String[] args) {
         try {
-            String json = "13800138000";
-            // 自定义的32位16进制密钥
+
             String key = "86C63180C2806ED1F47B859DE501215B";
-//            String cipher = SM4Util.encryptEcb(key, json);
-//            System.out.println(cipher);
-//            System.out.println(SM4Util.verifyEcb(key, cipher, json));// true
-            json = SM4Util.decryptEcb(key, "ec9f636d01579411cfcc2f814d271171");
+            String json = SM4Util.decryptEcb(key, "a9e87e6467c8c526a10094f7e780a14c");
             System.out.println(json);
         } catch (Exception e) {
             e.printStackTrace();

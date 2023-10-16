@@ -45,7 +45,7 @@ public class MySinkFactory implements TableSinkFactory {
     @Override
     public OptionRule optionRule() {
         return OptionRule.builder()
-                .required(URL, DRIVER)
+                .required(URL, DRIVER,DB_TYPE)
                 .optional(
                         USER,
                         PASSWORD,
