@@ -73,9 +73,8 @@ public abstract class MultipleFieldOutputTransform extends AbstractCatalogSuppor
                             + outputFieldDataTypes);
         }
 
-        List<String> fieldNames = new ArrayList<>(Arrays.asList(inputRowType.getFieldNames()));
-        List<SeaTunnelDataType> fieldDataTypes =
-                new ArrayList<>(Arrays.asList(inputRowType.getFieldTypes()));
+        List<String> fieldNames = new ArrayList<>();
+        List<SeaTunnelDataType> fieldDataTypes = new ArrayList<>();
 
         int addFieldCount = 0;
         for (int i = 0; i < outputFieldNames.length; i++) {

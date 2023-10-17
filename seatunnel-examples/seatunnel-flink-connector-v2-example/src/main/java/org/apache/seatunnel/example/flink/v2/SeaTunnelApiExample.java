@@ -26,16 +26,18 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
 
+// HADOOP_USER_NAME=hdfs
 public class SeaTunnelApiExample {
 
     public static void main(String[] args)
             throws FileNotFoundException, URISyntaxException, CommandException {
-        String configurePath = args.length > 0 ? args[0] : "/examples/demo_transform3.json";
+        String configurePath = args.length > 0 ? args[0] : "/examples/demo_log.json";
         String configFile = getTestConfigFile(configurePath);
         FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
         flinkCommandArgs.setConfigFile(configFile);
         flinkCommandArgs.setCheckConfig(false);
         flinkCommandArgs.setVariables(null);
+        System.setProperty("HADOOP_USER_NAME", "hdfs");
         SeaTunnel.run(flinkCommandArgs.buildCommand());
     }
 
