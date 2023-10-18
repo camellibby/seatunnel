@@ -117,7 +117,9 @@ public interface JdbcOptions {
                     .defaultValue(false)
                     .withDescription("support upsert by query primary_key exist");
 
-    /** source config */
+    /**
+     * source config
+     */
     Option<String> PARTITION_COLUMN =
             Options.key("partition_column")
                     .stringType()
@@ -152,4 +154,11 @@ public interface JdbcOptions {
                     .noDefaultValue()
                     .withDescription(
                             "作业执行执行之前的需要预执行的配置");
+
+    Option<String> DB_TYPE =
+            Options.key("db_type")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "数据库类型");
 }

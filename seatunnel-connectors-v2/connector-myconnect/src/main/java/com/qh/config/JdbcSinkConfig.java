@@ -23,6 +23,7 @@ import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder(builderClassName = "Builder")
@@ -39,6 +40,9 @@ public class JdbcSinkConfig implements Serializable {
     private String user;
     private String passWord;
     private String url;
+    private PreConfig preConfig;
+    private String dbType;
+    private Map<String, String> fieldMapper;
 
 
     public static JdbcSinkConfig of(ReadonlyConfig config) {
@@ -54,6 +58,9 @@ public class JdbcSinkConfig implements Serializable {
         config.getOptional(JdbcOptions.SUPPORT_UPSERT_BY_QUERY_PRIMARY_KEY_EXIST)
                 .ifPresent(builder::supportUpsertByQueryPrimaryKeyExist);
         config.getOptional(JdbcOptions.QUERY).ifPresent(builder::simpleSql);
+        config.getOptional(JdbcOptions.PRE_CONFIG).ifPresent(builder::preConfig);
+        config.getOptional(JdbcOptions.DB_TYPE).ifPresent(builder::dbType);
+        config.getOptional(JdbcOptions.FIELD_MAPPER).ifPresent(builder::fieldMapper);
         return builder.build();
     }
 }

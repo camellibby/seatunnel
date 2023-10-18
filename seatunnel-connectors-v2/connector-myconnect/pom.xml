@@ -41,21 +41,6 @@
             <version>${project.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.jooq</groupId>
-            <artifactId>jooq</artifactId>
-            <version>3.13.4</version>
-        </dependency>
-        <dependency>
-            <groupId>org.jooq</groupId>
-            <artifactId>jooq-meta</artifactId>
-            <version>3.13.4</version>
-        </dependency>
-        <dependency>
-            <groupId>org.jooq</groupId>
-            <artifactId>jooq-codegen</artifactId>
-            <version>3.13.4</version>
-        </dependency>
 
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
@@ -67,12 +52,14 @@
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-sync</artifactId>
             <version>${mongo.driver.version}</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-core</artifactId>
             <version>${mongo.driver.version}</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -88,11 +75,11 @@
             <scope>provided</scope>
         </dependency>
 
-        <dependency>
-            <groupId>org.mongodb</groupId>
-            <artifactId>bson</artifactId>
-            <version>${mongo.driver.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.mongodb</groupId>-->
+<!--            <artifactId>bson</artifactId>-->
+<!--            <version>${mongo.driver.version}</version>-->
+<!--        </dependency>-->
     </dependencies>
 
   <scm>
