@@ -55,6 +55,8 @@ import java.time.ZoneId;
 @AutoService(SeaTunnelSource.class)
 public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceConfig>
         implements SupportParallelism {
+    private static final long serialVersionUID =-1L;
+
     static final String IDENTIFIER = "MySQL-CDC";
 
     public MySqlIncrementalSource(
