@@ -208,6 +208,7 @@ public class MySinkWriter extends AbstractSinkWriter<SeaTunnelRow, Void> {
                 }
                 return rowData.toString();
             case STRING:
+            case DATE:
                 return "'" + String.valueOf(value) + "'";
             case TINYINT:
             case SMALLINT:

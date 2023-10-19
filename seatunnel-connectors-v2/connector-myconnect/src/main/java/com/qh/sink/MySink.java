@@ -22,7 +22,8 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
+import java.util.Properties;
+
 
 @AutoService(SeaTunnelSink.class)
 @Slf4j
@@ -57,17 +58,25 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
         String userName = jdbcSinkConfig.getUser();
         String password = jdbcSinkConfig.getPassWord();
         String url = jdbcSinkConfig.getUrl();
+        Properties info = new Properties();
+        info.setProperty("user", userName);
+        info.setProperty("password", password);
 
-        try {
-            if (jdbcSinkConfig.getDbType().equalsIgnoreCase("mysql")) {
-                Class.forName("com.mysql.cj.jdbc.Driver");
+        if (jdbcSinkConfig.getDbType().equalsIgnoreCase("mysql")) {
+            try {
+                connection = new com.mysql.cj.jdbc.Driver().connect(url, info);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
             }
-            if (jdbcSinkConfig.getDbType().equalsIgnoreCase("oracle")) {
-                Class.forName("oracle.jdbc.OracleDriver");
-            }
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
         }
+        if (jdbcSinkConfig.getDbType().equalsIgnoreCase("oracle")) {
+            try {
+                connection = new oracle.jdbc.driver.OracleDriver().connect(url, info);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
 
         //全量模式 判断是否需要清空表
         if (insertMode.equalsIgnoreCase("complete")) {
@@ -75,7 +84,6 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
             if (cleanTableWhenComplete) {
                 log.info("-------------------------------开始清空表-----------------------------------");
                 try {
-                    connection = DriverManager.getConnection(url, userName, password);
                     Statement stat = connection.createStatement();
                     String truncateSql = "truncate table " + jdbcSinkConfig.getTable();
                     stat.execute(truncateSql);
@@ -96,7 +104,6 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
         //增量模式 检查表是否有主键
         if (insertMode.equalsIgnoreCase("increment")) {
             try {
-                connection = DriverManager.getConnection(url, userName, password);
                 DatabaseMetaData meta = connection.getMetaData();
                 List<String> allColumns = new ArrayList<>();
                 boolean havePrimaryKeys = false;
