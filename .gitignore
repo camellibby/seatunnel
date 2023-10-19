@@ -56,3 +56,5 @@ demo*.json
 /seatunnel-examples/seatunnel-flink-connector-v2-example/src/main/resources/examples/a3.json
 /seatunnel-examples/seatunnel-flink-connector-v2-example/src/main/resources/examples/a4.json
 /seatunnel-examples/seatunnel-flink-connector-v2-example/src/main/resources/examples/socket.conf
+/seatunnel-examples/seatunnel-flink-connector-v2-example/src/main/resources/examples/a5.json
+/seatunnel-examples/seatunnel-flink-connector-v2-example/src/main/resources/examples/a6.json
