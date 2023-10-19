@@ -58,6 +58,7 @@ import static org.apache.seatunnel.connectors.seatunnel.cdc.sqlserver.source.uti
 @AutoService(SeaTunnelSource.class)
 public class SqlServerIncrementalSource<T> extends IncrementalSource<T, JdbcSourceConfig>
         implements SupportParallelism {
+    private static final long serialVersionUID =-1L;
 
     static final String IDENTIFIER = "SqlServer-CDC";
 
