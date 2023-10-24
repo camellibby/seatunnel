@@ -74,5 +74,11 @@ public abstract class AbstractCommandArgs extends CommandArgs {
                     "Identify whether get config from database or file")
     protected boolean db = false;
 
+    @Parameter(
+            names = {"--fid"},
+            description =
+                    "Identify whether get config from database or file")
+    protected String flinkJobId ;
+
     public abstract DeployMode getDeployMode();
 }

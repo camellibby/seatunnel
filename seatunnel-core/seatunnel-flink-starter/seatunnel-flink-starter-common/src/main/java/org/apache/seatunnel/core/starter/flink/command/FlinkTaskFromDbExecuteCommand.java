@@ -55,7 +55,7 @@ public class FlinkTaskFromDbExecuteCommand implements Command<FlinkCommandArgs> 
                             ConfigUtil.joinPath("env", "job.name"),
                             ConfigValueFactory.fromAnyRef(flinkCommandArgs.getJobName()));
         }
-        FlinkExecution seaTunnelTaskExecution = new FlinkExecution(config);
+        FlinkExecution seaTunnelTaskExecution = new FlinkExecution(config,this.flinkCommandArgs.getFlinkJobId());
         try {
             seaTunnelTaskExecution.execute();
         } catch (Exception e) {

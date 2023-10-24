@@ -17,6 +17,8 @@
 
 package org.apache.seatunnel.core.starter.flink.execution;
 
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.PipelineOptionsInternal;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigUtil;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigValueFactory;
@@ -50,7 +52,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/** Used to execute a SeaTunnelTask. */
+/**
+ * Used to execute a SeaTunnelTask.
+ */
 @Slf4j
 public class FlinkExecution implements TaskExecution {
     private final FlinkRuntimeEnvironment flinkRuntimeEnvironment;
@@ -62,22 +66,25 @@ public class FlinkExecution implements TaskExecution {
             sinkPluginExecuteProcessor;
     private final List<URL> jarPaths;
 
+    private JobContext jobContext;
+
+
     public FlinkExecution(Config config) {
+        this.jobContext = new JobContext();
         try {
             jarPaths =
                     new ArrayList<>(
                             Collections.singletonList(
                                     new File(
-                                                    Common.appStarterDir()
-                                                            .resolve(FlinkStarter.APP_JAR_NAME)
-                                                            .toString())
+                                            Common.appStarterDir()
+                                                    .resolve(FlinkStarter.APP_JAR_NAME)
+                                                    .toString())
                                             .toURI()
                                             .toURL()));
         } catch (MalformedURLException e) {
             throw new SeaTunnelException("load flink starter error.", e);
         }
         registerPlugin(config.getConfig("env"));
-        JobContext jobContext = new JobContext();
         jobContext.setJobMode(RuntimeEnvironment.getJobMode(config));
 
         this.sourcePluginExecuteProcessor =
@@ -94,7 +101,47 @@ public class FlinkExecution implements TaskExecution {
                         jarPaths, config.getConfigList(Constants.SINK), jobContext);
 
         this.flinkRuntimeEnvironment =
-                FlinkRuntimeEnvironment.getInstance(this.registerPlugin(config, jarPaths));
+                org.apache.seatunnel.core.starter.flink.execution.FlinkRuntimeEnvironment.getInstance(this.registerPlugin(config, jarPaths), jobContext);
+
+        this.sourcePluginExecuteProcessor.setRuntimeEnvironment(flinkRuntimeEnvironment);
+        this.transformPluginExecuteProcessor.setRuntimeEnvironment(flinkRuntimeEnvironment);
+        this.sinkPluginExecuteProcessor.setRuntimeEnvironment(flinkRuntimeEnvironment);
+    }
+
+    public FlinkExecution(Config config, String jobid) {
+        this.jobContext = new JobContext();
+        jobContext.setJobId(jobid);
+        try {
+            jarPaths =
+                    new ArrayList<>(
+                            Collections.singletonList(
+                                    new File(
+                                            Common.appStarterDir()
+                                                    .resolve(FlinkStarter.APP_JAR_NAME)
+                                                    .toString())
+                                            .toURI()
+                                            .toURL()));
+        } catch (MalformedURLException e) {
+            throw new SeaTunnelException("load flink starter error.", e);
+        }
+        registerPlugin(config.getConfig("env"));
+        jobContext.setJobMode(RuntimeEnvironment.getJobMode(config));
+
+        this.sourcePluginExecuteProcessor =
+                new SourceExecuteProcessor(
+                        jarPaths, config.getConfigList(Constants.SOURCE), jobContext);
+        this.transformPluginExecuteProcessor =
+                new TransformExecuteProcessor(
+                        jarPaths,
+                        TypesafeConfigUtils.getConfigList(
+                                config, Constants.TRANSFORM, Collections.emptyList()),
+                        jobContext);
+        this.sinkPluginExecuteProcessor =
+                new SinkExecuteProcessor(
+                        jarPaths, config.getConfigList(Constants.SINK), jobContext);
+
+        this.flinkRuntimeEnvironment =
+                org.apache.seatunnel.core.starter.flink.execution.FlinkRuntimeEnvironment.getInstance(this.registerPlugin(config, jarPaths), jobContext);
 
         this.sourcePluginExecuteProcessor.setRuntimeEnvironment(flinkRuntimeEnvironment);
         this.transformPluginExecuteProcessor.setRuntimeEnvironment(flinkRuntimeEnvironment);

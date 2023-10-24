@@ -27,7 +27,9 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** This class is used to store the context of the job. e.g. the table schema, catalog...etc. */
+/**
+ * This class is used to store the context of the job. e.g. the table schema, catalog...etc.
+ */
 public final class JobContext implements Serializable {
 
     private static final long serialVersionUID = -1L;
@@ -38,7 +40,7 @@ public final class JobContext implements Serializable {
 
     private JobMode jobMode;
 
-    private final String jobId;
+    private  String jobId;
 
     public JobContext() {
         this.jobId = UUID.randomUUID().toString().replace("-", "");
@@ -48,10 +50,12 @@ public final class JobContext implements Serializable {
         this.jobId = jobId + "";
     }
 
+
+
     /**
      * Put table schema.
      *
-     * @param tableName table name
+     * @param tableName   table name
      * @param tableSchema table schema
      */
     public void addSchema(String tableName, TableSchema tableSchema) {
@@ -79,5 +83,9 @@ public final class JobContext implements Serializable {
 
     public String getJobId() {
         return this.jobId;
+    }
+
+    public void setJobId(String jobId) {
+        this.jobId = jobId;
     }
 }

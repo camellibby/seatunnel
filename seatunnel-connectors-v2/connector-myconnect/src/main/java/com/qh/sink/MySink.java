@@ -4,6 +4,7 @@ import com.google.auto.service.AutoService;
 import com.qh.config.JdbcSinkConfig;
 import com.qh.config.PreConfig;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.common.PrepareFailException;
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.sink.SeaTunnelSink;
@@ -30,6 +31,14 @@ import java.util.Properties;
 public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
     private SeaTunnelRowType seaTunnelRowType;
     private ReadonlyConfig config;
+
+    private JobContext jobContext;
+
+    @Override
+    public void setJobContext(JobContext jobContext) {
+        super.setJobContext(jobContext);
+        this.jobContext=jobContext;
+    }
 
     private List<String> zipperColumns = Arrays.asList("zipperFlag", "zipperTime");
 
@@ -111,18 +120,16 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
                      ResultSet columns = meta.getColumns(null, null, jdbcSinkConfig.getTable(), "%");) {
                     while (primaryKeys.next()) {
                         havePrimaryKeys = true;
-//                        System.out.println("Primary key: " + primaryKeys.getString("COLUMN_NAME"));
                     }
                     while (columns.next()) {
                         allColumns.add(columns.getString("COLUMN_NAME"));
-//                        System.out.println("Column: " + columns.getString("COLUMN_NAME"));
                     }
                 }
                 if (!havePrimaryKeys) {
-                    throw new RuntimeException("目标表不存在主键,增量模式要求目标表必须存在主键");
+                    throw new RuntimeException("目标表不存在主键,增量模式要求目标表必须存在物理主键");
                 }
                 // 增量拉链表必须包含 "zipperFlag", "zipperTime" 2个字段
-                if (preConfig.getIncrementMode().equalsIgnoreCase("zipper")) {
+                if (preConfig.getIncrementMode() != null && preConfig.getIncrementMode().equalsIgnoreCase("zipper")) {
                     if (!allColumns.containsAll(zipperColumns)) {
                         throw new RuntimeException("增量模式(拉链选项)要求目标表必须包含 zipperFlag与zipperTime字段，且段类型为字符");
                     }
@@ -147,7 +154,7 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
     @Override
     public AbstractSinkWriter<SeaTunnelRow, Void> createWriter(SinkWriter.Context context) throws IOException {
         try {
-            return new MySinkWriter(seaTunnelRowType, context, config);
+            return new MySinkWriter(seaTunnelRowType, context, config,this.jobContext);
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }

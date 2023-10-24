@@ -25,20 +25,33 @@ import java.io.FileNotFoundException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.UUID;
 
 // HADOOP_USER_NAME=hdfs
 public class SeaTunnelApiExample {
 
     public static void main(String[] args)
             throws FileNotFoundException, URISyntaxException, CommandException {
-        String configurePath = args.length > 0 ? args[0] : "/examples/demo_log.json";
-        String configFile = getTestConfigFile(configurePath);
+//        String configurePath = args.length > 0 ? args[0] : "/examples/a6.json";
+//        String configFile = getTestConfigFile(configurePath);
+//        FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
+//        flinkCommandArgs.setConfigFile(configFile);
+//        flinkCommandArgs.setCheckConfig(false);
+//        flinkCommandArgs.setVariables(null);
+//        System.setProperty("HADOOP_USER_NAME", "hdfs");
+//        SeaTunnel.run(flinkCommandArgs.buildCommand());
+
         FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
-        flinkCommandArgs.setConfigFile(configFile);
+        flinkCommandArgs.setDb(true);
+        flinkCommandArgs.setConfigFile("-11111");
+        String fid= UUID.randomUUID().toString().replaceAll("-", "");
+        System.out.println("---------------------------------------fid---------------------------"+fid);
+        flinkCommandArgs.setFlinkJobId(fid);
         flinkCommandArgs.setCheckConfig(false);
         flinkCommandArgs.setVariables(null);
         System.setProperty("HADOOP_USER_NAME", "hdfs");
         SeaTunnel.run(flinkCommandArgs.buildCommand());
+
     }
 
     public static String getTestConfigFile(String configFile)
