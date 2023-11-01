@@ -17,7 +17,8 @@
     limitations under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>org.apache.seatunnel</groupId>
@@ -78,17 +79,23 @@
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
             <version>8.0.27</version>
-            <scope>compile</scope>
+            <scope>provided</scope>
         </dependency>
-
-        <!--        <dependency>-->
-<!--            <groupId>org.mongodb</groupId>-->
-<!--            <artifactId>bson</artifactId>-->
-<!--            <version>${mongo.driver.version}</version>-->
-<!--        </dependency>-->
+        <!-- https://mvnrepository.com/artifact/org.antlr/stringtemplate -->
+        <!-- https://mvnrepository.com/artifact/org.antlr/ST4 -->
+        <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>ST4</artifactId>
+            <version>4.3.4</version>
+        </dependency>
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <version>4.3.2</version>
+        </dependency>
     </dependencies>
 
-  <scm>
-    <tag>2.3.2</tag>
-  </scm>
+    <scm>
+        <tag>2.3.2</tag>
+    </scm>
 </project>

@@ -20,10 +20,6 @@ import java.io.IOException;
 
 
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
 
 
 @AutoService(SeaTunnelSink.class)
@@ -34,13 +30,13 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
 
     private JobContext jobContext;
 
+    private boolean upsert;
+
     @Override
     public void setJobContext(JobContext jobContext) {
         super.setJobContext(jobContext);
-        this.jobContext=jobContext;
+        this.jobContext = jobContext;
     }
-
-    private List<String> zipperColumns = Arrays.asList("zipperFlag", "zipperTime");
 
     public MySink(SeaTunnelRowType seaTunnelRowType, ReadonlyConfig config) {
         this.seaTunnelRowType = seaTunnelRowType;
@@ -61,84 +57,13 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
         this.config = ReadonlyConfig.fromConfig(pluginConfig);
         JdbcSinkConfig jdbcSinkConfig = JdbcSinkConfig.of(config);
         PreConfig preConfig = jdbcSinkConfig.getPreConfig();
-        String insertMode = preConfig.getInsertMode();
-
-        Connection connection = null;
-        String userName = jdbcSinkConfig.getUser();
-        String password = jdbcSinkConfig.getPassWord();
-        String url = jdbcSinkConfig.getUrl();
-        Properties info = new Properties();
-        info.setProperty("user", userName);
-        info.setProperty("password", password);
-
-        if (jdbcSinkConfig.getDbType().equalsIgnoreCase("mysql")) {
-            try {
-                connection = new com.mysql.cj.jdbc.Driver().connect(url, info);
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        if (jdbcSinkConfig.getDbType().equalsIgnoreCase("oracle")) {
-            try {
-                connection = new oracle.jdbc.driver.OracleDriver().connect(url, info);
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
+        try (Connection conn = DriverManager.getConnection(jdbcSinkConfig.getUrl(), jdbcSinkConfig.getUser(), jdbcSinkConfig.getPassWord())) {
+            preConfig.doPreConfig(conn, jdbcSinkConfig.getTable());
+            this.upsert = preConfig.getUpsert();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
 
-
-        //全量模式 判断是否需要清空表
-        if (insertMode.equalsIgnoreCase("complete")) {
-            boolean cleanTableWhenComplete = preConfig.isCleanTableWhenComplete();
-            if (cleanTableWhenComplete) {
-                log.info("-------------------------------开始清空表-----------------------------------");
-                try {
-                    Statement stat = connection.createStatement();
-                    String truncateSql = "truncate table " + jdbcSinkConfig.getTable();
-                    stat.execute(truncateSql);
-                    connection.close();
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                } finally {
-                    if (connection != null) {
-                        try {
-                            connection.close();
-                        } catch (SQLException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                }
-            }
-        }
-        //增量模式 检查表是否有主键
-        if (insertMode.equalsIgnoreCase("increment")) {
-            try {
-                DatabaseMetaData meta = connection.getMetaData();
-                List<String> allColumns = new ArrayList<>();
-                boolean havePrimaryKeys = false;
-                try (ResultSet primaryKeys = meta.getPrimaryKeys(null, null, jdbcSinkConfig.getTable());
-                     ResultSet columns = meta.getColumns(null, null, jdbcSinkConfig.getTable(), "%");) {
-                    while (primaryKeys.next()) {
-                        havePrimaryKeys = true;
-                    }
-                    while (columns.next()) {
-                        allColumns.add(columns.getString("COLUMN_NAME"));
-                    }
-                }
-                if (!havePrimaryKeys) {
-                    throw new RuntimeException("目标表不存在主键,增量模式要求目标表必须存在物理主键");
-                }
-                // 增量拉链表必须包含 "zipperFlag", "zipperTime" 2个字段
-                if (preConfig.getIncrementMode() != null && preConfig.getIncrementMode().equalsIgnoreCase("zipper")) {
-                    if (!allColumns.containsAll(zipperColumns)) {
-                        throw new RuntimeException("增量模式(拉链选项)要求目标表必须包含 zipperFlag与zipperTime字段，且段类型为字符");
-                    }
-                }
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-
-        }
     }
 
     @Override
@@ -154,7 +79,13 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
     @Override
     public AbstractSinkWriter<SeaTunnelRow, Void> createWriter(SinkWriter.Context context) throws IOException {
         try {
-            return new MySinkWriter(seaTunnelRowType, context, config,this.jobContext);
+            JdbcSinkConfig jdbcSinkConfig = JdbcSinkConfig.of(config);
+            PreConfig preConfig = jdbcSinkConfig.getPreConfig();
+            if (preConfig.getInsertMode().equalsIgnoreCase("complete")) {
+                return new MySinkWriterComplete(seaTunnelRowType, context, config, this.jobContext, this.upsert);
+            } else {
+                return new MySinkWriterIncrement(seaTunnelRowType, context, config, this.jobContext, this.upsert);
+            }
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }

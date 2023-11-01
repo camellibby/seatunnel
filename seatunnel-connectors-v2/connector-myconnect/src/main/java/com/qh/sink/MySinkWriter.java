@@ -1,5 +1,6 @@
 package com.qh.sink;
 
+import com.mysql.cj.jdbc.Driver;
 import com.qh.config.JdbcSinkConfig;
 import com.qh.config.PreConfig;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
 
 @Slf4j
 public class MySinkWriter extends AbstractSinkWriter<SeaTunnelRow, Void> {
@@ -35,7 +37,7 @@ public class MySinkWriter extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     private Integer commitSize = 0;
 
-    private Integer writeCount = 0;
+    private volatile Integer writeCount = 0;
     private List<String> primaryKeysValues = new ArrayList<>();
 
     private List<String> allColumns = new ArrayList<>();
@@ -165,31 +167,33 @@ public class MySinkWriter extends AbstractSinkWriter<SeaTunnelRow, Void> {
     }
 
     public void writeCount() {
-        String user = System.getenv("MYSQL_MASTER_USER");
-        String password = System.getenv("MYSQL_MASTER_PWD");
-        String dbHost = System.getenv("MYSQL_MASTER_HOST");
-        String dbPort = System.getenv("MYSQL_MASTER_PORT");
-        String dbName = System.getenv("PANGU_DB");
-        String url = "jdbc:mysql://" + dbHost + ":" + dbPort + "/" + dbName;
-        String sql = "update seatunnel_jobs_history set writeCount=writeCount+? where flinkJobId=?";
-        Properties info = new Properties();
-        info.setProperty("user", user);
-        info.setProperty("password", password);
-        try (Connection connection = new com.mysql.cj.jdbc.Driver().connect(url, info);
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setInt(1, writeCount);
-            statement.setString(2, jobContext.getJobId());
-            System.out.println("------------------jobContext.getJobId()-------------------" + jobContext.getJobId());
-            statement.execute();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        } finally {
-            try {
-                connection.close();
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
+        new Thread(() -> {
+            Object o = new Object();
+            synchronized (o) {
+                String user = System.getenv("MYSQL_MASTER_USER");
+                String password = System.getenv("MYSQL_MASTER_PWD");
+                String dbHost = System.getenv("MYSQL_MASTER_HOST");
+                String dbPort = System.getenv("MYSQL_MASTER_PORT");
+                String dbName = System.getenv("PANGU_DB");
+                String url = "jdbc:mysql://" + dbHost + ":" + dbPort + "/" + dbName;
+                String sql = "update seatunnel_jobs_history set writeCount=writeCount+" + writeCount + " where flinkJobId='" + jobContext.getJobId() + "'";
+                Properties info = new Properties();
+                info.setProperty("user", user);
+                info.setProperty("password", password);
+                try (Connection connection = new Driver().connect(url, info);
+                     PreparedStatement statement = connection.prepareStatement(sql)) {
+                    int i = statement.executeUpdate();
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                } finally {
+                    try {
+                        connection.close();
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
             }
-        }
+        }).start();
     }
 
     private String fieldsInfo(SeaTunnelRowType seaTunnelRowType) {

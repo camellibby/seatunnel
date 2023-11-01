@@ -32,25 +32,25 @@ public class SeaTunnelApiExample {
 
     public static void main(String[] args)
             throws FileNotFoundException, URISyntaxException, CommandException {
-//        String configurePath = args.length > 0 ? args[0] : "/examples/a6.json";
-//        String configFile = getTestConfigFile(configurePath);
-//        FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
-//        flinkCommandArgs.setConfigFile(configFile);
-//        flinkCommandArgs.setCheckConfig(false);
-//        flinkCommandArgs.setVariables(null);
-//        System.setProperty("HADOOP_USER_NAME", "hdfs");
-//        SeaTunnel.run(flinkCommandArgs.buildCommand());
-
+        String configurePath = args.length > 0 ? args[0] : "/examples/a6.json";
+        String configFile = getTestConfigFile(configurePath);
         FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
-        flinkCommandArgs.setDb(true);
-        flinkCommandArgs.setConfigFile("-11111");
-        String fid= UUID.randomUUID().toString().replaceAll("-", "");
-        System.out.println("---------------------------------------fid---------------------------"+fid);
-        flinkCommandArgs.setFlinkJobId(fid);
+        flinkCommandArgs.setConfigFile(configFile);
         flinkCommandArgs.setCheckConfig(false);
         flinkCommandArgs.setVariables(null);
         System.setProperty("HADOOP_USER_NAME", "hdfs");
         SeaTunnel.run(flinkCommandArgs.buildCommand());
+
+//        FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
+//        flinkCommandArgs.setDb(true);
+//        flinkCommandArgs.setConfigFile("1717075640566841346");
+//        String fid= UUID.randomUUID().toString().replaceAll("-", "");
+//        System.out.println("---------------------------------------fid---------------------------"+fid);
+//        flinkCommandArgs.setFlinkJobId(fid);
+//        flinkCommandArgs.setCheckConfig(false);
+//        flinkCommandArgs.setVariables(null);
+//        System.setProperty("HADOOP_USER_NAME", "hdfs");
+//        SeaTunnel.run(flinkCommandArgs.buildCommand());
 
     }
 
