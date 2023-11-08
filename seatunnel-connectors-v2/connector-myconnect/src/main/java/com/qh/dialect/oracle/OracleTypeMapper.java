@@ -23,45 +23,48 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.seatunnel.api.table.type.*;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
 
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
+import java.math.BigDecimal;
+import java.sql.*;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 
 @Slf4j
 public class OracleTypeMapper implements JdbcDialectTypeMapper {
 
     // ============================data types=====================
 
-    private static final String ORACLE_UNKNOWN = "UNKNOWN";
+    static final String ORACLE_UNKNOWN = "UNKNOWN";
 
     // -------------------------number----------------------------
-    private static final String ORACLE_BINARY_DOUBLE = "BINARY_DOUBLE";
-    private static final String ORACLE_BINARY_FLOAT = "BINARY_FLOAT";
-    private static final String ORACLE_NUMBER = "NUMBER";
-    private static final String ORACLE_FLOAT = "FLOAT";
-    private static final String ORACLE_REAL = "REAL";
-    private static final String ORACLE_INTEGER = "INTEGER";
+    static final String ORACLE_BINARY_DOUBLE = "BINARY_DOUBLE";
+    static final String ORACLE_BINARY_FLOAT = "BINARY_FLOAT";
+    static final String ORACLE_NUMBER = "NUMBER";
+    static final String ORACLE_FLOAT = "FLOAT";
+    static final String ORACLE_REAL = "REAL";
+    static final String ORACLE_INTEGER = "INTEGER";
 
     // -------------------------string----------------------------
-    private static final String ORACLE_CHAR = "CHAR";
-    private static final String ORACLE_VARCHAR2 = "VARCHAR2";
-    private static final String ORACLE_NCHAR = "NCHAR";
-    private static final String ORACLE_NVARCHAR2 = "NVARCHAR2";
-    private static final String ORACLE_LONG = "LONG";
-    private static final String ORACLE_ROWID = "ROWID";
-    private static final String ORACLE_CLOB = "CLOB";
-    private static final String ORACLE_NCLOB = "NCLOB";
+    static final String ORACLE_CHAR = "CHAR";
+    static final String ORACLE_VARCHAR2 = "VARCHAR2";
+    static final String ORACLE_NCHAR = "NCHAR";
+    static final String ORACLE_NVARCHAR2 = "NVARCHAR2";
+    static final String ORACLE_LONG = "LONG";
+    static final String ORACLE_ROWID = "ROWID";
+    static final String ORACLE_CLOB = "CLOB";
+    static final String ORACLE_NCLOB = "NCLOB";
 
     // ------------------------------time-------------------------
-    private static final String ORACLE_DATE = "DATE";
-    private static final String ORACLE_TIMESTAMP = "TIMESTAMP";
-    private static final String ORACLE_TIMESTAMP_WITH_LOCAL_TIME_ZONE =
+    static final String ORACLE_DATE = "DATE";
+    static final String ORACLE_TIMESTAMP = "TIMESTAMP";
+    static final String ORACLE_TIMESTAMP_WITH_LOCAL_TIME_ZONE =
             "TIMESTAMP WITH LOCAL TIME ZONE";
 
     // ------------------------------blob-------------------------
-    private static final String ORACLE_BLOB = "BLOB";
-    private static final String ORACLE_BFILE = "BFILE";
-    private static final String ORACLE_RAW = "RAW";
-    private static final String ORACLE_LONG_RAW = "LONG RAW";
+    static final String ORACLE_BLOB = "BLOB";
+    static final String ORACLE_BFILE = "BFILE";
+    static final String ORACLE_RAW = "RAW";
+    static final String ORACLE_LONG_RAW = "LONG RAW";
+
 
     @SuppressWarnings("checkstyle:MagicNumber")
     @Override
@@ -112,7 +115,7 @@ public class OracleTypeMapper implements JdbcDialectTypeMapper {
             case ORACLE_LONG_RAW:
             case ORACLE_BFILE:
                 return PrimitiveByteArrayType.INSTANCE;
-                // Doesn't support yet
+            // Doesn't support yet
             case ORACLE_UNKNOWN:
             default:
                 final String jdbcColumnName = metadata.getColumnName(colIndex);

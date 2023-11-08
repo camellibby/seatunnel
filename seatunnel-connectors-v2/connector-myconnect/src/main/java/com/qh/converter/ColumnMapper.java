@@ -1,0 +1,16 @@
+package com.qh.converter;
+
+import lombok.Data;
+
+@Data
+public class ColumnMapper {
+    private String sourceColumnName;
+    private String sourceColumnTypeName;
+    private String sinkColumnName;
+    private String sinkColumnTypeName;
+    private Integer sourceRowPosition;
+    private Integer sinkRowPosition;
+    private boolean pk = false;
+    private boolean uc = false;
+    private String sinkColumnDbType;
+}

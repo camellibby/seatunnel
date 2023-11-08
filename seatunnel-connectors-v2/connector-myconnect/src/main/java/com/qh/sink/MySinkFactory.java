@@ -45,7 +45,7 @@ public class MySinkFactory implements TableSinkFactory {
     @Override
     public OptionRule optionRule() {
         return OptionRule.builder()
-                .required(URL, DRIVER,DB_TYPE)
+                .required(URL, DRIVER, DB_TYPE)
                 .optional(
                         USER,
                         PASSWORD,
@@ -91,7 +91,8 @@ public class MySinkFactory implements TableSinkFactory {
         return () ->
                 new MySink(
                         context.getCatalogTable().getTableSchema().toPhysicalRowDataType(),
-                        options
+                        options,
+                        sinkConfig
                 );
     }
 }

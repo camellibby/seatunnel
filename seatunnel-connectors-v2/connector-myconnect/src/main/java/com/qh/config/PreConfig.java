@@ -1,15 +1,20 @@
 package com.qh.config;
 
+import com.qh.converter.ColumnMapper;
+import com.qh.dialect.JdbcDialect;
+import com.qh.dialect.oracle.OracleDialect;
+import com.qh.sink.Utils;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.configuration.util.OptionMark;
 import redis.clients.jedis.Jedis;
+import scala.Predef;
 
 import java.io.Serializable;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
+
+import static com.qh.sink.Utils.getUniqueConstraints;
 
 
 @Data
@@ -21,7 +26,7 @@ public class PreConfig implements Serializable {
     private boolean cleanTableWhenComplete;
     @OptionMark(description = "增量模式 update或者zipper模式 ")
     private String incrementMode;
-    private static final List<String> zipperColumns = Arrays.asList("zipperFlag", "zipperTime");
+    private static final List<String> zipperColumns = Arrays.asList("ZIPPERFLAG", "ZIPPERSTARTTIME", "ZIPPERENDTIME");
 
     private String redisHost;
     private Integer redisPort;
@@ -40,8 +45,7 @@ public class PreConfig implements Serializable {
         this.redisDbIndex = Integer.valueOf(redisDbIndex);
     }
 
-
-    public void doPreConfig(Connection connection, String tableName) throws SQLException {
+    public void doPreConfig(Connection connection, String tableName, JdbcDialect jdbcDialect) throws SQLException {
         Jedis jedis = new Jedis(this.redisHost, this.redisPort);
         jedis.auth(this.redisPassWord);
         jedis.select(this.redisDbIndex);
@@ -63,23 +67,8 @@ public class PreConfig implements Serializable {
             String type = rsColumn.getString("TYPE_NAME");
             int size = rsColumn.getInt("COLUMN_SIZE");
         }
-        ResultSet rsPk = metadata.getPrimaryKeys(null, null, tableName);
-        List<String> primaryKeys = new ArrayList<>();
-        while (rsPk.next()) {
-            String columnName = rsPk.getString("COLUMN_NAME");
-            primaryKeys.add(columnName);
-        }
-        List<String> uniqueIndex = new ArrayList<>();
-        try (ResultSet rs = metadata.getIndexInfo(null, null, tableName, true, true)) {
-            while (rs.next()) {
-                String indexName = rs.getString("INDEX_NAME");
-                String columnName = rs.getString("COLUMN_NAME");
-                if (indexName == null || columnName == null) {
-                    continue;
-                }
-                uniqueIndex.add(columnName);
-            }
-        }
+
+        List<Utils.UniqueConstraint> uniqueConstraints = getUniqueConstraints(connection, null, tableName);
 
 
         if (this.insertMode.equalsIgnoreCase("complete")) {
@@ -88,27 +77,56 @@ public class PreConfig implements Serializable {
                 st.execute(String.format("truncate  table %s", tableName));
             }
         }
+
         if (this.insertMode.equalsIgnoreCase("increment")) {
             if (this.incrementMode.equalsIgnoreCase("update")) {
-                if (primaryKeys.isEmpty() && uniqueIndex.isEmpty()) {
-                    throw new RuntimeException(String.format("增量更新模式下,目标表(%s)必须包含主键或者唯一索引", tableName));
+                if (uniqueConstraints.isEmpty()) {
+                    throw new RuntimeException(String.format("增量更新模式下,目标表(%s)必须包含唯一索引", tableName));
                 }
-                if (!columns.contains("XJ_ST_FLAG")) {
-                    throw new RuntimeException(String.format("增量更新模式下,目标表(%s)必须包含字段类型为字符(长度最少为30)，字段名为XJ_ST_FLAG(区分大小写)的字段,建议在该字段建立位图索引", tableName));
+            }
+
+            if (this.incrementMode.equalsIgnoreCase("zipper")) {
+                if (!uniqueConstraints.isEmpty()) {
+                    uniqueConstraints.forEach(x -> {
+                        if (!new HashSet<>(x.columns).containsAll(zipperColumns) || (x.columns.size() <= 3)) {
+                            throw new RuntimeException(String.format("增量拉链模式下,目标表(%s)必须包含唯一索引,且唯一索引必须包含 ZIPPERFLAG,ZIPPERSTARTTIME,ZIPPERENDTIME ", tableName));
+                        }
+                    });
+                } else {
+                    throw new RuntimeException(String.format("增量拉链模式下,目标表(%s)必须包含唯一索引,且唯一索引必须包含 ZIPPERFLAG,ZIPPERSTARTTIME,ZIPPERENDTIME ", tableName));
                 }
-                Statement st = connection.createStatement();
-                st.execute(String.format("update  %s set XJ_ST_FLAG= null", tableName));
+            }
+
+            int tableCount = 0;
+            String tmpTableName = "UC_" + tableName;
+            String countTable = String.format("select count(1) sl from user_tables a where a.TABLE_NAME='%s'", tmpTableName);
+            PreparedStatement preparedStatement = connection.prepareStatement(countTable);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            while (resultSet.next()) {
+                tableCount = resultSet.getInt("sl");
+            }
+            if (tableCount == 1) {
+                PreparedStatement preparedStatement1 = connection.prepareStatement(String.format("drop table %s", tmpTableName));
+                preparedStatement1.execute();
+            }
+
+            for (Utils.UniqueConstraint uniqueConstraint : uniqueConstraints) {
+                PreparedStatement preparedStatement1 = connection.prepareStatement(
+                        String.format("create  table %s as select  %s from %s where 1=2",
+                                tmpTableName,
+                                StringUtils.join(uniqueConstraint.columns, ','),
+                                tableName
+                        ));
+                preparedStatement1.execute();
+                PreparedStatement preparedStatement2 = connection.prepareStatement(String.format(
+                        "CREATE UNIQUE INDEX %s ON %s(%s)",
+                        tmpTableName,
+                        tmpTableName,
+                        StringUtils.join(uniqueConstraint.columns, ',')
+                ));
+                preparedStatement2.execute();
             }
 
         }
-    }
-
-    public boolean getUpsert() {
-        if (this.insertMode.equalsIgnoreCase("increment")) {
-            if (this.getIncrementMode().equalsIgnoreCase("update")) {
-                return true;
-            }
-        }
-        return false;
     }
 }

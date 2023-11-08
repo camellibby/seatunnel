@@ -3,6 +3,8 @@ package com.qh.sink;
 import com.google.auto.service.AutoService;
 import com.qh.config.JdbcSinkConfig;
 import com.qh.config.PreConfig;
+import com.qh.dialect.JdbcDialect;
+import com.qh.dialect.oracle.OracleDialect;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.common.PrepareFailException;
@@ -20,6 +22,7 @@ import java.io.IOException;
 
 
 import java.sql.*;
+import java.time.LocalDateTime;
 
 
 @AutoService(SeaTunnelSink.class)
@@ -30,7 +33,7 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
 
     private JobContext jobContext;
 
-    private boolean upsert;
+    private JdbcSinkConfig jdbcSinkConfig;
 
     @Override
     public void setJobContext(JobContext jobContext) {
@@ -38,9 +41,10 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
         this.jobContext = jobContext;
     }
 
-    public MySink(SeaTunnelRowType seaTunnelRowType, ReadonlyConfig config) {
+    public MySink(SeaTunnelRowType seaTunnelRowType, ReadonlyConfig config, JdbcSinkConfig jdbcSinkConfig) {
         this.seaTunnelRowType = seaTunnelRowType;
         this.config = config;
+        this.jdbcSinkConfig = jdbcSinkConfig;
     }
 
     public MySink() {
@@ -58,8 +62,11 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
         JdbcSinkConfig jdbcSinkConfig = JdbcSinkConfig.of(config);
         PreConfig preConfig = jdbcSinkConfig.getPreConfig();
         try (Connection conn = DriverManager.getConnection(jdbcSinkConfig.getUrl(), jdbcSinkConfig.getUser(), jdbcSinkConfig.getPassWord())) {
-            preConfig.doPreConfig(conn, jdbcSinkConfig.getTable());
-            this.upsert = preConfig.getUpsert();
+            JdbcDialect jdbcDialect = null;
+            if (jdbcSinkConfig.getDbType().equalsIgnoreCase("ORACLE")) {
+                jdbcDialect = new OracleDialect();
+            }
+            preConfig.doPreConfig(conn, jdbcSinkConfig.getTable(), jdbcDialect);
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -82,9 +89,12 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
             JdbcSinkConfig jdbcSinkConfig = JdbcSinkConfig.of(config);
             PreConfig preConfig = jdbcSinkConfig.getPreConfig();
             if (preConfig.getInsertMode().equalsIgnoreCase("complete")) {
-                return new MySinkWriterComplete(seaTunnelRowType, context, config, this.jobContext, this.upsert);
+                return new MySinkWriterComplete(seaTunnelRowType, context, config, this.jobContext);
             } else {
-                return new MySinkWriterIncrement(seaTunnelRowType, context, config, this.jobContext, this.upsert);
+                if (preConfig.getIncrementMode().equalsIgnoreCase("update")) {
+                    return new MySinkWriterUpdate(seaTunnelRowType, context, config, this.jobContext,LocalDateTime.now());
+                }
+                return new MySinkWriterZipper(seaTunnelRowType, context, config, this.jobContext, LocalDateTime.now());
             }
         } catch (SQLException e) {
             throw new RuntimeException(e);

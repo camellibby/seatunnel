@@ -1,7 +1,9 @@
 package com.qh.sink;
 
-import com.mysql.cj.jdbc.Driver;
 import com.qh.config.JdbcSinkConfig;
+import com.qh.converter.ColumnMapper;
+import com.qh.dialect.JdbcDialect;
+import com.qh.dialect.oracle.OracleDialect;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.common.JobContext;
@@ -9,52 +11,67 @@ import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
-import org.stringtemplate.v4.ST;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.params.SetParams;
 
 import java.io.IOException;
 import java.sql.*;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Date;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collectors;
 
+import static com.qh.sink.Utils.*;
+
 
 @Slf4j
 public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void> {
-    private final SeaTunnelRowType seaTunnelRowType;
+    private final SeaTunnelRowType sourceRowType;
     private final Context context;
     private ConcurrentLinkedDeque<SeaTunnelRow> cld = new ConcurrentLinkedDeque<SeaTunnelRow>();
     private LongAdder longAdder = new LongAdder();
-    private final Map<String, Integer> columnNameAndIndex = new HashMap<>();
     private final JdbcSinkConfig jdbcSinkConfig;
-    private boolean upsert = false;
     private JobContext jobContext;
     private volatile boolean stop = false;
 
-    private LocalDateTime startTime;
+    private JdbcDialect jdbcDialect;
 
-    public MySinkWriterComplete(SeaTunnelRowType seaTunnelRowType, Context context, ReadonlyConfig config, JobContext jobContext, boolean upsert) throws SQLException {
+    private LocalDateTime startTime;
+    private Map<String, String> metaDataHash;
+
+    private Connection conn;
+
+    private String table;
+    private List<ColumnMapper> columnMappers = new ArrayList<>();
+
+    private SeaTunnelRowType sinkTableRowType;
+
+    public MySinkWriterComplete(SeaTunnelRowType seaTunnelRowType, Context context, ReadonlyConfig config, JobContext jobContext) throws SQLException {
         this.jobContext = jobContext;
-        this.seaTunnelRowType = seaTunnelRowType;
+        this.sourceRowType = seaTunnelRowType;
         this.context = context;
         this.jdbcSinkConfig = JdbcSinkConfig.of(config);
-        this.upsert = upsert;
+        this.table = this.jdbcSinkConfig.getTable();
         this.startTime = LocalDateTime.now();
-        Map<String, String> fieldMapper = jdbcSinkConfig.getFieldMapper();
-        fieldMapper.forEach((k, v) -> {
-                    for (int i = 0; i < seaTunnelRowType.getFieldNames().length; i++) {
-                        if (seaTunnelRowType.getFieldNames()[i].equalsIgnoreCase(k)) {
-                            this.columnNameAndIndex.put(v, i);
-                        }
-                    }
-                }
-        );
+
+        if (this.jdbcSinkConfig.getDbType().equalsIgnoreCase("ORACLE")) {
+            this.jdbcDialect = new OracleDialect();
+        }
+
+        this.conn = DriverManager.getConnection(this.jdbcSinkConfig.getUrl(), this.jdbcSinkConfig.getUser(), this.jdbcSinkConfig.getPassWord());
+        this.sinkTableRowType = initTableField(conn, this.jdbcDialect, this.jdbcSinkConfig);
+        this.initColumnMappers(this.jdbcSinkConfig, this.sourceRowType, this.sinkTableRowType, conn);
+
+        String sqlQuery = jdbcDialect.getSinkQueryUpdate(this.table, this.columnMappers, 0);
+        PreparedStatement preparedStatementQuery = conn.prepareStatement(sqlQuery);
+        ResultSet resultSet = preparedStatementQuery.executeQuery();
+        ResultSetMetaData metaData = resultSet.getMetaData();
+        Map<String, String> metaDataHash = new HashMap<>();
+        for (int i = 0; i < metaData.getColumnCount(); i++) {
+            metaDataHash.put(metaData.getColumnName(i + 1), metaData.getColumnTypeName(i + 1));
+        }
+        this.metaDataHash = metaDataHash;
+        preparedStatementQuery.close();
 
         Jedis jedis = new Jedis(this.jdbcSinkConfig.getPreConfig().getRedisHost(), this.jdbcSinkConfig.getPreConfig().getRedisPort());
         jedis.auth(this.jdbcSinkConfig.getPreConfig().getRedisPassWord());
@@ -78,9 +95,8 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
 
     public void insertToDb() {
         try (Connection conn = DriverManager.getConnection(this.jdbcSinkConfig.getUrl(), this.jdbcSinkConfig.getUser(), this.jdbcSinkConfig.getPassWord())) {
-            List<String> columns = new ArrayList<>(this.columnNameAndIndex.keySet());
-            String table = this.jdbcSinkConfig.getTable();
-            List<String> values = this.columnNameAndIndex.entrySet().stream().map(x -> "?").collect(Collectors.toList());
+            List<String> columns = this.columnMappers.stream().map(x->x.getSinkColumnName()).collect(Collectors.toList());
+            List<String> values = this.columnMappers.stream().map(x -> "?").collect(Collectors.toList());
             String sqlUpsert = "insert into "
                     + table
                     + String.format("(%s)", StringUtils.join(columns, ","))
@@ -90,24 +106,12 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
             while (!stop || !cld.isEmpty()) {
                 SeaTunnelRow poll = cld.poll();
                 if (poll != null) {
-                    for (int i = 0; i < columns.size(); i++) {
-                        Integer valueIndex = this.columnNameAndIndex.get(columns.get(i));
+                    for (int i = 0; i < this.columnMappers.size(); i++) {
+                        Integer valueIndex =this.columnMappers.get(i).getSourceRowPosition();
                         Object field = poll.getField(valueIndex);
-                        if (field instanceof Date) {
-                            psUpsert.setTimestamp(i + 1, new Timestamp(((Date) field).getTime()));
-                        } else if (field instanceof LocalDate) {
-                            psUpsert.setDate(i + 1, java.sql.Date.valueOf((LocalDate) field));
-                        } else if (field instanceof Integer) {
-                            psUpsert.setInt(i + 1, (Integer) field);
-                        } else if (field instanceof Long) {
-                            psUpsert.setLong(i + 1, (Long) field);
-                        } else if (field instanceof Double) {
-                            psUpsert.setDouble(i + 1, (Double) field);
-                        } else if (field instanceof Float) {
-                            psUpsert.setFloat(i + 1, (Float) field);
-                        } else {
-                            psUpsert.setString(i + 1, (String) field);
-                        }
+                        String column = columns.get(i);
+                        String dbType = metaDataHash.get(column);
+                        jdbcDialect.setPreparedStatementValueByDbType(i + 1, psUpsert, dbType, Object2String(field));
                     }
                     size++;
                     psUpsert.addBatch();
@@ -151,90 +155,50 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
                     jedis.del(redisKey);
                     jedis.del(redisListKey);
                     jedis.disconnect();
-                    insertLog(writeCount, 0L, writeCount, 0L, writeCount, this.jobContext.getJobId());
+                    LocalDateTime endTime = LocalDateTime.now();
+                    insertLog(writeCount, 0L, writeCount, 0L, writeCount, this.jobContext.getJobId(), startTime, endTime);
                 }
             }
         }
-    }
-
-    public void insertLog(Long writeCount, Long modifyCount, Long deleteCount, Long keepCount, Long insertCount, String flinkJobId) {
-        String user = System.getenv("MYSQL_MASTER_USER");
-        String password = System.getenv("MYSQL_MASTER_PWD");
-        String dbHost = System.getenv("MYSQL_MASTER_HOST");
-        String dbPort = System.getenv("MYSQL_MASTER_PORT");
-        String dbName = System.getenv("PANGU_DB");
-        String url = "jdbc:mysql://" + dbHost + ":" + dbPort + "/" + dbName;
-        Properties info = new Properties();
-        info.setProperty("user", user);
-        info.setProperty("password", password);
-        String querySql = "select  count(1) logCount from  seatunnel_jobs_history where flinkJobId=?";
-        try (Connection connection = new Driver().connect(url, info)) {
-            PreparedStatement statement = connection.prepareStatement(querySql);
-            statement.setString(1, this.jobContext.getJobId());
-            ResultSet resultSet = statement.executeQuery();
-            while (resultSet.next()) {
-                int logCount = resultSet.getInt("logCount");
-                if (logCount == 1) {
-                    String updateString = "update seatunnel_jobs_history  " +
-                            "   SET writeCount  = <writeCount>,  " +
-                            "       updateCount = <updateCount>,  " +
-                            "       deleteCount = <deleteCount>,  " +
-                            "       keepCount   = <keepCount>,  " +
-                            "       insertCount = <insertCount>  " +
-                            " WHERE flinkJobId = '<flinkJobId>'";
-                    ST template = new ST(updateString);
-                    template.add("writeCount", writeCount);
-                    template.add("updateCount", modifyCount);
-                    template.add("deleteCount", deleteCount);
-                    template.add("keepCount", keepCount);
-                    template.add("insertCount", insertCount);
-                    template.add("flinkJobId", flinkJobId);
-                    String updateSql = template.render();
-                    PreparedStatement psUpdate = connection.prepareStatement(updateSql);
-                    psUpdate.execute();
-                } else {
-                    LocalDateTime endTime = LocalDateTime.now();
-                    String insertString = "INSERT INTO seatunnel_jobs_history  " +
-                            "  (jobId,  " +
-                            "   flinkJobId,  " +
-                            "   jobStatus,  " +
-                            "   startTime,  " +
-                            "   endTime,  " +
-                            "   writeCount,  " +
-                            "   updateCount,  " +
-                            "   deleteCount,  " +
-                            "   keepCount,  " +
-                            "   insertCount )  " +
-                            "VALUES  " +
-                            "  ('<jobId>',  " +
-                            "   '<flinkJobId>',  " +
-                            "   'FINISHED',  " +
-                            "   '<startTime>',  " +
-                            "   '<endTime>',  " +
-                            "   <writeCount>,  " +
-                            "   <updateCount>,  " +
-                            "   <deleteCount>,  " +
-                            "   <keepCount>,  " +
-                            "   <insertCount>)";
-                    ST template = new ST(insertString);
-                    template.add("jobId", flinkJobId);
-                    template.add("flinkJobId", flinkJobId);
-                    template.add("writeCount", writeCount);
-                    template.add("updateCount", modifyCount);
-                    template.add("deleteCount", deleteCount);
-                    template.add("keepCount", keepCount);
-                    template.add("insertCount", insertCount);
-                    template.add("startTime", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                    template.add("endTime", endTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                    String insertSql = template.render();
-                    PreparedStatement psInsert = connection.prepareStatement(insertSql);
-                    psInsert.execute();
-
-                }
-            }
+        jedis.disconnect();
+        try {
+            conn.close();
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
     }
+
+    private void initColumnMappers(JdbcSinkConfig jdbcSinkConfig, SeaTunnelRowType sourceRowType, SeaTunnelRowType sinkTableRowType, Connection conn) throws SQLException {
+        Map<String, String> fieldMapper = jdbcSinkConfig.getFieldMapper();
+        fieldMapper.forEach((k, v) -> {
+            ColumnMapper columnMapper = new ColumnMapper();
+            columnMapper.setSourceColumnName(k);
+            columnMapper.setSourceRowPosition(sourceRowType.indexOf(k));
+            String typeNameSS = sourceRowType.getFieldType(sourceRowType.indexOf(k)).getTypeClass().getName();
+            columnMapper.setSourceColumnTypeName(typeNameSS);
+
+            columnMapper.setSinkColumnName(v);
+            columnMapper.setSinkRowPosition(sinkTableRowType.indexOf(v));
+            String typeNameSK = sinkTableRowType.getFieldType(sinkTableRowType.indexOf(v)).getTypeClass().getName();
+            columnMapper.setSinkColumnTypeName(typeNameSK);
+            try {
+                PreparedStatement preparedStatementQuery = conn.prepareStatement("select  * from " + table + " where 1=2 ");
+                ResultSet resultSet = preparedStatementQuery.executeQuery();
+                ResultSetMetaData metaData = resultSet.getMetaData();
+                for (int i = 0; i < metaData.getColumnCount(); i++) {
+                    String columnName = metaData.getColumnName(i + 1);
+                    if (v.equalsIgnoreCase(columnName)) {
+                        String columnTypeName = metaData.getColumnTypeName(i + 1);
+                        columnMapper.setSinkColumnDbType(columnTypeName);
+                    }
+                }
+                preparedStatementQuery.close();
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+            columnMappers.add(columnMapper);
+        });
+    }
+
 
 }
