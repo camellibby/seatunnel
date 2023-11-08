@@ -45,7 +45,7 @@ public class PreConfig implements Serializable {
         this.redisDbIndex = Integer.valueOf(redisDbIndex);
     }
 
-    public void doPreConfig(Connection connection, String tableName, JdbcDialect jdbcDialect) throws SQLException {
+    public void doPreConfig(Connection connection, String tableName, String schemaPattern) throws SQLException {
         Jedis jedis = new Jedis(this.redisHost, this.redisPort);
         jedis.auth(this.redisPassWord);
         jedis.select(this.redisDbIndex);
@@ -59,13 +59,17 @@ public class PreConfig implements Serializable {
 
 
         DatabaseMetaData metadata = connection.getMetaData();
-        ResultSet rsColumn = metadata.getColumns(null, null, tableName, null);
+        ResultSet rsColumn = metadata.getColumns(null, schemaPattern, tableName, null);
         List<String> columns = new ArrayList<>();
         while (rsColumn.next()) {
             String name = rsColumn.getString("COLUMN_NAME");
             columns.add(name);
             String type = rsColumn.getString("TYPE_NAME");
             int size = rsColumn.getInt("COLUMN_SIZE");
+        }
+
+        if(columns.isEmpty()){
+            throw new RuntimeException("目标表不存在");
         }
 
         List<Utils.UniqueConstraint> uniqueConstraints = getUniqueConstraints(connection, null, tableName);
