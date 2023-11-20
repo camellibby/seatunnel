@@ -18,17 +18,20 @@
 package com.qh.dialect.mysql;
 
 import com.qh.dialect.JdbcConnectorException;
+import com.qh.dialect.JdbcDialect;
 import com.qh.dialect.JdbcDialectTypeMapper;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.seatunnel.api.table.type.*;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-@Slf4j
+
 public class MySqlTypeMapper implements JdbcDialectTypeMapper {
 
+    private static final Logger LOG = LoggerFactory.getLogger(JdbcDialect.class);
 
     // ============================data types=====================
 
@@ -81,6 +84,7 @@ public class MySqlTypeMapper implements JdbcDialectTypeMapper {
     private static final String MYSQL_GEOMETRY = "GEOMETRY";
 
     @SuppressWarnings("checkstyle:MagicNumber")
+    @Override
     public SeaTunnelDataType<?> mapping(ResultSetMetaData metadata, int colIndex)
             throws SQLException {
         String mysqlType = metadata.getColumnTypeName(colIndex).toUpperCase();
@@ -112,7 +116,7 @@ public class MySqlTypeMapper implements JdbcDialectTypeMapper {
                 return new DecimalType(20, 0);
             case MYSQL_DECIMAL:
                 if (precision > 38) {
-                    log.warn("{} will probably cause value overflow.", MYSQL_DECIMAL);
+                    LOG.warn("{} will probably cause value overflow.", MYSQL_DECIMAL);
                     return new DecimalType(38, 18);
                 }
                 return new DecimalType(precision, scale);
@@ -121,12 +125,12 @@ public class MySqlTypeMapper implements JdbcDialectTypeMapper {
             case MYSQL_FLOAT:
                 return BasicType.FLOAT_TYPE;
             case MYSQL_FLOAT_UNSIGNED:
-                log.warn("{} will probably cause value overflow.", MYSQL_FLOAT_UNSIGNED);
+                LOG.warn("{} will probably cause value overflow.", MYSQL_FLOAT_UNSIGNED);
                 return BasicType.FLOAT_TYPE;
             case MYSQL_DOUBLE:
                 return BasicType.DOUBLE_TYPE;
             case MYSQL_DOUBLE_UNSIGNED:
-                log.warn("{} will probably cause value overflow.", MYSQL_DOUBLE_UNSIGNED);
+                LOG.warn("{} will probably cause value overflow.", MYSQL_DOUBLE_UNSIGNED);
                 return BasicType.DOUBLE_TYPE;
             case MYSQL_CHAR:
             case MYSQL_TINYTEXT:
@@ -136,7 +140,7 @@ public class MySqlTypeMapper implements JdbcDialectTypeMapper {
             case MYSQL_JSON:
                 return BasicType.STRING_TYPE;
             case MYSQL_LONGTEXT:
-                log.warn(
+                LOG.warn(
                         "Type '{}' has a maximum precision of 536870911 in MySQL. "
                                 + "Due to limitations in the seatunnel type system, "
                                 + "the precision will be set to 2147483647.",

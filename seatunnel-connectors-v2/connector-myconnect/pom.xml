@@ -33,6 +33,7 @@
         <mongo.driver.version>4.7.1</mongo.driver.version>
         <sqlserver.version>9.2.1.jre8</sqlserver.version>
         <oracle.version>12.2.0.1</oracle.version>
+        <clickhouse.version>0.3.2-patch11</clickhouse.version>
     </properties>
 
     <dependencies>
@@ -81,13 +82,20 @@
             <version>8.0.27</version>
             <scope>provided</scope>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/org.antlr/stringtemplate -->
-        <!-- https://mvnrepository.com/artifact/org.antlr/ST4 -->
+
+        <dependency>
+            <groupId>com.clickhouse</groupId>
+            <artifactId>clickhouse-jdbc</artifactId>
+            <version>${clickhouse.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.antlr</groupId>
             <artifactId>ST4</artifactId>
             <version>4.3.4</version>
         </dependency>
+
         <dependency>
             <groupId>redis.clients</groupId>
             <artifactId>jedis</artifactId>

@@ -22,6 +22,7 @@ import com.qh.config.JdbcSinkConfig;
 import com.qh.converter.ColumnMapper;
 import com.qh.converter.JdbcRowConverter;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.stringtemplate.v4.ST;
 
 import java.io.Serializable;
@@ -204,8 +205,9 @@ public interface JdbcDialect extends Serializable {
         fieldMapper.forEach((k, v) -> {
             columns.add(v);
         });
-        String sql = String.format("select  %s from %s", StringUtils.join(columns, ","), table);
+        String sql = String.format("select  %s from %s where 1=2 ", StringUtils.join(columns, ","), table);
         PreparedStatement ps = conn.prepareStatement(sql);
+        ps.executeQuery();
         return ps.getMetaData();
     }
 
@@ -234,8 +236,8 @@ public interface JdbcDialect extends Serializable {
             } else {
                 preparedStatement.setString(position, (String) value);
             }
-        }else{
-            preparedStatement.setNull(position,Types.NULL);
+        } else {
+            preparedStatement.setNull(position, Types.NULL);
         }
 
     }
@@ -265,6 +267,7 @@ public interface JdbcDialect extends Serializable {
         }
         return sqlQuery;
     }
+
     default String getSinkQueryZipper(String tableName, List<ColumnMapper> columnMappers, int rowSize) {
         List<ColumnMapper> ucColumns = columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         String sqlQueryString = " select <columns:{sub | <sub.sinkColumnName>}; separator=\", \"> " +
@@ -289,6 +292,96 @@ public interface JdbcDialect extends Serializable {
             sqlQuery = sqlQuery + wheres;
         }
         return sqlQuery;
+    }
+
+    default String copyTableOnlyColumn(String sourceTable, String targetTable, List<String> columns) {
+        return format("create  table %s as select  %s from %s where 1=2 ",
+                targetTable,
+                StringUtils.join(columns, ','),
+                sourceTable
+        );
+    }
+
+    default void updateData(Connection connection,
+                            String table,
+                            List<ColumnMapper> columnMappers,
+                            List<ColumnMapper> listUc,
+                            HashMap<List<String>, SeaTunnelRow> rows,
+                            Map<String, String> metaDataHash
+
+    ) throws SQLException {
+        String templateInsert = "update <table> set " +
+                "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> " +
+                " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
+        ST template = new ST(templateInsert);
+        template.add("table", table);
+        template.add("columns", columnMappers);
+        template.add("pks", listUc);
+        String updateSql = template.render();
+        PreparedStatement preparedStatement = connection.prepareStatement(updateSql);
+        for (SeaTunnelRow row : rows.values()) {
+            for (int i = 0; i < columnMappers.size(); i++) {
+                String column = columnMappers.get(i).getSinkColumnName();
+                String dbType = metaDataHash.get(column);
+                this.setPreparedStatementValueByDbType(
+                        i + 1,
+                        preparedStatement,
+                        dbType,
+                        (String) row.getField(columnMappers.get(i).getSinkRowPosition()));
+            }
+            for (int i = 0; i < listUc.size(); i++) {
+                String column = listUc.get(i).getSinkColumnName();
+                String dbType = metaDataHash.get(column);
+                this.setPreparedStatementValueByDbType(
+                        i + 1 + columnMappers.size(),
+                        preparedStatement,
+                        dbType,
+                        (String) row.getField(listUc.get(i).getSinkRowPosition()));
+            }
+            preparedStatement.addBatch();
+        }
+        preparedStatement.executeBatch();
+        preparedStatement.close();
+    }
+
+    default int deleteData(Connection connection, String table, String ucTable, List<ColumnMapper> ucColumns) {
+        String delSql = "delete from  <table> a   " +
+                " where not exists " +
+                "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> b where <pks:{pk | a.<pk.sinkColumnName>=b.<pk.sinkColumnName> }; separator=\" and \">  ) ";
+        ST template = new ST(delSql);
+        template.add("table", table);
+        template.add("tmpTable", ucTable);
+        template.add("pks", ucColumns);
+        PreparedStatement preparedStatement = null;
+        int del = 0;
+        try {
+            preparedStatement = connection.prepareStatement(template.render());
+            del = preparedStatement.executeUpdate();
+            preparedStatement.close();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        return del;
+    }
+
+    default int deleteDataZipper(Connection connection, String table, String ucTable, List<ColumnMapper> columnMappers, LocalDateTime startTime) {
+        return 0;
+    }
+
+
+    default Long getTableCount(Connection connection, String table) {
+        long count = 0L;
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement(format("select  count(1) sl  from %s", table));
+            ResultSet resultSet = preparedStatement.executeQuery();
+            if (resultSet.next()) {
+                count = resultSet.getLong("sl");
+                preparedStatement.close();
+            }
+            return count;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }

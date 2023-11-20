@@ -4,7 +4,7 @@ import com.google.auto.service.AutoService;
 import com.qh.config.JdbcSinkConfig;
 import com.qh.config.PreConfig;
 import com.qh.dialect.JdbcDialect;
-import com.qh.dialect.oracle.OracleDialect;
+import com.qh.dialect.JdbcDialectFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.common.PrepareFailException;
@@ -35,6 +35,8 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
 
     private JdbcSinkConfig jdbcSinkConfig;
 
+    private Long tableCount;
+
     @Override
     public void setJobContext(JobContext jobContext) {
         super.setJobContext(jobContext);
@@ -62,11 +64,9 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
         JdbcSinkConfig jdbcSinkConfig = JdbcSinkConfig.of(config);
         PreConfig preConfig = jdbcSinkConfig.getPreConfig();
         try (Connection conn = DriverManager.getConnection(jdbcSinkConfig.getUrl(), jdbcSinkConfig.getUser(), jdbcSinkConfig.getPassWord())) {
-            JdbcDialect jdbcDialect = null;
-            if (jdbcSinkConfig.getDbType().equalsIgnoreCase("ORACLE")) {
-                jdbcDialect = new OracleDialect();
-            }
-            preConfig.doPreConfig(conn, jdbcSinkConfig.getTable(), jdbcSinkConfig.getUser().toUpperCase());
+            JdbcDialect jdbcDialect = JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType());
+            this.tableCount = jdbcDialect.getTableCount(conn, jdbcSinkConfig.getTable());
+            preConfig.doPreConfig(conn, jdbcSinkConfig);
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -89,10 +89,10 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
             JdbcSinkConfig jdbcSinkConfig = JdbcSinkConfig.of(config);
             PreConfig preConfig = jdbcSinkConfig.getPreConfig();
             if (preConfig.getInsertMode().equalsIgnoreCase("complete")) {
-                return new MySinkWriterComplete(seaTunnelRowType, context, config, this.jobContext);
+                return new MySinkWriterComplete(seaTunnelRowType, context, config, this.jobContext, this.tableCount);
             } else {
                 if (preConfig.getIncrementMode().equalsIgnoreCase("update")) {
-                    return new MySinkWriterUpdate(seaTunnelRowType, context, config, this.jobContext,LocalDateTime.now());
+                    return new MySinkWriterUpdate(seaTunnelRowType, context, config, this.jobContext, LocalDateTime.now());
                 }
                 return new MySinkWriterZipper(seaTunnelRowType, context, config, this.jobContext, LocalDateTime.now());
             }

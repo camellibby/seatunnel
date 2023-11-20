@@ -4,8 +4,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qh.config.JdbcSinkConfig;
+import com.qh.config.Util;
 import com.qh.converter.ColumnMapper;
+import com.qh.dialect.JdbcConnectorErrorCode;
+import com.qh.dialect.JdbcConnectorException;
 import com.qh.dialect.JdbcDialect;
+import com.qh.dialect.JdbcDialectFactory;
 import com.qh.dialect.oracle.OracleDialect;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -28,14 +32,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collectors;
 
-import static com.qh.sink.Utils.*;
-
 
 @Slf4j
 public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     private final SeaTunnelRowType sourceRowType;
     private SeaTunnelRowType sinkTableRowType;
-    private ConcurrentLinkedDeque<SeaTunnelRow> cld = new ConcurrentLinkedDeque<SeaTunnelRow>();
+    private List<SeaTunnelRow> cld = new ArrayList<>();
     private LongAdder writeCount = new LongAdder();
     private LongAdder keepCount = new LongAdder();
     private LongAdder updateCount = new LongAdder();
@@ -45,9 +47,8 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     private final JdbcSinkConfig jdbcSinkConfig;
     private JobContext jobContext;
-    private volatile boolean stop = false;
     private LocalDateTime startTime;
-    private int batchSize = 1000;
+    private int batchSize = 2000;
     private JdbcDialect jdbcDialect;
     private String table;
     private String tmpTable;
@@ -57,7 +58,9 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     private Connection conn;
 
     private List<ColumnMapper> columnMappers = new ArrayList<>();
-    private final List<String> zipperColumns = Arrays.asList("ZIPPERFLAG", "ZIPPERSTARTTIME", "ZIPPERENDTIME");
+    private final List<String> zipperColumns = Arrays.asList("operateFlag", "operateTime");
+
+    private final Util util = new Util();
 
     public MySinkWriterZipper(SeaTunnelRowType seaTunnelRowType,
                               Context context,
@@ -70,11 +73,9 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         this.startTime = startTime;
         this.table = this.jdbcSinkConfig.getTable();
         this.tmpTable = "UC_" + this.jdbcSinkConfig.getTable();
-        if (this.jdbcSinkConfig.getDbType().equalsIgnoreCase("ORACLE")) {
-            this.jdbcDialect = new OracleDialect();
-        }
-        this.conn = DriverManager.getConnection(this.jdbcSinkConfig.getUrl(), this.jdbcSinkConfig.getUser(), this.jdbcSinkConfig.getPassWord());
-        this.sinkTableRowType = initTableField(conn, this.jdbcDialect, this.jdbcSinkConfig);
+        this.jdbcDialect = JdbcDialectFactory.getJdbcDialect(this.jdbcSinkConfig.getDbType());
+        this.conn = util.getConnection(this.jdbcSinkConfig);
+        this.sinkTableRowType = util.initTableField(conn, this.jdbcDialect, this.jdbcSinkConfig);
         this.initColumnMappers(this.jdbcSinkConfig, this.sourceRowType, this.sinkTableRowType, conn);
 
         String sqlQuery = jdbcDialect.getSinkQueryZipper(this.table, this.columnMappers, 0);
@@ -88,7 +89,6 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         this.metaDataHash = metaDataHash;
         preparedStatementQuery.close();
 
-
         String redisKey = String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable());
         Jedis jedis = new Jedis(this.jdbcSinkConfig.getPreConfig().getRedisHost(), this.jdbcSinkConfig.getPreConfig().getRedisPort());
         jedis.auth(this.jdbcSinkConfig.getPreConfig().getRedisPassWord());
@@ -96,51 +96,31 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         jedis.incr(redisKey);
         jedis.disconnect();
 
-        new Thread(this::consumeData).start();
 
     }
 
     private void consumeData() {
-        int size = 0;
-        List<SeaTunnelRow> oldRows = new ArrayList<>();
         HashMap<List<String>, SeaTunnelRow> sourceRows = new HashMap<>();
         List<ColumnMapper> ucColumns = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
-        while (!stop || !cld.isEmpty()) {
-            SeaTunnelRow poll = cld.poll();
-            if (poll != null) {
-                oldRows.add(poll);
+        for (SeaTunnelRow seaTunnelRow : cld) {
+            if (seaTunnelRow != null) {
                 SeaTunnelRow newRow = new SeaTunnelRow(columnMappers.size());
                 for (int i = 0; i < this.columnMappers.size(); i++) {
-                    Object field = poll.getField(this.columnMappers.get(i).getSourceRowPosition());
-                    newRow.setField(i, Object2String(field));
+                    Object field = seaTunnelRow.getField(this.columnMappers.get(i).getSourceRowPosition());
+                    newRow.setField(i, util.Object2String(field));
                 }
                 List<String> keys = new ArrayList<>();
                 ucColumns.forEach(x -> {
-                    Object field = poll.getField(x.getSourceRowPosition());
-                    keys.add(Object2String(field));
+                    Object field = seaTunnelRow.getField(x.getSourceRowPosition());
+                    keys.add(util.Object2String(field));
                 });
                 sourceRows.put(keys, newRow);
-                size++;
             }
-            if (size == batchSize) {
-                try {
-                    insertTmpUks(oldRows, this.metaDataHash, conn);
-                    compareData(sourceRows);
-                    oldRows.clear();
-                    sourceRows.clear();
-                    size = 0;
-                } catch (SQLException e) {
-                    throw new RuntimeException(e);
-                }
-            }
+
         }
         try {
-            insertTmpUks(oldRows, this.metaDataHash, conn);
+            insertTmpUks(this.cld, this.metaDataHash, conn);
             compareData(sourceRows);
-            oldRows.clear();
-            sourceRows.clear();
-            statisticalResults(conn);
-            conn.close();
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -172,7 +152,6 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     private void initColumnMappers(JdbcSinkConfig jdbcSinkConfig, SeaTunnelRowType sourceRowType, SeaTunnelRowType sinkTableRowType, Connection conn) throws SQLException {
         Map<String, String> fieldMapper = jdbcSinkConfig.getFieldMapper();
-        List<UniqueConstraint> uniqueConstraints = getUniqueConstraints(conn, null, this.table);
         fieldMapper.forEach((k, v) -> {
             ColumnMapper columnMapper = new ColumnMapper();
             columnMapper.setSourceColumnName(k);
@@ -185,8 +164,8 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             String typeNameSK = sinkTableRowType.getFieldType(sinkTableRowType.indexOf(v)).getTypeClass().getName();
             columnMapper.setSinkColumnTypeName(typeNameSK);
 
-            for (UniqueConstraint uniqueConstraint : uniqueConstraints) {
-                if (uniqueConstraint.columns.containsAll(zipperColumns) && uniqueConstraint.columns.contains(v)) {
+            for (String primaryKey : jdbcSinkConfig.getPrimaryKeys()) {
+                if (primaryKey.equalsIgnoreCase(v)) {
                     columnMapper.setUc(true);
                 }
             }
@@ -212,7 +191,11 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     @Override
     public void write(SeaTunnelRow element) throws IOException {
         this.writeCount.increment();
-        cld.add(element);
+        this.cld.add(element);
+        if (this.writeCount.longValue() % batchSize == 0) {
+            this.consumeData();
+            cld.clear();
+        }
     }
 
     private void doInsert(List<SeaTunnelRow> rows, Map<String, String> metaDataHash, Connection connection) throws SQLException {
@@ -220,9 +203,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         for (ColumnMapper column : columnMappers) {
             newColumns.add(column.getSinkColumnName());
         }
-        newColumns.add("ZIPPERFLAG");
-        newColumns.add("ZIPPERSTARTTIME");
-        newColumns.add("ZIPPERENDTIME");
+        newColumns.addAll(this.zipperColumns);
         String templateInsert = "INSERT INTO <table> " +
                 "(<columns:{sub | <sub>}; separator=\", \">) " +
                 "values(  <columns:{sub | ?}; separator=\", \"> ) ";
@@ -237,9 +218,8 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                 String dbType = metaDataHash.get(column);
                 jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, (String) row.getField(i));
             }
-            jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 1, preparedStatement, "VARCHAR2", "N");
-            jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 2, preparedStatement, "VARCHAR2", "1970-01-01 00:00:00");
-            jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 3, preparedStatement, "VARCHAR2", "9999-12-31 23:59:59");
+            jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 1, preparedStatement, "VARCHAR2", "I");
+            jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 2, preparedStatement, "VARCHAR2", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             preparedStatement.addBatch();
         }
         preparedStatement.executeBatch();
@@ -248,46 +228,11 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     private void doUpdate(HashMap<List<String>, SeaTunnelRow> rows, Map<String, String> metaDataHash, Connection connection) throws SQLException {
         List<ColumnMapper> listUc = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
-        String update = "update <table> " +
-                "   set ZIPPERFLAG = 'D', ZIPPERENDTIME = ?" +
-                " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> and ZIPPERFLAG='N' and ZIPPERENDTIME='9999-12-31 23:59:59' ";
-        ST tmpst = new ST(update);
-        tmpst.add("table", table);
-        tmpst.add("pks", listUc);
-        String render = tmpst.render();
-        PreparedStatement preparedStatement1 = conn.prepareStatement(render);
-        rows.forEach((k, v) -> {
-            try {
-                preparedStatement1.setString(1, startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-            for (int i = 0; i < listUc.size(); i++) {
-                String sinkColumnName = listUc.get(i).getSinkColumnName();
-                String dbType = metaDataHash.get(sinkColumnName);
-                try {
-                    jdbcDialect.setPreparedStatementValueByDbType(i + 2, preparedStatement1, dbType, k.get(i));
-                } catch (SQLException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            try {
-                preparedStatement1.addBatch();
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        });
-        preparedStatement1.executeBatch();
-        preparedStatement1.close();
-
-
         List<String> newColumns = new ArrayList<>();
         for (ColumnMapper column : columnMappers) {
             newColumns.add(column.getSinkColumnName());
         }
-        newColumns.add("ZIPPERFLAG");
-        newColumns.add("ZIPPERSTARTTIME");
-        newColumns.add("ZIPPERENDTIME");
+        newColumns.addAll(this.zipperColumns);
         String templateInsert = "INSERT INTO <table> " +
                 "(<columns:{sub | <sub>}; separator=\", \">) " +
                 "values(  <columns:{sub | ?}; separator=\", \"> ) ";
@@ -302,9 +247,8 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                 String dbType = metaDataHash.get(column);
                 jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, (String) row.getField(i));
             }
-            jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 1, preparedStatement, "VARCHAR2", "N");
+            jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 1, preparedStatement, "VARCHAR2", "U");
             jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 2, preparedStatement, "VARCHAR2", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-            jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 3, preparedStatement, "VARCHAR2", "9999-12-31 23:59:59");
             preparedStatement.addBatch();
         }
         preparedStatement.executeBatch();
@@ -323,7 +267,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         for (SeaTunnelRow oldRow : oldRows) {
             for (int i = 0; i < ucColumns.size(); i++) {
                 String dbType = metaDataHash.get(ucColumns.get(i).getSinkColumnName());
-                jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, Object2String(oldRow.getField(ucColumns.get(i).getSourceRowPosition())));
+                jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, util.Object2String(oldRow.getField(ucColumns.get(i).getSourceRowPosition())));
             }
             preparedStatement.addBatch();
         }
@@ -352,16 +296,16 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             });
             ResultSet resultSet = preparedStatementQuery.executeQuery();
             while (resultSet.next()) {
-                SeaTunnelRow internal = toInternal(resultSet, this.sinkTableRowType);
+                SeaTunnelRow internal = util.toInternal(resultSet, this.sinkTableRowType);
                 SeaTunnelRow newRow = new SeaTunnelRow(columnMappers.size());
                 for (int i = 0; i < this.columnMappers.size(); i++) {
                     Object field = internal.getField(columnMappers.get(i).getSinkRowPosition());
-                    newRow.setField(i, Object2String(field));
+                    newRow.setField(i, util.Object2String(field));
                 }
                 List<String> keys = new ArrayList<>();
                 ucColumns.forEach((x -> {
                     Object field = internal.getField(x.getSinkRowPosition());
-                    keys.add(Object2String(field));
+                    keys.add(util.Object2String(field));
                 }));
                 sinkRows.put(keys, newRow);
             }
@@ -372,7 +316,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         }
     }
 
-    private void statisticalResults(Connection conn) throws SQLException {
+    private void statisticalResults(Connection conn) throws Exception {
         String redisKey = String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable());
         Jedis jedis = new Jedis(this.jdbcSinkConfig.getPreConfig().getRedisHost(), this.jdbcSinkConfig.getPreConfig().getRedisPort());
         jedis.auth(this.jdbcSinkConfig.getPreConfig().getRedisPassWord());
@@ -411,24 +355,10 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                             throw new RuntimeException(e);
                         }
                     }
-
-                    List<ColumnMapper> ucColumns = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
-                    String delSql = "update <table> a  set ZIPPERFLAG='D' ,ZIPPERENDTIME = ? " +
-                            " where not exists " +
-                            "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> b where <pks:{pk | a.<pk.sinkColumnName>=b.<pk.sinkColumnName> }; separator=\" and \">  ) " +
-                            "   and zipperflag = 'N'";
-                    ST template = new ST(delSql);
-                    template.add("table", table);
-                    template.add("tmpTable", tmpTable);
-                    template.add("pks", ucColumns);
-                    String render = template.render();
-                    PreparedStatement preparedStatement = conn.prepareStatement(render);
-                    preparedStatement.setString(1, startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                    int del = preparedStatement.executeUpdate();
-                    preparedStatement.close();
+                    int del = this.jdbcDialect.deleteDataZipper(conn, this.table, this.tmpTable, this.columnMappers, this.startTime);
                     deleteCount.add(del);
                     LocalDateTime endTime = LocalDateTime.now();
-                    insertLog(writeCount.longValue(),
+                    util.insertLog(writeCount.longValue(),
                             updateCount.longValue(),
                             deleteCount.longValue(),
                             keepCount.longValue(),
@@ -450,7 +380,13 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     @Override
     public void close() {
-        this.stop = true;
+        try {
+            this.consumeData();
+            statisticalResults(conn);
+            this.conn.close();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
 

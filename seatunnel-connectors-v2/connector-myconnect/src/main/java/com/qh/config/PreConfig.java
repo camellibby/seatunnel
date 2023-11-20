@@ -1,21 +1,16 @@
 package com.qh.config;
 
-import com.qh.converter.ColumnMapper;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.qh.dialect.JdbcDialect;
-import com.qh.dialect.oracle.OracleDialect;
-import com.qh.sink.Utils;
+import com.qh.dialect.JdbcDialectFactory;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.configuration.util.OptionMark;
 import redis.clients.jedis.Jedis;
-import scala.Predef;
 
 import java.io.Serializable;
 import java.sql.*;
 import java.util.*;
-
-import static com.qh.sink.Utils.getUniqueConstraints;
-
 
 @Data
 public class PreConfig implements Serializable {
@@ -26,11 +21,16 @@ public class PreConfig implements Serializable {
     private boolean cleanTableWhenComplete;
     @OptionMark(description = "增量模式 update或者zipper模式 ")
     private String incrementMode;
-    private static final List<String> zipperColumns = Arrays.asList("ZIPPERFLAG", "ZIPPERSTARTTIME", "ZIPPERENDTIME");
 
+    @JsonIgnore
+    private static final List<String> zipperColumns = Arrays.asList("operateFlag", "operateTime");
+    @JsonIgnore
     private String redisHost;
+    @JsonIgnore
     private Integer redisPort;
+    @JsonIgnore
     private String redisPassWord;
+    @JsonIgnore
     private Integer redisDbIndex;
 
 
@@ -45,10 +45,15 @@ public class PreConfig implements Serializable {
         this.redisDbIndex = Integer.valueOf(redisDbIndex);
     }
 
-    public void doPreConfig(Connection connection, String tableName, String schemaPattern) throws SQLException {
+    public void doPreConfig(Connection connection, JdbcSinkConfig jdbcSinkConfig) throws SQLException {
         Jedis jedis = new Jedis(this.redisHost, this.redisPort);
         jedis.auth(this.redisPassWord);
         jedis.select(this.redisDbIndex);
+
+        String tableName = jdbcSinkConfig.getTable();
+        String schemaPattern = jdbcSinkConfig.getDbType().equalsIgnoreCase("oracle") ?
+                jdbcSinkConfig.getDatabase().toUpperCase() :
+                jdbcSinkConfig.getDatabase();
         String values = jedis.get(String.format("seatunnel:job:sink:%s", tableName));
         if (null != values) {
             jedis.disconnect();
@@ -64,71 +69,49 @@ public class PreConfig implements Serializable {
         while (rsColumn.next()) {
             String name = rsColumn.getString("COLUMN_NAME");
             columns.add(name);
-            String type = rsColumn.getString("TYPE_NAME");
-            int size = rsColumn.getInt("COLUMN_SIZE");
         }
 
-        if(columns.isEmpty()){
+        if (columns.isEmpty()) {
             throw new RuntimeException("目标表不存在");
         }
-
-        List<Utils.UniqueConstraint> uniqueConstraints = getUniqueConstraints(connection, null, tableName);
 
 
         if (this.insertMode.equalsIgnoreCase("complete")) {
             if (this.cleanTableWhenComplete) {
                 Statement st = connection.createStatement();
                 st.execute(String.format("truncate  table %s", tableName));
+                st.close();
             }
         }
 
         if (this.insertMode.equalsIgnoreCase("increment")) {
-            if (this.incrementMode.equalsIgnoreCase("update")) {
-                if (uniqueConstraints.isEmpty()) {
-                    throw new RuntimeException(String.format("增量更新模式下,目标表(%s)必须包含唯一索引", tableName));
-                }
+            if (null == jdbcSinkConfig.getPrimaryKeys() || jdbcSinkConfig.getPrimaryKeys().isEmpty()) {
+                throw new RuntimeException(String.format("增量更新模式下,未标示逻辑主键", tableName));
             }
 
-            if (this.incrementMode.equalsIgnoreCase("zipper")) {
-                if (!uniqueConstraints.isEmpty()) {
-                    uniqueConstraints.forEach(x -> {
-                        if (!new HashSet<>(x.columns).containsAll(zipperColumns) || (x.columns.size() <= 3)) {
-                            throw new RuntimeException(String.format("增量拉链模式下,目标表(%s)必须包含唯一索引,且唯一索引必须包含 ZIPPERFLAG,ZIPPERSTARTTIME,ZIPPERENDTIME ", tableName));
-                        }
-                    });
-                } else {
-                    throw new RuntimeException(String.format("增量拉链模式下,目标表(%s)必须包含唯一索引,且唯一索引必须包含 ZIPPERFLAG,ZIPPERSTARTTIME,ZIPPERENDTIME ", tableName));
-                }
-            }
 
-            int tableCount = 0;
             String tmpTableName = "UC_" + tableName;
-            String countTable = String.format("select count(1) sl from user_tables a where a.TABLE_NAME='%s'", tmpTableName);
-            PreparedStatement preparedStatement = connection.prepareStatement(countTable);
-            ResultSet resultSet = preparedStatement.executeQuery();
-            while (resultSet.next()) {
-                tableCount = resultSet.getInt("sl");
-            }
-            if (tableCount == 1) {
-                PreparedStatement preparedStatement1 = connection.prepareStatement(String.format("drop table %s", tmpTableName));
-                preparedStatement1.execute();
+            try {
+                PreparedStatement drop = connection.prepareStatement(String.format("drop table  %s", tmpTableName));
+                drop.execute();
+                drop.close();
+            } catch (SQLException e) {
+                System.out.println("删除报错意味着没有表");
             }
 
-            for (Utils.UniqueConstraint uniqueConstraint : uniqueConstraints) {
-                PreparedStatement preparedStatement1 = connection.prepareStatement(
-                        String.format("create  table %s as select  %s from %s where 1=2",
-                                tmpTableName,
-                                StringUtils.join(uniqueConstraint.columns, ','),
-                                tableName
-                        ));
-                preparedStatement1.execute();
+            String copyTableOnlyColumnSql = JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).copyTableOnlyColumn(tableName, tmpTableName, jdbcSinkConfig.getPrimaryKeys());
+            PreparedStatement preparedStatement1 = connection.prepareStatement(copyTableOnlyColumnSql);
+            preparedStatement1.execute();
+            preparedStatement1.close();
+            if (!jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
                 PreparedStatement preparedStatement2 = connection.prepareStatement(String.format(
                         "CREATE UNIQUE INDEX %s ON %s(%s)",
                         tmpTableName,
                         tmpTableName,
-                        StringUtils.join(uniqueConstraint.columns, ',')
+                        StringUtils.join(jdbcSinkConfig.getPrimaryKeys(), ',')
                 ));
                 preparedStatement2.execute();
+                preparedStatement2.close();
             }
 
         }

@@ -43,6 +43,7 @@ public class JdbcSinkConfig implements Serializable {
     private PreConfig preConfig;
     private String dbType;
     private Map<String, String> fieldMapper;
+    private String driver;
 
 
     public static JdbcSinkConfig of(ReadonlyConfig config) {
@@ -50,6 +51,7 @@ public class JdbcSinkConfig implements Serializable {
         builder.jdbcConnectionConfig(JdbcConnectionConfig.of(config));
         builder.isExactlyOnce(config.get(JdbcOptions.IS_EXACTLY_ONCE));
         builder.user(config.get(JdbcOptions.USER));
+        builder.driver(config.get(JdbcOptions.DRIVER));
         builder.passWord(config.get(JdbcOptions.PASSWORD));
         builder.url(config.get(JdbcOptions.URL));
         config.getOptional(JdbcOptions.PRIMARY_KEYS).ifPresent(builder::primaryKeys);
