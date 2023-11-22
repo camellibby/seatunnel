@@ -52,7 +52,7 @@ public class PreConfig implements Serializable {
 
         String tableName = jdbcSinkConfig.getTable();
         String schemaPattern = jdbcSinkConfig.getDbType().equalsIgnoreCase("oracle") ?
-                jdbcSinkConfig.getDatabase().toUpperCase() :
+                jdbcSinkConfig.getUser().toUpperCase() :
                 jdbcSinkConfig.getDatabase();
         String values = jedis.get(String.format("seatunnel:job:sink:%s", tableName));
         if (null != values) {

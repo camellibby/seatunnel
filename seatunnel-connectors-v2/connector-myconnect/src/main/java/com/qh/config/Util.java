@@ -124,7 +124,7 @@ public class Util {
             } else if (value instanceof Long) {
                 return Long.toString((Long) value);
             } else if (value instanceof BigDecimal) {
-                return value.toString();
+                return ((BigDecimal) value).stripTrailingZeros().toPlainString();
             } else if (value instanceof LocalDate) {
                 DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd");
                 return ((LocalDate) value).format(df);

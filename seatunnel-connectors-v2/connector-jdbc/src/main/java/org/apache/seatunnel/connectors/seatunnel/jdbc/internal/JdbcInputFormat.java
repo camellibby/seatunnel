@@ -21,6 +21,7 @@ package org.apache.seatunnel.connectors.seatunnel.jdbc.internal;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcSourceConfig;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorException;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.connection.JdbcConnectionProvider;
@@ -30,6 +31,7 @@ import org.apache.seatunnel.connectors.seatunnel.jdbc.source.JdbcSourceSplit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Predef;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -42,6 +44,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * InputFormat to read data from a database and generate Rows. The InputFormat has to be configured
@@ -68,13 +72,18 @@ public class JdbcInputFormat implements Serializable {
 
     protected JdbcDialect jdbcDialect;
 
+
+    private JdbcSourceConfig jdbcSourceConfig;
+
     public JdbcInputFormat(
             JdbcConnectionProvider connectionProvider,
             JdbcDialect jdbcDialect,
             SeaTunnelRowType typeInfo,
             String queryTemplate,
             int fetchSize,
-            Boolean autoCommit) {
+            Boolean autoCommit,
+            JdbcSourceConfig jdbcSourceConfig
+    ) {
         this.connectionProvider = connectionProvider;
         this.jdbcRowConverter = jdbcDialect.getRowConverter();
         this.typeInfo = typeInfo;
@@ -82,6 +91,7 @@ public class JdbcInputFormat implements Serializable {
         this.fetchSize = fetchSize;
         this.autoCommit = autoCommit;
         this.jdbcDialect = jdbcDialect;
+        this.jdbcSourceConfig = jdbcSourceConfig;
     }
 
     public void openInputFormat() {
@@ -128,7 +138,7 @@ public class JdbcInputFormat implements Serializable {
      * Connects to the source database and executes the query
      *
      * @param inputSplit which is ignored if this InputFormat is executed as a non-parallel source,
-     *     a "hook" to the query parameters otherwise (using its <i>parameterId</i>)
+     *                   a "hook" to the query parameters otherwise (using its <i>parameterId</i>)
      * @throws IOException if there's an error during the execution of the query
      */
     public void open(JdbcSourceSplit inputSplit) throws IOException {
@@ -137,45 +147,137 @@ public class JdbcInputFormat implements Serializable {
                 openInputFormat();
             }
             Object[] parameterValues = inputSplit.getParameterValues();
-            if (parameterValues != null) {
-                for (int i = 0; i < parameterValues.length; i++) {
-                    Object param = parameterValues[i];
-                    if (param instanceof String) {
-                        statement.setString(i + 1, (String) param);
-                    } else if (param instanceof Long) {
-                        statement.setLong(i + 1, (Long) param);
-                    } else if (param instanceof Integer) {
-                        statement.setInt(i + 1, (Integer) param);
-                    } else if (param instanceof Double) {
-                        statement.setDouble(i + 1, (Double) param);
-                    } else if (param instanceof Boolean) {
-                        statement.setBoolean(i + 1, (Boolean) param);
-                    } else if (param instanceof Float) {
-                        statement.setFloat(i + 1, (Float) param);
-                    } else if (param instanceof BigDecimal) {
-                        statement.setBigDecimal(i + 1, (BigDecimal) param);
-                    } else if (param instanceof Byte) {
-                        statement.setByte(i + 1, (Byte) param);
-                    } else if (param instanceof Short) {
-                        statement.setShort(i + 1, (Short) param);
-                    } else if (param instanceof Date) {
-                        statement.setDate(i + 1, (Date) param);
-                    } else if (param instanceof Time) {
-                        statement.setTime(i + 1, (Time) param);
-                    } else if (param instanceof Timestamp) {
-                        statement.setTimestamp(i + 1, (Timestamp) param);
-                    } else if (param instanceof Array) {
-                        statement.setArray(i + 1, (Array) param);
-                    } else {
-                        // extends with other types if needed
-                        throw new JdbcConnectorException(
-                                CommonErrorCode.UNSUPPORTED_DATA_TYPE,
-                                "open() failed. Parameter "
-                                        + i
-                                        + " of type "
-                                        + param.getClass()
-                                        + " is not handled (yet).");
+            List<Object> parameterValuesNew = new ArrayList<>();
+            try {
+                Connection dbConn = connectionProvider.getOrEstablishConnection();
+                if (parameterValues != null) {
+                    ResultSet splitValue = this.jdbcDialect.getSplitValue(dbConn, this.jdbcSourceConfig, parameterValues);
+                    while (splitValue.next()) {
+                        Object object = splitValue.getObject(1);
+                        parameterValuesNew.add(object);
                     }
+                    if (parameterValuesNew.size() == 1) {
+                        parameterValuesNew.add(parameterValuesNew.get(0));
+                    }
+                }
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+            if (!parameterValuesNew.isEmpty()) {
+                if (parameterValuesNew.get(0) == null && parameterValuesNew.get(1) == null) {
+                    try {
+                        Connection dbConn = connectionProvider.getOrEstablishConnection();
+                        this.queryTemplate = String.format("select  * from  (%s) a where %s is null ",
+                                this.jdbcSourceConfig.getQuery(),
+                                this.jdbcSourceConfig.getPartitionColumn().get()
+                        );
+                        this.statement = jdbcDialect.creatPreparedStatement(dbConn, queryTemplate, fetchSize);
+                    } catch (ClassNotFoundException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                if (parameterValuesNew.get(0) != null && parameterValuesNew.get(1) == null) {
+                    try {
+                        Connection dbConn = connectionProvider.getOrEstablishConnection();
+                        this.queryTemplate = String.format("select  * from  (%s) a where %s>=? or  %s is null ",
+                                this.jdbcSourceConfig.getQuery(),
+                                this.jdbcSourceConfig.getPartitionColumn().get(),
+                                this.jdbcSourceConfig.getPartitionColumn().get()
+                        );
+                        this.statement = jdbcDialect.creatPreparedStatement(dbConn, queryTemplate, fetchSize);
+                        Object param = parameterValuesNew.get(0);
+                        if (param instanceof String) {
+                            statement.setString(1, (String) param);
+                        } else if (param instanceof Long) {
+                            statement.setLong(1, (Long) param);
+                        } else if (param instanceof Integer) {
+                            statement.setInt(1, (Integer) param);
+                        } else if (param instanceof Double) {
+                            statement.setDouble(1, (Double) param);
+                        } else if (param instanceof Boolean) {
+                            statement.setBoolean(1, (Boolean) param);
+                        } else if (param instanceof Float) {
+                            statement.setFloat(1, (Float) param);
+                        } else if (param instanceof BigDecimal) {
+                            statement.setBigDecimal(1, (BigDecimal) param);
+                        } else if (param instanceof Byte) {
+                            statement.setByte(1, (Byte) param);
+                        } else if (param instanceof Short) {
+                            statement.setShort(1, (Short) param);
+                        } else if (param instanceof Date) {
+                            statement.setDate(1, (Date) param);
+                        } else if (param instanceof Time) {
+                            statement.setTime(1, (Time) param);
+                        } else if (param instanceof Timestamp) {
+                            statement.setTimestamp(1, (Timestamp) param);
+                        } else if (param instanceof Array) {
+                            statement.setArray(1, (Array) param);
+                        } else {
+                            // extends with other types if needed
+                            throw new JdbcConnectorException(
+                                    CommonErrorCode.UNSUPPORTED_DATA_TYPE,
+                                    "open() failed. Parameter "
+                                            + 0
+                                            + " of type "
+                                            + param.getClass()
+                                            + " is not handled (yet).");
+                        }
+                    } catch (ClassNotFoundException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                if (parameterValuesNew.get(0) != null && parameterValuesNew.get(1) != null) {
+                    try {
+                        Connection dbConn = connectionProvider.getOrEstablishConnection();
+                        this.queryTemplate = String.format("select  * from  (%s) a where %s>=? and   %s <=? ",
+                                this.jdbcSourceConfig.getQuery(),
+                                this.jdbcSourceConfig.getPartitionColumn().get(),
+                                this.jdbcSourceConfig.getPartitionColumn().get()
+                        );
+                        this.statement = jdbcDialect.creatPreparedStatement(dbConn, queryTemplate, fetchSize);
+                        for (int i = 0; i < parameterValuesNew.size(); i++) {
+                            Object param = parameterValuesNew.get(i);
+                            if (param instanceof String) {
+                                statement.setString(i + 1, (String) param);
+                            } else if (param instanceof Long) {
+                                statement.setLong(i + 1, (Long) param);
+                            } else if (param instanceof Integer) {
+                                statement.setInt(i + 1, (Integer) param);
+                            } else if (param instanceof Double) {
+                                statement.setDouble(i + 1, (Double) param);
+                            } else if (param instanceof Boolean) {
+                                statement.setBoolean(i + 1, (Boolean) param);
+                            } else if (param instanceof Float) {
+                                statement.setFloat(i + 1, (Float) param);
+                            } else if (param instanceof BigDecimal) {
+                                statement.setBigDecimal(i + 1, (BigDecimal) param);
+                            } else if (param instanceof Byte) {
+                                statement.setByte(i + 1, (Byte) param);
+                            } else if (param instanceof Short) {
+                                statement.setShort(i + 1, (Short) param);
+                            } else if (param instanceof Date) {
+                                statement.setDate(i + 1, (Date) param);
+                            } else if (param instanceof Time) {
+                                statement.setTime(i + 1, (Time) param);
+                            } else if (param instanceof Timestamp) {
+                                statement.setTimestamp(i + 1, (Timestamp) param);
+                            } else if (param instanceof Array) {
+                                statement.setArray(i + 1, (Array) param);
+                            } else {
+                                // extends with other types if needed
+                                throw new JdbcConnectorException(
+                                        CommonErrorCode.UNSUPPORTED_DATA_TYPE,
+                                        "open() failed. Parameter "
+                                                + i
+                                                + " of type "
+                                                + param.getClass()
+                                                + " is not handled (yet).");
+                            }
+                        }
+                    } catch (ClassNotFoundException e) {
+                        throw new RuntimeException(e);
+                    }
+
                 }
             }
             resultSet = statement.executeQuery();
@@ -211,7 +313,9 @@ public class JdbcInputFormat implements Serializable {
         return !hasNext;
     }
 
-    /** Convert a row of data to seatunnelRow */
+    /**
+     * Convert a row of data to seatunnelRow
+     */
     public SeaTunnelRow nextRecord() {
         try {
             if (!hasNext) {

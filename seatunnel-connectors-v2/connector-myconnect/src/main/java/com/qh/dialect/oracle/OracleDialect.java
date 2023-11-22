@@ -18,17 +18,22 @@
 package com.qh.dialect.oracle;
 
 
-
+import com.qh.converter.ColumnMapper;
 import com.qh.converter.JdbcRowConverter;
 import com.qh.dialect.JdbcConnectorException;
 import com.qh.dialect.JdbcDialect;
 import com.qh.dialect.JdbcDialectTypeMapper;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
+import org.stringtemplate.v4.ST;
 
 import java.math.BigDecimal;
 import java.sql.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -137,6 +142,7 @@ public class OracleDialect implements JdbcDialect {
         }
         return statement;
     }
+
     @Override
     public void setPreparedStatementValueByDbType(int position, PreparedStatement preparedStatement, String oracleType, String value) throws SQLException {
         switch (oracleType) {
@@ -202,6 +208,103 @@ public class OracleDialect implements JdbcDialect {
                                 oracleType, oracleType));
 
         }
+    }
 
+    public String getSinkQueryZipper(String tableName, List<ColumnMapper> columnMappers, int rowSize) {
+        List<ColumnMapper> ucColumns = columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
+        String sqlQueryString = "select  " +
+                " <columns:{sub | <sub.sinkColumnName>  }; separator=\", \"> " +
+                "  from (select   " +
+                " <columns:{sub | <sub.sinkColumnName>  }; separator=\", \"> " +
+                "               ,OPERATEFLAG,row_number() over(partition by <ucs:{uc | <uc.sinkColumnName>   }; separator=\", \"> order by OPERATETIME desc) hang  " +
+                "          from <table>  " +
+                "         )  " +
+                " where hang = 1  " +
+                "   and  OPERATEFLAG in ('I', 'U')" +
+                "   and <filter> ";
+        ST sqlQueryTemplate = new ST(sqlQueryString);
+        sqlQueryTemplate.add("table", tableName);
+        sqlQueryTemplate.add("columns", columnMappers);
+        sqlQueryTemplate.add("ucs", ucColumns);
+        if (rowSize == 0) {
+            sqlQueryTemplate.add("filter", "1=2");
+        } else {
+            String where = "(";
+            List<String> collect = ucColumns.stream().map(x -> x.getSinkColumnName()).collect(Collectors.toList());
+            String join = StringUtils.join(collect, ',');
+            where += join + ") in ( %s ) ";
+            List<String> tmp1 = new ArrayList<>();
+            for (int i1 = 0; i1 < ucColumns.size(); i1++) {
+                tmp1.add("?");
+            }
+            String tmp2 = String.format("(%s)", StringUtils.join(tmp1, ","));
+
+            List<String> tmp3 = new ArrayList<>();
+            for (int i = 0; i < rowSize; i++) {
+                tmp3.add(tmp2);
+            }
+            where = String.format(where, StringUtils.join(tmp3, ","));
+            sqlQueryTemplate.add("filter", where);
+        }
+        String sqlQuery = sqlQueryTemplate.render();
+        return sqlQuery;
+    }
+
+    public int deleteDataZipper(Connection connection, String table, String ucTable, List<ColumnMapper> columnMappers, LocalDateTime startTime) {
+        List<ColumnMapper> ucColumns = columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
+        int insert = 0;
+        String insertSql1 = "select count(1) sl " +
+                "  from (select * " +
+                "          from (select <pks:{pk | <pk.sinkColumnName>}; separator=\", \">, " +
+                "                       OPERATEFLAG, " +
+                "                       row_number() over(partition by <pks:{pk | <pk.sinkColumnName>}; separator=\", \"> order by OPERATETIME desc) hang " +
+                "                  from <table>) " +
+                "         where hang = 1 " +
+                "           and OPERATEFLAG in ('I', 'U')) " +
+                " where <pks:{pk | <pk.sinkColumnName>}; separator=\", \"> not in (select <pks:{pk | <pk.sinkColumnName>}; separator=\", \"> from <ucTable>)";
+        ST template1 = new ST(insertSql1);
+        template1.add("table", table);
+        template1.add("pks", ucColumns);
+        template1.add("ucTable", ucTable);
+        template1.add("operateTime", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        String render1 = template1.render();
+        PreparedStatement preparedStatement1 = null;
+        try {
+            preparedStatement1 = connection.prepareStatement(render1);
+            ResultSet resultSet = preparedStatement1.executeQuery();
+            if (resultSet.next()) {
+                insert = resultSet.getInt("sl");
+            }
+            preparedStatement1.close();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        String insertSql = "insert into <table>" +
+                "  (<columns:{sub | <sub.sinkColumnName>  }; separator=\", \">, operateFlag, operateTime)" +
+                " select  " +
+                "  <columns:{sub | <sub.sinkColumnName> }; separator=\", \">, 'D' operateFlag, '<operateTime>' operateTime" +
+                "  from (select *  " +
+                "          from (select <columns:{sub | <sub.sinkColumnName> }; separator=\", \">,operateFlag,  " +
+                "                       row_number() over(partition by <pks:{pk | <pk.sinkColumnName>}; separator=\", \"> order by OPERATETIME desc) hang  " +
+                "                  from <table>)  " +
+                "         where hang = 1  " +
+                "           and OPERATEFLAG in ('I', 'U'))  " +
+                " where <pks:{pk | <pk.sinkColumnName>}; separator=\", \"> not in (select <pks:{pk | <pk.sinkColumnName>}; separator=\", \"> from  <ucTable> )";
+        ST template = new ST(insertSql);
+        template.add("table", table);
+        template.add("columns", columnMappers);
+        template.add("pks", ucColumns);
+        template.add("ucTable", ucTable);
+        template.add("operateTime", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        String render = template.render();
+        PreparedStatement preparedStatement = null;
+        try {
+            preparedStatement = connection.prepareStatement(render);
+            preparedStatement.execute();
+            preparedStatement.close();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        return insert;
     }
 }

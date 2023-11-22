@@ -109,10 +109,12 @@ public class JdbcSource
         }
 
         if (partitionParameter != null) {
-            this.query =
-                    JdbcSourceFactory.obtainPartitionSql(
-                            partitionParameter.getPartitionColumnName(),
-                            jdbcSourceConfig.getQuery());
+            this.query =jdbcDialect.getPartitionSql(partitionParameter.getPartitionColumnName(),jdbcSourceConfig.getQuery());
+//                    JdbcSourceFactory.obtainPartitionSql(
+//                            partitionParameter.getPartitionColumnName(),
+//                            jdbcSourceConfig.getQuery(),
+//                            jdbcDialect
+//                            );
         }
 
         this.inputFormat =
@@ -122,7 +124,9 @@ public class JdbcSource
                         typeInfo,
                         query,
                         jdbcSourceConfig.getFetchSize(),
-                        jdbcSourceConfig.getJdbcConnectionConfig().isAutoCommit());
+                        jdbcSourceConfig.getJdbcConnectionConfig().isAutoCommit(),
+                        jdbcSourceConfig
+                );
     }
 
     @Override

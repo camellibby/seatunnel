@@ -43,6 +43,7 @@ import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDiale
 
 import com.google.auto.service.AutoService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.oracle.OracleDialect;
 
 import java.io.Serializable;
 import java.sql.Connection;
@@ -75,7 +76,7 @@ public class JdbcSourceFactory implements TableSourceFactory {
     @Override
     @SuppressWarnings("unchecked")
     public <T, SplitT extends SourceSplit, StateT extends Serializable>
-            TableSource<T, SplitT, StateT> createSource(TableFactoryContext context) {
+    TableSource<T, SplitT, StateT> createSource(TableFactoryContext context) {
         CatalogTable catalogTable = context.getCatalogTable();
         JdbcSourceConfig config = JdbcSourceConfig.of(context.getOptions());
         JdbcConnectionProvider connectionProvider =
@@ -93,7 +94,9 @@ public class JdbcSourceFactory implements TableSourceFactory {
                         rowType,
                         querySql,
                         config.getFetchSize(),
-                        config.getJdbcConnectionConfig().isAutoCommit());
+                        config.getJdbcConnectionConfig().isAutoCommit(),
+                        config
+                );
         return () ->
                 (SeaTunnelSource<T, SplitT, StateT>)
                         new JdbcSource(
@@ -103,18 +106,15 @@ public class JdbcSourceFactory implements TableSourceFactory {
                                 inputFormat,
                                 partitionParameter.orElse(null),
                                 connectionProvider,
-                                partitionParameter.isPresent()
-                                        ? obtainPartitionSql(
-                                                partitionParameter.get().getPartitionColumnName(),
-                                                querySql)
-                                        : querySql);
+                                partitionParameter.isPresent() ? dialect.getPartitionSql(partitionParameter.get().getPartitionColumnName(), querySql) : querySql);
     }
 
-    static String obtainPartitionSql(String partitionColumn, String nativeSql) {
-        return String.format(
-                "SELECT * FROM (%s) tt where %s >= ? AND %s <= ?",
-                nativeSql, partitionColumn, partitionColumn);
-    }
+//    static String obtainPartitionSql(String partitionColumn, String nativeSql, JdbcDialect jdbcDialect) {
+//        return String.format(
+//                "SELECT * FROM (%s) tt where nvl(%s, '0') >= ? AND nvl(%s, '0') <= ?",
+//                nativeSql, partitionColumn, partitionColumn);
+//
+//    }
 
     public static Optional<PartitionParameter> createPartitionParameter(
             JdbcSourceConfig config,
@@ -144,22 +144,20 @@ public class JdbcSourceFactory implements TableSourceFactory {
             return new PartitionParameter(
                     columnName, min, max, config.getPartitionNumber().orElse(null));
         }
+        JdbcDialect dialect = JdbcDialectLoader.load(config.getJdbcConnectionConfig().getUrl());
         try (ResultSet rs =
-                connection
-                        .createStatement()
-                        .executeQuery(
-                                String.format(
-                                        "SELECT MAX(%s),MIN(%s) " + "FROM (%s) tt",
-                                        columnName, columnName, config.getQuery()))) {
+                     connection
+                             .createStatement()
+                             .executeQuery(dialect.getPartitionColumnCount(columnName, config))) {
             if (rs.next()) {
                 max =
                         config.getPartitionUpperBound().isPresent()
                                 ? config.getPartitionUpperBound().get()
                                 : rs.getLong(1);
-                min =
-                        config.getPartitionLowerBound().isPresent()
-                                ? config.getPartitionLowerBound().get()
-                                : rs.getLong(2);
+                min = 1;
+//                        config.getPartitionLowerBound().isPresent()
+//                                ? config.getPartitionLowerBound().get()
+//                                : rs.getLong(2);
             }
         } catch (SQLException e) {
             throw new PrepareFailException("jdbc", PluginType.SOURCE, e.toString());
@@ -191,12 +189,12 @@ public class JdbcSourceFactory implements TableSourceFactory {
                             "Partitioned column(%s) don't exist in the table columns",
                             partitionColumn));
         }
-        SeaTunnelDataType<?> partitionColumnType = fieldTypes.get(partitionColumn);
-        if (!isNumericType(partitionColumnType)) {
-            throw new JdbcConnectorException(
-                    CommonErrorCode.ILLEGAL_ARGUMENT,
-                    String.format("%s is not numeric type", partitionColumn));
-        }
+//        SeaTunnelDataType<?> partitionColumnType = fieldTypes.get(partitionColumn);
+//        if (!isNumericType(partitionColumnType)) {
+//            throw new JdbcConnectorException(
+//                    CommonErrorCode.ILLEGAL_ARGUMENT,
+//                    String.format("%s is not numeric type", partitionColumn));
+//        }
     }
 
     private static boolean isNumericType(SeaTunnelDataType<?> type) {

@@ -17,8 +17,10 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcSourceConfig;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.converter.JdbcRowConverter;
+import org.stringtemplate.v4.ST;
 
 import java.io.Serializable;
 import java.sql.Connection;
@@ -27,6 +29,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -59,7 +62,9 @@ public interface JdbcDialect extends Serializable {
      */
     JdbcDialectTypeMapper getJdbcDialectTypeMapper();
 
-    /** Quotes the identifier for table name or field name */
+    /**
+     * Quotes the identifier for table name or field name
+     */
     default String quoteIdentifier(String identifier) {
         return identifier;
     }
@@ -196,4 +201,64 @@ public interface JdbcDialect extends Serializable {
         PreparedStatement ps = conn.prepareStatement(jdbcSourceConfig.getQuery());
         return ps.getMetaData();
     }
+
+    /**
+     *  默认为oracle写法 每个数据库需要单独实现
+     *  oracle 是默认 nulls last 其他数据库要注意把 null 放在最后面
+     *  为了防止 有人修改了数据库排序规则 强制把空值的放在最后面去
+     * @param conn
+     * @param jdbcSourceConfig
+     * @param parameterValues
+     * @return
+     */
+    default ResultSet getSplitValue(Connection conn, JdbcSourceConfig jdbcSourceConfig, Object[] parameterValues) {
+        String template = "select * " +
+                "  from (select <partitionColumn>, " +
+                "               Row_number() over(order by <partitionColumn>) hang " +
+                "          from (select distinct  <partitionColumn>  <partitionColumn> " +
+                "                  from (<query>)) )" +
+                " where hang in (<parameterValues>) " +
+                " order by <partitionColumn> asc nulls last";
+        ST st = new ST(template);
+        st.add("partitionColumn", jdbcSourceConfig.getPartitionColumn().orElseThrow(() -> new NullPointerException("分区列为空")));
+        st.add("query", jdbcSourceConfig.getQuery());
+        List<Long> parameterValuesInt = Arrays.stream(parameterValues).map(x -> (Long) x).collect(Collectors.toList());
+        st.add("parameterValues", StringUtils.join(parameterValuesInt, ","));
+        String render = st.render();
+        try {
+            PreparedStatement preparedStatement = conn.prepareStatement(render);
+            return preparedStatement.executeQuery();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * 默认为oracle写法 每个数据库需要单独实现
+     * 下面的sql把 空值列 也算成了单独的一项 其他数据库也要照此写法
+     * @param columnName
+     * @param config
+     * @return
+     */
+    default String getPartitionColumnCount(String columnName, JdbcSourceConfig config) {
+        String template = "select sum(sl) " +
+                "  from (SELECT COUNT(DISTINCT <columnName>) sl " +
+                "          FROM (<tableName>) " +
+                "        union all " +
+                "        select 1 " +
+                "          from (<tableName>) " +
+                "         where <columnName> is null " +
+                "           and rownum = 1) a";
+        ST st = new ST(template);
+        st.add("columnName", columnName);
+        st.add("tableName", config.getQuery());
+        return st.render();
+    }
+
+    default String getPartitionSql(String partitionColumn, String nativeSql) {
+        return String.format(
+                "SELECT * FROM (%s) tt where %s >= ? AND %s <= ?",
+                nativeSql, partitionColumn, partitionColumn);
+    }
+
 }

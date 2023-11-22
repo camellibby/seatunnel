@@ -17,15 +17,19 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.mysql;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcSourceConfig;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.converter.JdbcRowConverter;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDialect;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDialectTypeMapper;
+import org.stringtemplate.v4.ST;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -78,4 +82,49 @@ public class MysqlDialect implements JdbcDialect {
         statement.setFetchSize(Integer.MIN_VALUE);
         return statement;
     }
+
+    public ResultSet getSplitValue(Connection conn, JdbcSourceConfig jdbcSourceConfig, Object[] parameterValues) {
+        String template = "select *  " +
+                "  from (SELECT <partitionColumn>, @i := @i + 1 hang  " +
+                "          FROM (SELECT DISTINCT <partitionColumn>  " +
+                "                  FROM (SELECT <partitionColumn>  " +
+                "                          FROM (<query>) a) a  " +
+                "                 ORDER BY <partitionColumn> is null  ASC, <partitionColumn> asc ) a,  " +
+                "               (SELECT @i := 0) b) a  " +
+                " where hang in (<parameterValues>)";
+        ST st = new ST(template);
+        st.add("partitionColumn", jdbcSourceConfig.getPartitionColumn().orElseThrow(() -> new NullPointerException("分区列为空")));
+        st.add("query", jdbcSourceConfig.getQuery());
+        List<Long> parameterValuesInt = Arrays.stream(parameterValues).map(x -> (Long) x).collect(Collectors.toList());
+        st.add("parameterValues", StringUtils.join(parameterValuesInt, ","));
+        String render = st.render();
+        try {
+            PreparedStatement preparedStatement = conn.prepareStatement(render);
+            return preparedStatement.executeQuery();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    public String getPartitionColumnCount(String columnName, JdbcSourceConfig config) {
+        String template = "SELECT sum(sl) sl " +
+                "  FROM (SELECT COUNT(DISTINCT <columnName>) sl " +
+                "          FROM (<tableName>) a " +
+                "        UNION ALL " +
+                "        SELECT * " +
+                "          FROM (SELECT 1 FROM (<tableName>) a WHERE <columnName> IS NULL LIMIT 1) a) a";
+        ST st = new ST(template);
+        st.add("columnName", columnName);
+        st.add("tableName", config.getQuery());
+        return st.render();
+    }
+
+    public String getPartitionSql(String partitionColumn, String nativeSql) {
+        return String.format(
+                "SELECT * FROM (%s) tt where %s >= ? AND %s <= ?",
+                nativeSql, partitionColumn, partitionColumn);
+    }
+
+
 }
