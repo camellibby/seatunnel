@@ -17,8 +17,17 @@
 
 package org.apache.seatunnel.core.starter.flink.execution;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.util.JSONPObject;
+import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.PipelineOptionsInternal;
+import org.apache.flink.core.execution.JobClient;
+import org.apache.flink.core.execution.JobListener;
+import org.apache.flink.runtime.client.JobExecutionException;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.seatunnel.core.starter.flink.utils.HttpUtil;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigUtil;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigValueFactory;
@@ -40,6 +49,7 @@ import org.apache.flink.types.Row;
 
 import lombok.extern.slf4j.Slf4j;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -159,9 +169,48 @@ public class FlinkExecution implements TaskExecution {
                 flinkRuntimeEnvironment.getStreamExecutionEnvironment().getExecutionPlan());
         log.info("Flink job name: {}", flinkRuntimeEnvironment.getJobName());
         try {
-            flinkRuntimeEnvironment
-                    .getStreamExecutionEnvironment()
-                    .execute(flinkRuntimeEnvironment.getJobName());
+            StreamExecutionEnvironment env = flinkRuntimeEnvironment
+                    .getStreamExecutionEnvironment();
+            env.registerJobListener(new JobListener() {
+                @Override
+                public void onJobSubmitted(@Nullable JobClient jobClient, @Nullable Throwable throwable) {
+
+                }
+
+                @Override
+                public void onJobExecuted(@Nullable JobExecutionResult jobExecutionResult, @Nullable Throwable throwable) {
+                    String st_log_back_url = System.getenv("ST_LOG_BACK_URL");
+                    if (throwable == null) {
+                        try {
+                            ObjectMapper mapper = new ObjectMapper();
+                            ObjectNode objectNode = mapper.createObjectNode();
+                            objectNode.put("jobId", jobExecutionResult.getJobID().toHexString());
+                            objectNode.put("status", "FINISHED");
+                            HttpUtil.sendPostRequest(st_log_back_url, objectNode.toString());
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    } else {
+                        try {
+                            JobExecutionException jobExecutionException = null;
+                            if (throwable instanceof JobExecutionException) {
+                                jobExecutionException = (JobExecutionException) throwable;
+                            }
+                            ObjectMapper mapper = new ObjectMapper();
+                            ObjectNode objectNode = mapper.createObjectNode();
+                            objectNode.put("jobId", jobExecutionException.getJobID().toHexString());
+                            objectNode.put("status", "FAILED");
+                            objectNode.put("error", jobExecutionException.getCause().getCause().toString());
+                            HttpUtil.sendPostRequest(st_log_back_url, objectNode.toString());
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+            });
+
+
+            env.execute(flinkRuntimeEnvironment.getJobName());
         } catch (Exception e) {
             throw new TaskExecuteException("Execute Flink job error", e);
         }

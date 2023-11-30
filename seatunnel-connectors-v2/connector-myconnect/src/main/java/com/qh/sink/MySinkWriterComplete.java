@@ -138,6 +138,13 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
             psUpsert.executeBatch();
             psUpsert.close();
         } catch (SQLException e) {
+            Jedis jedis = new Jedis(this.jdbcSinkConfig.getPreConfig().getRedisHost(), this.jdbcSinkConfig.getPreConfig().getRedisPort());
+            jedis.auth(this.jdbcSinkConfig.getPreConfig().getRedisPassWord());
+            jedis.select(this.jdbcSinkConfig.getPreConfig().getRedisDbIndex());
+            String redisKey = String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable());
+            String redisListKey = String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable()) + ":list";
+            jedis.del(redisKey);
+            jedis.del(redisListKey);
             throw new RuntimeException(e);
         }
     }
