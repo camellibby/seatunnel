@@ -20,6 +20,7 @@ package org.apache.seatunnel.core.starter.flink.execution;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.util.JSONPObject;
+import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.PipelineOptionsInternal;
@@ -48,6 +49,8 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.types.Row;
 
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -65,8 +68,10 @@ import java.util.stream.Stream;
 /**
  * Used to execute a SeaTunnelTask.
  */
-@Slf4j
+//@Slf4j
 public class FlinkExecution implements TaskExecution {
+
+    private static final Logger log = LoggerFactory.getLogger(FlinkExecution.class);
     private final FlinkRuntimeEnvironment flinkRuntimeEnvironment;
     private final PluginExecuteProcessor<DataStream<Row>, FlinkRuntimeEnvironment>
             sourcePluginExecuteProcessor;
@@ -171,45 +176,13 @@ public class FlinkExecution implements TaskExecution {
         try {
             StreamExecutionEnvironment env = flinkRuntimeEnvironment
                     .getStreamExecutionEnvironment();
-            env.registerJobListener(new JobListener() {
-                @Override
-                public void onJobSubmitted(@Nullable JobClient jobClient, @Nullable Throwable throwable) {
-
-                }
-
-                @Override
-                public void onJobExecuted(@Nullable JobExecutionResult jobExecutionResult, @Nullable Throwable throwable) {
-                    String st_log_back_url = System.getenv("ST_LOG_BACK_URL");
-                    if (throwable == null) {
-                        try {
-                            ObjectMapper mapper = new ObjectMapper();
-                            ObjectNode objectNode = mapper.createObjectNode();
-                            objectNode.put("jobId", jobExecutionResult.getJobID().toHexString());
-                            objectNode.put("status", "FINISHED");
-                            HttpUtil.sendPostRequest(st_log_back_url, objectNode.toString());
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
-                    } else {
-                        try {
-                            JobExecutionException jobExecutionException = null;
-                            if (throwable instanceof JobExecutionException) {
-                                jobExecutionException = (JobExecutionException) throwable;
-                            }
-                            ObjectMapper mapper = new ObjectMapper();
-                            ObjectNode objectNode = mapper.createObjectNode();
-                            objectNode.put("jobId", jobExecutionException.getJobID().toHexString());
-                            objectNode.put("status", "FAILED");
-                            objectNode.put("error", jobExecutionException.getCause().getCause().toString());
-                            HttpUtil.sendPostRequest(st_log_back_url, objectNode.toString());
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                }
-            });
-
-
+//            env.registerJobListener(new MyJobListener(this.jobContext.getJobId()));
+//            List<JobListener> jobListeners = env.getJobListeners();
+//            for (JobListener jobListener : jobListeners) {
+//                Class<? extends JobListener> aClass = jobListener.getClass();
+//                System.out.println(aClass.getName());
+//            }
+            System.gc();
             env.execute(flinkRuntimeEnvironment.getJobName());
         } catch (Exception e) {
             throw new TaskExecuteException("Execute Flink job error", e);
