@@ -1,16 +1,9 @@
 package com.qh.sink;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qh.config.JdbcSinkConfig;
 import com.qh.config.Util;
 import com.qh.converter.ColumnMapper;
-import com.qh.dialect.JdbcConnectorErrorCode;
-import com.qh.dialect.JdbcConnectorException;
 import com.qh.dialect.JdbcDialect;
 import com.qh.dialect.JdbcDialectFactory;
-import com.qh.dialect.oracle.OracleDialect;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.common.JobContext;
@@ -18,16 +11,12 @@ import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
-import org.json.JSONObject;
 import org.stringtemplate.v4.ST;
-import redis.clients.jedis.Jedis;
-
 import java.io.IOException;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collectors;
@@ -88,15 +77,6 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         }
         this.metaDataHash = metaDataHash;
         preparedStatementQuery.close();
-
-        String redisKey = String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable());
-        Jedis jedis = new Jedis(this.jdbcSinkConfig.getPreConfig().getRedisHost(), this.jdbcSinkConfig.getPreConfig().getRedisPort());
-        jedis.auth(this.jdbcSinkConfig.getPreConfig().getRedisPassWord());
-        jedis.select(this.jdbcSinkConfig.getPreConfig().getRedisDbIndex());
-        jedis.incr(redisKey);
-        jedis.disconnect();
-
-
     }
 
     private void consumeData() {
@@ -122,13 +102,6 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             insertTmpUks(this.cld, this.metaDataHash, conn);
             compareData(sourceRows);
         } catch (SQLException e) {
-            Jedis jedis = new Jedis(this.jdbcSinkConfig.getPreConfig().getRedisHost(), this.jdbcSinkConfig.getPreConfig().getRedisPort());
-            jedis.auth(this.jdbcSinkConfig.getPreConfig().getRedisPassWord());
-            jedis.select(this.jdbcSinkConfig.getPreConfig().getRedisDbIndex());
-            String redisKey = String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable());
-            String redisListKey = String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable()) + ":list";
-            jedis.del(redisKey);
-            jedis.del(redisListKey);
             throw new RuntimeException(e);
         }
 
@@ -324,65 +297,17 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     }
 
     private void statisticalResults(Connection conn) throws Exception {
-        String redisKey = String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable());
-        Jedis jedis = new Jedis(this.jdbcSinkConfig.getPreConfig().getRedisHost(), this.jdbcSinkConfig.getPreConfig().getRedisPort());
-        jedis.auth(this.jdbcSinkConfig.getPreConfig().getRedisPassWord());
-        jedis.select(this.jdbcSinkConfig.getPreConfig().getRedisDbIndex());
-        jedis.decr(redisKey);
-
-        JSONObject jsonObject = new JSONObject();
-        jsonObject.put("writeCount", writeCount);
-        jsonObject.put("keepCount", keepCount);
-        jsonObject.put("updateCount", updateCount);
-        jsonObject.put("insertCount", insertCount);
-
-        String redisListKey = String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable()) + ":list";
-        jedis.lpush(redisListKey, jsonObject.toString());
-        String value = jedis.get(redisKey);
-        if (null != value) {
-            int i = Integer.parseInt(value);
-            if (i == 0) {
-                long running = jedis.setnx(redisKey + ":running", "value");
-                jedis.expire(redisKey + ":running", 5);
-                if (running == 1) {
-                    List<String> totalList = jedis.lrange(redisListKey, 0, -1);
-                    writeCount.reset();
-                    keepCount.reset();
-                    updateCount.reset();
-                    insertCount.reset();
-                    for (String s : totalList) {
-                        ObjectMapper objectMapper = new ObjectMapper();
-                        try {
-                            JsonNode jsonNode = objectMapper.readTree(s);
-                            writeCount.add(jsonNode.get("writeCount").asLong());
-                            keepCount.add(jsonNode.get("keepCount").asLong());
-                            updateCount.add(jsonNode.get("updateCount").asLong());
-                            insertCount.add(jsonNode.get("insertCount").asLong());
-                        } catch (JsonProcessingException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                    int del = this.jdbcDialect.deleteDataZipper(conn, this.table, this.tmpTable, this.columnMappers, this.startTime);
-                    deleteCount.add(del);
-                    LocalDateTime endTime = LocalDateTime.now();
-                    util.insertLog(writeCount.longValue(),
-                            updateCount.longValue(),
-                            deleteCount.longValue(),
-                            keepCount.longValue(),
-                            insertCount.longValue(),
-                            this.jobContext.getJobId(),
-                            startTime,
-                            endTime);
-
-                    jedis.del(redisKey);
-                    jedis.del(redisListKey);
-                }
-            }
-        }
-
-        jedis.disconnect();
-
-
+        int del = this.jdbcDialect.deleteDataZipper(conn, this.table, this.tmpTable, this.columnMappers, this.startTime);
+        deleteCount.add(del);
+        LocalDateTime endTime = LocalDateTime.now();
+        util.insertLog(writeCount.longValue(),
+                updateCount.longValue(),
+                deleteCount.longValue(),
+                keepCount.longValue(),
+                insertCount.longValue(),
+                this.jobContext.getJobId(),
+                startTime,
+                endTime);
     }
 
     @Override

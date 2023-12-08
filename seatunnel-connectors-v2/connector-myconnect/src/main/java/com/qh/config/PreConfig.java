@@ -1,12 +1,10 @@
 package com.qh.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.qh.dialect.JdbcDialect;
 import com.qh.dialect.JdbcDialectFactory;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.configuration.util.OptionMark;
-import redis.clients.jedis.Jedis;
 
 import java.io.Serializable;
 import java.sql.*;
@@ -24,44 +22,18 @@ public class PreConfig implements Serializable {
 
     @JsonIgnore
     private static final List<String> zipperColumns = Arrays.asList("operateFlag", "operateTime");
-    @JsonIgnore
-    private String redisHost;
-    @JsonIgnore
-    private Integer redisPort;
-    @JsonIgnore
-    private String redisPassWord;
-    @JsonIgnore
-    private Integer redisDbIndex;
 
 
     public PreConfig() {
-        String redisHost = System.getenv("REDISHOST");
-        String redisPort = System.getenv("REDISPORT");
-        String redisPassword = System.getenv("REDISPASSWORD");
-        String redisDbIndex = System.getenv("REDISDBINDEX");
-        this.redisHost = redisHost;
-        this.redisPort = Integer.valueOf(redisPort);
-        this.redisPassWord = redisPassword;
-        this.redisDbIndex = Integer.valueOf(redisDbIndex);
     }
 
     public void doPreConfig(Connection connection, JdbcSinkConfig jdbcSinkConfig) throws SQLException {
-        Jedis jedis = new Jedis(this.redisHost, this.redisPort);
-        jedis.auth(this.redisPassWord);
-        jedis.select(this.redisDbIndex);
+
 
         String tableName = jdbcSinkConfig.getTable();
         String schemaPattern = jdbcSinkConfig.getDbType().equalsIgnoreCase("oracle") ?
                 jdbcSinkConfig.getUser().toUpperCase() :
                 jdbcSinkConfig.getDatabase();
-        String values = jedis.get(String.format("seatunnel:job:sink:%s", tableName));
-        if (null != values) {
-            jedis.disconnect();
-            connection.close();
-            throw new RuntimeException(String.format("有作业正在往表%s写入数据，作业禁止运行", tableName));
-        }
-        jedis.disconnect();
-
 
         DatabaseMetaData metadata = connection.getMetaData();
         ResultSet rsColumn = metadata.getColumns(null, schemaPattern, tableName, null);

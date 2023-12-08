@@ -3,13 +3,8 @@ package com.qh.sink;
 import com.qh.config.JdbcSinkConfig;
 import com.qh.config.Util;
 import com.qh.converter.ColumnMapper;
-import com.qh.dialect.ClickHouse.ClickHouseDialect;
-import com.qh.dialect.JdbcConnectorErrorCode;
-import com.qh.dialect.JdbcConnectorException;
 import com.qh.dialect.JdbcDialect;
 import com.qh.dialect.JdbcDialectFactory;
-import com.qh.dialect.mysql.MysqlDialect;
-import com.qh.dialect.oracle.OracleDialect;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.common.JobContext;
@@ -17,13 +12,12 @@ import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
-import redis.clients.jedis.Jedis;
+
 
 import java.io.IOException;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collectors;
 
@@ -33,7 +27,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
     private final SeaTunnelRowType sourceRowType;
     private final Context context;
     private List<SeaTunnelRow> cld = new ArrayList<>();
-    private LongAdder writeCount = new LongAdder();
+    private Long writeCount = 0L;
     private final JdbcSinkConfig jdbcSinkConfig;
     private JobContext jobContext;
 
@@ -76,18 +70,11 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
         }
         this.metaDataHash = metaDataHash;
         preparedStatementQuery.close();
-
-        Jedis jedis = new Jedis(this.jdbcSinkConfig.getPreConfig().getRedisHost(), this.jdbcSinkConfig.getPreConfig().getRedisPort());
-        jedis.auth(this.jdbcSinkConfig.getPreConfig().getRedisPassWord());
-        jedis.select(this.jdbcSinkConfig.getPreConfig().getRedisDbIndex());
-        jedis.incr(String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable()));
-        jedis.expire(String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable()), 36000);
-        jedis.disconnect();
     }
 
     @Override
     public void write(SeaTunnelRow element) throws IOException {
-        this.writeCount.increment();
+        this.writeCount++;
         this.cld.add(element);
         if (this.writeCount.longValue() % batchSize == 0) {
             this.insertToDb();
@@ -99,16 +86,8 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
     public void close() {
         this.insertToDb();
         try {
-            String redisKey = String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable());
-            String redisListKey = String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable()) + ":list";
-            Jedis jedis = new Jedis(this.jdbcSinkConfig.getPreConfig().getRedisHost(), this.jdbcSinkConfig.getPreConfig().getRedisPort());
-            jedis.auth(this.jdbcSinkConfig.getPreConfig().getRedisPassWord());
-            jedis.select(this.jdbcSinkConfig.getPreConfig().getRedisDbIndex());
-            jedis.decr(redisKey);
-            jedis.lpush(redisListKey, String.valueOf(writeCount.sum()));
-            jedis.disconnect();
             conn.close();
-            statisticalResults(redisKey, redisListKey);
+            statisticalResults();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -138,39 +117,13 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
             psUpsert.executeBatch();
             psUpsert.close();
         } catch (SQLException e) {
-            Jedis jedis = new Jedis(this.jdbcSinkConfig.getPreConfig().getRedisHost(), this.jdbcSinkConfig.getPreConfig().getRedisPort());
-            jedis.auth(this.jdbcSinkConfig.getPreConfig().getRedisPassWord());
-            jedis.select(this.jdbcSinkConfig.getPreConfig().getRedisDbIndex());
-            String redisKey = String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable());
-            String redisListKey = String.format("seatunnel:job:sink:%s", jdbcSinkConfig.getTable()) + ":list";
-            jedis.del(redisKey);
-            jedis.del(redisListKey);
             throw new RuntimeException(e);
         }
     }
 
-    public void statisticalResults(String redisKey, String redisListKey) throws Exception {
-        Jedis jedis = new Jedis(this.jdbcSinkConfig.getPreConfig().getRedisHost(), this.jdbcSinkConfig.getPreConfig().getRedisPort());
-        jedis.auth(this.jdbcSinkConfig.getPreConfig().getRedisPassWord());
-        jedis.select(this.jdbcSinkConfig.getPreConfig().getRedisDbIndex());
-        String value = jedis.get(redisKey);
-        if (null != value) {
-            int i = Integer.parseInt(value);
-            if (i == 0) {
-                long running = jedis.setnx(redisKey + ":running", "value");
-                jedis.expire(redisKey + ":running", 5);
-                if (running == 1) {
-                    List<String> writeCountList = jedis.lrange(redisListKey, 0, -1);
-                    Long writeCount = writeCountList.stream().map(Long::parseLong).reduce(Long::sum).orElse(0L);
-                    jedis.del(redisKey);
-                    jedis.del(redisListKey);
-                    jedis.disconnect();
-                    LocalDateTime endTime = LocalDateTime.now();
-                    util.insertLog(writeCount, 0L, tableCount, 0L, writeCount, this.jobContext.getJobId(), startTime, endTime);
-                }
-            }
-        }
-        jedis.disconnect();
+    public void statisticalResults() throws Exception {
+        LocalDateTime endTime = LocalDateTime.now();
+        util.insertLog(writeCount, 0L, tableCount, 0L, writeCount, this.jobContext.getJobId(), startTime, endTime);
     }
 
     private void initColumnMappers(JdbcSinkConfig jdbcSinkConfig, SeaTunnelRowType sourceRowType, SeaTunnelRowType sinkTableRowType, Connection conn) throws SQLException {

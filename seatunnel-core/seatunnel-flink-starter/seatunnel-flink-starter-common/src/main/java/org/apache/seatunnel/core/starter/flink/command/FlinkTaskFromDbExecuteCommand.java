@@ -27,8 +27,12 @@ import org.apache.seatunnel.core.starter.flink.execution.FlinkExecution;
 import org.apache.seatunnel.core.starter.utils.ConfigShadeUtils;
 import org.apache.seatunnel.shade.com.typesafe.config.*;
 
-import java.sql.*;
-import java.util.Properties;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 @Slf4j
 public class FlinkTaskFromDbExecuteCommand implements Command<FlinkCommandArgs> {
@@ -64,28 +68,35 @@ public class FlinkTaskFromDbExecuteCommand implements Command<FlinkCommandArgs> 
     }
 
     private String getConfig() {
-        String user = System.getenv("MYSQL_MASTER_USER");
-        String password = System.getenv("MYSQL_MASTER_PWD");
-        String dbHost = System.getenv("MYSQL_MASTER_HOST");
-        String dbPort = System.getenv("MYSQL_MASTER_PORT");
-        String dbName = System.getenv("PANGU_DB");
-        String url = "jdbc:mysql://" + dbHost + ":" + dbPort + "/" + dbName;
-        String sql = "select job_config from seatunnel_jobs where id=?";
-        Properties info = new Properties();
-        info.setProperty("user", user);
-        info.setProperty("password", password);
-        String config = null;
-        try (Connection connection = new com.mysql.cj.jdbc.Driver().connect(url, info);
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, flinkCommandArgs.getConfigFile());
-            ResultSet resultSet = statement.executeQuery();
-            if (resultSet.next()) {
-                config = resultSet.getString("job_config");
+        try {
+            String postData = String.format("{\"jobId\":\"%s\"}", new Object[] { this.flinkCommandArgs.getConfigFile() });
+            String st_config_file_url = System.getenv("ST_CONFIG_FILE_URL");
+            StringBuilder stringBuilder = new StringBuilder();
+            URL apiUrl = new URL(st_config_file_url);
+            HttpURLConnection connection = (HttpURLConnection)apiUrl.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setDoOutput(true);
+            OutputStream outputStream = connection.getOutputStream();
+            outputStream.write(postData.getBytes());
+            outputStream.flush();
+            outputStream.close();
+            int responseCode = connection.getResponseCode();
+            if (responseCode == 200) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                String line;
+                while ((line = reader.readLine()) != null)
+                    stringBuilder.append(line).append("\n");
+                reader.close();
+//                System.out.println("Response Body:\n" + stringBuilder.toString());
+                connection.disconnect();
+                return stringBuilder.toString();
             }
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
+            connection.disconnect();
+            throw new RuntimeException("获取作业JSON文件失败,请检查 ST_CONFIG_FILE_URL 环境变量");
+        } catch (IOException e) {
+            throw new RuntimeException("获取作业JSON文件失败,请检查 ST_CONFIG_FILE_URL 环境变量", e);
         }
-        log.info(config);
-        return config;
     }
 }

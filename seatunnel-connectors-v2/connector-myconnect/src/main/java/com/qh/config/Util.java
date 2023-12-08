@@ -1,5 +1,6 @@
 package com.qh.config;
 
+import com.alibaba.fastjson.JSONObject;
 import com.qh.config.JdbcSinkConfig;
 import com.qh.dialect.JdbcConnectorErrorCode;
 import com.qh.dialect.JdbcConnectorException;
@@ -10,7 +11,6 @@ import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
-import org.json.JSONObject;
 
 import java.io.OutputStream;
 import java.math.BigDecimal;
