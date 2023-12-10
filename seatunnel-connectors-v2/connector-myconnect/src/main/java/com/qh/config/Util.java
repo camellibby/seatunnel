@@ -149,7 +149,7 @@ public class Util {
         param.put("insertCount", insertCount);
         param.put("startTime", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         param.put("endTime", endTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-        String st_log_url = System.getenv("ST_LOG_URL");
+        String st_log_url = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/gatherJobLog";
         this.sendPostRequest(st_log_url, param.toString());
 
     }

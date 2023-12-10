@@ -59,7 +59,7 @@ public class FlinkTaskFromDbExecuteCommand implements Command<FlinkCommandArgs> 
                             ConfigUtil.joinPath("env", "job.name"),
                             ConfigValueFactory.fromAnyRef(flinkCommandArgs.getJobName()));
         }
-        FlinkExecution seaTunnelTaskExecution = new FlinkExecution(config,this.flinkCommandArgs.getFlinkJobId());
+        FlinkExecution seaTunnelTaskExecution = new FlinkExecution(config, this.flinkCommandArgs.getFlinkJobId());
         try {
             seaTunnelTaskExecution.execute();
         } catch (Exception e) {
@@ -69,11 +69,11 @@ public class FlinkTaskFromDbExecuteCommand implements Command<FlinkCommandArgs> 
 
     private String getConfig() {
         try {
-            String postData = String.format("{\"jobId\":\"%s\"}", new Object[] { this.flinkCommandArgs.getConfigFile() });
-            String st_config_file_url = System.getenv("ST_CONFIG_FILE_URL");
+            String postData = String.format("{\"jobId\":\"%s\"}", new Object[]{this.flinkCommandArgs.getConfigFile()});
+            String st_config_file_url = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/stConfigString";
             StringBuilder stringBuilder = new StringBuilder();
             URL apiUrl = new URL(st_config_file_url);
-            HttpURLConnection connection = (HttpURLConnection)apiUrl.openConnection();
+            HttpURLConnection connection = (HttpURLConnection) apiUrl.openConnection();
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setRequestProperty("Accept", "application/json");
@@ -94,9 +94,9 @@ public class FlinkTaskFromDbExecuteCommand implements Command<FlinkCommandArgs> 
                 return stringBuilder.toString();
             }
             connection.disconnect();
-            throw new RuntimeException("获取作业JSON文件失败,请检查 ST_CONFIG_FILE_URL 环境变量");
+            throw new RuntimeException("获取作业JSON文件失败,请检查 ST_SERVICE_URL 环境变量");
         } catch (IOException e) {
-            throw new RuntimeException("获取作业JSON文件失败,请检查 ST_CONFIG_FILE_URL 环境变量", e);
+            throw new RuntimeException("获取作业JSON文件失败,请检查 ST_SERVICE_URL 环境变量", e);
         }
     }
 }
