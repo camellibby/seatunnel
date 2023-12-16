@@ -1,4 +1,5 @@
 package com.qh.sink;
+
 import com.qh.config.JdbcSinkConfig;
 import com.qh.config.Util;
 import com.qh.converter.ColumnMapper;
@@ -12,6 +13,7 @@ import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
 import org.stringtemplate.v4.ST;
+
 import java.io.IOException;
 import java.sql.*;
 import java.time.LocalDateTime;
@@ -64,8 +66,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         this.conn = util.getConnection(this.jdbcSinkConfig);
         this.sinkTableRowType = util.initTableField(conn, this.jdbcDialect, this.jdbcSinkConfig);
         this.initColumnMappers(this.jdbcSinkConfig, this.sourceRowType, this.sinkTableRowType, conn);
-
-        String sqlQuery = jdbcDialect.getSinkQueryUpdate(this.table, this.columnMappers, 0);
+        String sqlQuery = jdbcDialect.getSinkQueryUpdate(this.columnMappers, 0, this.jdbcSinkConfig);
         PreparedStatement preparedStatementQuery = conn.prepareStatement(sqlQuery);
         ResultSet resultSet = preparedStatementQuery.executeQuery();
         ResultSetMetaData metaData = resultSet.getMetaData();
@@ -125,7 +126,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
             }
         });
         doInsert(needInsertRows, this.metaDataHash, conn);
-        doUpdate(needUpdate, this.metaDataHash, conn);
+        doUpdate(needUpdate, this.metaDataHash);
 
     }
 
@@ -137,7 +138,6 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
             columnMapper.setSourceRowPosition(sourceRowType.indexOf(k));
             String typeNameSS = sourceRowType.getFieldType(sourceRowType.indexOf(k)).getTypeClass().getName();
             columnMapper.setSourceColumnTypeName(typeNameSS);
-
             columnMapper.setSinkColumnName(v);
             columnMapper.setSinkRowPosition(sinkTableRowType.indexOf(v));
             String typeNameSK = sinkTableRowType.getFieldType(sinkTableRowType.indexOf(v)).getTypeClass().getName();
@@ -149,9 +149,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                 }
             }
             try {
-                PreparedStatement preparedStatementQuery = conn.prepareStatement("select  * from " + table + " where 1=2 ");
-                ResultSet resultSet = preparedStatementQuery.executeQuery();
-                ResultSetMetaData metaData = resultSet.getMetaData();
+                ResultSetMetaData metaData = this.jdbcDialect.getResultSetMetaData(conn, jdbcSinkConfig);
                 for (int i = 0; i < metaData.getColumnCount(); i++) {
                     String columnName = metaData.getColumnName(i + 1);
                     if (v.equalsIgnoreCase(columnName)) {
@@ -159,7 +157,6 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                         columnMapper.setSinkColumnDbType(columnTypeName);
                     }
                 }
-                preparedStatementQuery.close();
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
@@ -179,16 +176,12 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     private void doInsert(List<SeaTunnelRow> rows, Map<String, String> metaDataHash, Connection connection) throws SQLException {
         List<String> newColumns = new ArrayList<>();
+        List<String> newValues = new ArrayList<>();
         for (ColumnMapper column : columnMappers) {
             newColumns.add(column.getSinkColumnName());
+            newValues.add("?");
         }
-        String templateInsert = "INSERT INTO <table> " +
-                "(<columns:{sub | <sub>}; separator=\", \">) " +
-                "values(  <columns:{sub | ?}; separator=\", \"> ) ";
-        ST template = new ST(templateInsert);
-        template.add("table", table);
-        template.add("columns", newColumns);
-        String insertSql = template.render();
+        String insertSql = jdbcDialect.insertTableSql(jdbcSinkConfig, newColumns, newValues);
         PreparedStatement preparedStatement = connection.prepareStatement(insertSql);
         for (SeaTunnelRow row : rows) {
             for (int i = 0; i < columnMappers.size(); i++) {
@@ -202,16 +195,16 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         preparedStatement.close();
     }
 
-    private void doUpdate(HashMap<List<String>, SeaTunnelRow> rows, Map<String, String> metaDataHash, Connection connection) throws SQLException {
+    private void doUpdate(HashMap<List<String>, SeaTunnelRow> rows, Map<String, String> metaDataHash) throws SQLException {
         List<ColumnMapper> listUc = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
-        this.jdbcDialect.updateData(conn, table, columnMappers, listUc, rows, metaDataHash);
+        this.jdbcDialect.updateData(conn, jdbcSinkConfig, columnMappers, listUc, rows, metaDataHash);
 
     }
 
     private HashMap<List<String>, SeaTunnelRow> getSinkRows(Connection conn, HashMap<List<String>, SeaTunnelRow> sourceRows) {
         AtomicInteger tmp = new AtomicInteger();
         HashMap<List<String>, SeaTunnelRow> sinkRows = new HashMap<>();
-        String sqlQuery = jdbcDialect.getSinkQueryUpdate(this.table, this.columnMappers, sourceRows.size());
+        String sqlQuery = jdbcDialect.getSinkQueryUpdate(this.columnMappers, sourceRows.size(), this.jdbcSinkConfig);
         List<ColumnMapper> ucColumns = columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         try {
             PreparedStatement preparedStatementQuery = conn.prepareStatement(sqlQuery);
@@ -223,7 +216,6 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                         throw new RuntimeException(e);
                     }
                 }
-                ;
                 tmp.getAndIncrement();
             });
             ResultSet resultSet = preparedStatementQuery.executeQuery();
@@ -262,10 +254,14 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     private void insertTmpUks(List<SeaTunnelRow> oldRows, Map<String, String> metaDataHash, Connection conn) throws SQLException {
         List<ColumnMapper> ucColumns = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
-        String insert = String.format("insert  into %s(%s) values(%s)",
-                tmpTable,
-                StringUtils.join(ucColumns.stream().map(x -> x.getSinkColumnName()).collect(Collectors.toList()), ","),
-                StringUtils.join(ucColumns.stream().map(x -> "?").collect(Collectors.toList()), ",")
+        JdbcSinkConfig newJdbcSinkConfig = JdbcSinkConfig.builder()
+                .dbSchema(jdbcSinkConfig.getDbSchema())
+                .table(tmpTable)
+                .build();
+        String insert = jdbcDialect.insertTableSql(
+                newJdbcSinkConfig,
+                ucColumns.stream().map(x -> x.getSinkColumnName()).collect(Collectors.toList()),
+                ucColumns.stream().map(x -> "?").collect(Collectors.toList())
         );
         PreparedStatement preparedStatement = conn.prepareStatement(insert);
         for (SeaTunnelRow oldRow : oldRows) {
@@ -277,7 +273,6 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         }
         preparedStatement.executeBatch();
         preparedStatement.close();
-
     }
 
     @Override

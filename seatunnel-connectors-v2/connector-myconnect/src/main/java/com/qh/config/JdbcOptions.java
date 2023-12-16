@@ -161,4 +161,10 @@ public interface JdbcOptions {
                     .noDefaultValue()
                     .withDescription(
                             "数据库类型");
+    Option<String> dbSchema =
+            Options.key("dbSchema")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "数据库Schema");
 }

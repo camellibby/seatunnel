@@ -1,5 +1,6 @@
 package com.qh.dialect.ClickHouse;
 
+import com.qh.config.JdbcSinkConfig;
 import com.qh.converter.ColumnMapper;
 import com.qh.converter.JdbcRowConverter;
 import com.qh.dialect.JdbcDialect;
@@ -167,7 +168,7 @@ public class ClickHouseDialect implements JdbcDialect {
         return del;
     }
 
-    public int deleteDataZipper(Connection connection, String table, String ucTable, List<ColumnMapper> columnMappers, LocalDateTime startTime) {
+    public int deleteDataZipper(Connection connection, JdbcSinkConfig jdbcSinkConfig, List<ColumnMapper> columnMappers, LocalDateTime startTime) {
         List<ColumnMapper> ucColumns = columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         int insert = 0;
         String insertSql1 = "select  count(1) sl  " +
@@ -178,10 +179,10 @@ public class ClickHouseDialect implements JdbcDialect {
                 "           group by <pks:{pk | <pk.sinkColumnName>}; separator=\", \">" +
                 "           order by <pks:{pk | <pk.sinkColumnName>}; separator=\", \"> ) a";
         ST template1 = new ST(insertSql1);
-        template1.add("table", table);
+        template1.add("table", jdbcSinkConfig.getTable());
         template1.add("columns", columnMappers);
         template1.add("pks", ucColumns);
-        template1.add("ucTable", ucTable);
+        template1.add("ucTable", "UC_" + jdbcSinkConfig.getTable());
         template1.add("operateTime", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         String render1 = template1.render();
         PreparedStatement preparedStatement1 = null;
@@ -205,10 +206,10 @@ public class ClickHouseDialect implements JdbcDialect {
                 "           group by <pks:{pk | <pk.sinkColumnName>}; separator=\", \">" +
                 "           order by <pks:{pk | <pk.sinkColumnName>}; separator=\", \"> ) a";
         ST template = new ST(insertSql);
-        template.add("table", table);
+        template.add("table", jdbcSinkConfig.getTable());
         template.add("columns", columnMappers);
         template.add("pks", ucColumns);
-        template.add("ucTable", ucTable);
+        template.add("ucTable", "UC_" + jdbcSinkConfig.getTable());
         template.add("operateTime", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         String render = template.render();
         PreparedStatement preparedStatement = null;

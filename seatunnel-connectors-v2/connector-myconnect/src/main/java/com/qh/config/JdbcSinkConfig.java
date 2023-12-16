@@ -19,6 +19,7 @@ package com.qh.config;
 
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 
 import java.io.Serializable;
@@ -44,6 +45,7 @@ public class JdbcSinkConfig implements Serializable {
     private String dbType;
     private Map<String, String> fieldMapper;
     private String driver;
+    private String dbSchema;
 
 
     public static JdbcSinkConfig of(ReadonlyConfig config) {
@@ -62,6 +64,7 @@ public class JdbcSinkConfig implements Serializable {
         config.getOptional(JdbcOptions.QUERY).ifPresent(builder::simpleSql);
         config.getOptional(JdbcOptions.PRE_CONFIG).ifPresent(builder::preConfig);
         config.getOptional(JdbcOptions.DB_TYPE).ifPresent(builder::dbType);
+        config.getOptional(JdbcOptions.dbSchema).ifPresent(builder::dbSchema);
         config.getOptional(JdbcOptions.FIELD_MAPPER).ifPresent(builder::fieldMapper);
         return builder.build();
     }

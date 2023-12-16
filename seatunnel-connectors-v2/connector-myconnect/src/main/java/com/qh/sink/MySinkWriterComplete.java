@@ -6,19 +6,15 @@ import com.qh.converter.ColumnMapper;
 import com.qh.dialect.JdbcDialect;
 import com.qh.dialect.JdbcDialectFactory;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
-
-
 import java.io.IOException;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collectors;
 
 
@@ -60,7 +56,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
         this.sinkTableRowType = util.initTableField(conn, this.jdbcDialect, this.jdbcSinkConfig);
         this.initColumnMappers(this.jdbcSinkConfig, this.sourceRowType, this.sinkTableRowType, conn);
         this.tableCount = tableCount;
-        String sqlQuery = jdbcDialect.getSinkQueryUpdate(this.table, this.columnMappers, 0);
+        String sqlQuery = jdbcDialect.getSinkQueryUpdate(this.columnMappers, 0,jdbcSinkConfig);
         PreparedStatement preparedStatementQuery = conn.prepareStatement(sqlQuery);
         ResultSet resultSet = preparedStatementQuery.executeQuery();
         ResultSetMetaData metaData = resultSet.getMetaData();
@@ -97,11 +93,8 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
         try (Connection conn = DriverManager.getConnection(this.jdbcSinkConfig.getUrl(), this.jdbcSinkConfig.getUser(), this.jdbcSinkConfig.getPassWord())) {
             List<String> columns = this.columnMappers.stream().map(x -> x.getSinkColumnName()).collect(Collectors.toList());
             List<String> values = this.columnMappers.stream().map(x -> "?").collect(Collectors.toList());
-            String sqlUpsert = "insert into "
-                    + table
-                    + String.format("(%s)", StringUtils.join(columns, ","))
-                    + String.format("values (%s)", StringUtils.join(values, ","));
-            PreparedStatement psUpsert = conn.prepareStatement(sqlUpsert);
+            String sql = jdbcDialect.insertTableSql(this.jdbcSinkConfig,columns,values);
+            PreparedStatement psUpsert = conn.prepareStatement(sql);
             for (SeaTunnelRow seaTunnelRow : this.cld) {
                 if (seaTunnelRow != null) {
                     for (int i = 0; i < this.columnMappers.size(); i++) {
@@ -132,17 +125,14 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
             ColumnMapper columnMapper = new ColumnMapper();
             columnMapper.setSourceColumnName(k);
             columnMapper.setSourceRowPosition(sourceRowType.indexOf(k));
-            String typeNameSS = sourceRowType.getFieldType(sourceRowType.indexOf(k)).getTypeClass().getName();
-            columnMapper.setSourceColumnTypeName(typeNameSS);
-
+            String typeNames = sourceRowType.getFieldType(sourceRowType.indexOf(k)).getTypeClass().getName();
+            columnMapper.setSourceColumnTypeName(typeNames);
             columnMapper.setSinkColumnName(v);
             columnMapper.setSinkRowPosition(sinkTableRowType.indexOf(v));
             String typeNameSK = sinkTableRowType.getFieldType(sinkTableRowType.indexOf(v)).getTypeClass().getName();
             columnMapper.setSinkColumnTypeName(typeNameSK);
             try {
-                PreparedStatement preparedStatementQuery = conn.prepareStatement("select  * from " + table + " where 1=2 ");
-                ResultSet resultSet = preparedStatementQuery.executeQuery();
-                ResultSetMetaData metaData = resultSet.getMetaData();
+                ResultSetMetaData metaData = this.jdbcDialect.getResultSetMetaData(conn,jdbcSinkConfig);
                 for (int i = 0; i < metaData.getColumnCount(); i++) {
                     String columnName = metaData.getColumnName(i + 1);
                     if (v.equalsIgnoreCase(columnName)) {
@@ -150,7 +140,6 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
                         columnMapper.setSinkColumnDbType(columnTypeName);
                     }
                 }
-                preparedStatementQuery.close();
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }

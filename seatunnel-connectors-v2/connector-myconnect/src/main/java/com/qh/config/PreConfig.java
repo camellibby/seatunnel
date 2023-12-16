@@ -20,8 +20,8 @@ public class PreConfig implements Serializable {
     @OptionMark(description = "增量模式 update或者zipper模式 ")
     private String incrementMode;
 
-    @JsonIgnore
-    private static final List<String> zipperColumns = Arrays.asList("operateFlag", "operateTime");
+//    @JsonIgnore
+//    private static final List<String> zipperColumns = Arrays.asList("operateFlag", "operateTime");
 
 
     public PreConfig() {
@@ -31,9 +31,7 @@ public class PreConfig implements Serializable {
 
 
         String tableName = jdbcSinkConfig.getTable();
-        String schemaPattern = jdbcSinkConfig.getDbType().equalsIgnoreCase("oracle") ?
-                jdbcSinkConfig.getUser().toUpperCase() :
-                jdbcSinkConfig.getDatabase();
+        String schemaPattern = jdbcSinkConfig.getDbSchema();
 
         DatabaseMetaData metadata = connection.getMetaData();
         ResultSet rsColumn = metadata.getColumns(null, schemaPattern, tableName, null);
@@ -51,7 +49,7 @@ public class PreConfig implements Serializable {
         if (this.insertMode.equalsIgnoreCase("complete")) {
             if (this.cleanTableWhenComplete) {
                 Statement st = connection.createStatement();
-                st.execute(String.format("truncate  table %s", tableName));
+                st.execute(JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).truncateTable(jdbcSinkConfig));
                 st.close();
             }
         }
@@ -64,24 +62,19 @@ public class PreConfig implements Serializable {
 
             String tmpTableName = "UC_" + tableName;
             try {
-                PreparedStatement drop = connection.prepareStatement(String.format("drop table  %s", tmpTableName));
+                PreparedStatement drop = connection.prepareStatement(JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).dropTable(jdbcSinkConfig, tmpTableName));
                 drop.execute();
                 drop.close();
             } catch (SQLException e) {
                 System.out.println("删除报错意味着没有表");
             }
 
-            String copyTableOnlyColumnSql = JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).copyTableOnlyColumn(tableName, tmpTableName, jdbcSinkConfig.getPrimaryKeys());
+            String copyTableOnlyColumnSql = JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).copyTableOnlyColumn(tableName, tmpTableName, jdbcSinkConfig);
             PreparedStatement preparedStatement1 = connection.prepareStatement(copyTableOnlyColumnSql);
             preparedStatement1.execute();
             preparedStatement1.close();
             if (!jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
-                PreparedStatement preparedStatement2 = connection.prepareStatement(String.format(
-                        "CREATE UNIQUE INDEX %s ON %s(%s)",
-                        tmpTableName,
-                        tmpTableName,
-                        StringUtils.join(jdbcSinkConfig.getPrimaryKeys(), ',')
-                ));
+                PreparedStatement preparedStatement2 = connection.prepareStatement(JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).createIndex(tmpTableName, jdbcSinkConfig));
                 preparedStatement2.execute();
                 preparedStatement2.close();
             }

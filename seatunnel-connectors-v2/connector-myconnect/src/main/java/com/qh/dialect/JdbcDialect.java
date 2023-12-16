@@ -242,13 +242,13 @@ public interface JdbcDialect extends Serializable {
 
     }
 
-    default String getSinkQueryUpdate(String tableName, List<ColumnMapper> columnMappers, int rowSize) {
+    default String getSinkQueryUpdate(List<ColumnMapper> columnMappers, int rowSize, JdbcSinkConfig jdbcSinkConfig) {
         List<ColumnMapper> ucColumns = columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         String sqlQueryString = " select <columns:{sub | <sub.sinkColumnName>}; separator=\", \"> " +
                 "  from <table> a " +
                 " where  ";
         ST sqlQueryTemplate = new ST(sqlQueryString);
-        sqlQueryTemplate.add("table", tableName);
+        sqlQueryTemplate.add("table", jdbcSinkConfig.getTable());
         sqlQueryTemplate.add("columns", columnMappers);
         String sqlQuery = sqlQueryTemplate.render();
         List<String> where = new ArrayList<>();
@@ -268,13 +268,22 @@ public interface JdbcDialect extends Serializable {
         return sqlQuery;
     }
 
-    default String getSinkQueryZipper(String tableName, List<ColumnMapper> columnMappers, int rowSize) {
+
+    default String insertTableSql(JdbcSinkConfig jdbcSinkConfig, List<String> columns, List<String> values) {
+        String sql = "insert into "
+                + jdbcSinkConfig.getTable()
+                + String.format("(%s)", StringUtils.join(columns, ","))
+                + String.format("values (%s)", StringUtils.join(values, ","));
+        return sql;
+    }
+
+    default String getSinkQueryZipper(List<ColumnMapper> columnMappers, int rowSize, JdbcSinkConfig jdbcSinkConfig) {
         List<ColumnMapper> ucColumns = columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         String sqlQueryString = " select <columns:{sub | <sub.sinkColumnName>}; separator=\", \"> " +
                 "  from <table> a " +
                 " where  ";
         ST sqlQueryTemplate = new ST(sqlQueryString);
-        sqlQueryTemplate.add("table", tableName);
+        sqlQueryTemplate.add("table", jdbcSinkConfig.getTable());
         sqlQueryTemplate.add("columns", columnMappers);
         String sqlQuery = sqlQueryTemplate.render();
         List<String> where = new ArrayList<>();
@@ -294,16 +303,34 @@ public interface JdbcDialect extends Serializable {
         return sqlQuery;
     }
 
-    default String copyTableOnlyColumn(String sourceTable, String targetTable, List<String> columns) {
+    default String copyTableOnlyColumn(String sourceTable, String targetTable, JdbcSinkConfig jdbcSinkConfig) {
         return format("create  table %s as select  %s from %s where 1=2 ",
                 targetTable,
-                StringUtils.join(columns, ','),
+                StringUtils.join(jdbcSinkConfig.getPrimaryKeys(), ','),
                 sourceTable
         );
     }
 
+    default String truncateTable(JdbcSinkConfig jdbcSinkConfig) {
+        return String.format("truncate  table %s", jdbcSinkConfig.getTable());
+    }
+
+    default String dropTable(JdbcSinkConfig jdbcSinkConfig, String tableName) {
+        return String.format("drop table  %s", tableName);
+    }
+
+
+    default String createIndex(String tmpTableName, JdbcSinkConfig jdbcSinkConfig) {
+        return String.format(
+                "CREATE UNIQUE INDEX %s ON %s(%s)",
+                tmpTableName,
+                tmpTableName,
+                StringUtils.join(jdbcSinkConfig.getPrimaryKeys(), ',')
+        );
+    }
+
     default void updateData(Connection connection,
-                            String table,
+                            JdbcSinkConfig jdbcSinkConfig,
                             List<ColumnMapper> columnMappers,
                             List<ColumnMapper> listUc,
                             HashMap<List<String>, SeaTunnelRow> rows,
@@ -314,7 +341,7 @@ public interface JdbcDialect extends Serializable {
                 "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> " +
                 " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
         ST template = new ST(templateInsert);
-        template.add("table", table);
+        template.add("table", jdbcSinkConfig.getTable());
         template.add("columns", columnMappers);
         template.add("pks", listUc);
         String updateSql = template.render();
@@ -364,7 +391,7 @@ public interface JdbcDialect extends Serializable {
         return del;
     }
 
-    default int deleteDataZipper(Connection connection, String table, String ucTable, List<ColumnMapper> columnMappers, LocalDateTime startTime) {
+    default int deleteDataZipper(Connection connection,  JdbcSinkConfig jdbcSinkConfig,  List<ColumnMapper> columnMappers, LocalDateTime startTime) {
         return 0;
     }
 
