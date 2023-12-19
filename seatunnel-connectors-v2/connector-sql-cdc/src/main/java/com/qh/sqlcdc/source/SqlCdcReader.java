@@ -67,15 +67,19 @@ public class SqlCdcReader extends AbstractSingleSplitReader<SeaTunnelRow> {
     public void pollNext(Collector<SeaTunnelRow> output) throws Exception {
         try {
             String sql = this.sqlCdcConfig.getQuery();
-            PreparedStatement ps = conn.prepareStatement(sql);
-            ps.executeQuery();
-            ResultSet resultSet = ps.getResultSet();
-            while (resultSet.next()) {
-                SeaTunnelRow seaTunnelRow = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
-                seaTunnelRow.setRowKind(RowKind.UPDATE_AFTER);
-                output.collect(seaTunnelRow);
+            while (true) {
+                PreparedStatement ps = conn.prepareStatement(sql);
+                ps.executeQuery();
+                ResultSet resultSet = ps.getResultSet();
+                while (resultSet.next()) {
+                    SeaTunnelRow seaTunnelRow = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
+                    seaTunnelRow.setRowKind(RowKind.UPDATE_AFTER);
+                    output.collect(seaTunnelRow);
+                }
+                ps.close();
+                log.info("下一轮循环开始");
+                Thread.sleep(2 * 1000);
             }
-            Thread.sleep(1000 * 3);
         } catch (Exception e) {
             log.warn("get row type info exception", e);
         }

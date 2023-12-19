@@ -42,18 +42,18 @@ public class ClickHouseDialect implements JdbcDialect {
     }
 
 
-    public String getSinkQueryZipper(String tableName, List<ColumnMapper> columnMappers, int rowSize) {
+    public String getSinkQueryZipper(List<ColumnMapper> columnMappers, int rowSize, JdbcSinkConfig jdbcSinkConfig) {
         List<ColumnMapper> ucColumns = columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         String sqlQueryString = " select " +
-                " <columns:{sub |   <if(sub.uc)> <sub.sinkColumnName> <else> argMax( <sub.sinkColumnName>, operateTime) as  <sub.sinkColumnName>  <endif>   }; separator=\", \"> " +
+                " <columns:{sub |   <if(sub.uc)> <sub.sinkColumnName> <else> argMax( <sub.sinkColumnName>, OPERATETIME) as  <sub.sinkColumnName>  <endif>   }; separator=\", \"> " +
                 "  from <table> " +
-                " where operateFlag in ('I', 'U') " +
+                " where OPERATEFLAG in ('I', 'U') " +
                 " and <filter> " +
                 " group by <ucs:{uc | <uc.sinkColumnName>   }; separator=\", \"> " +
                 " order by <ucs:{uc | <uc.sinkColumnName>   }; separator=\" ,\"> ";
 
         ST sqlQueryTemplate = new ST(sqlQueryString);
-        sqlQueryTemplate.add("table", tableName);
+        sqlQueryTemplate.add("table", jdbcSinkConfig.getTable());
         sqlQueryTemplate.add("columns", columnMappers);
         sqlQueryTemplate.add("ucs", ucColumns);
         if (rowSize == 0) {
@@ -80,11 +80,12 @@ public class ClickHouseDialect implements JdbcDialect {
         return sqlQuery;
     }
 
-    public String copyTableOnlyColumn(String sourceTable, String targetTable, List<String> columns) {
-        return format("create  table %s ENGINE = MergeTree order by (%s) as  select  %s from %s where 1=2 ",
+    public String copyTableOnlyColumn(String sourceTable, String targetTable, JdbcSinkConfig jdbcSinkConfig) {
+        List<String> collect = jdbcSinkConfig.getPrimaryKeys().stream().map(x -> "\"" + x + "\"").collect(Collectors.toList());
+        return format("create  table %s ENGINE = MergeTree ORDER BY (%s) as select  %s from %s where 1=2 ",
                 targetTable,
-                StringUtils.join(columns, ','),
-                StringUtils.join(columns, ','),
+                StringUtils.join(collect, ','),
+                StringUtils.join(collect, ','),
                 sourceTable
         );
     }
@@ -172,9 +173,9 @@ public class ClickHouseDialect implements JdbcDialect {
         List<ColumnMapper> ucColumns = columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         int insert = 0;
         String insertSql1 = "select  count(1) sl  " +
-                "    from (select <columns:{sub |   <if(sub.uc)> <sub.sinkColumnName> <else> argMax( <sub.sinkColumnName>, operateTime) as  <sub.sinkColumnName>  <endif>   }; separator=\", \">  " +
+                "    from (select <columns:{sub |   <if(sub.uc)> <sub.sinkColumnName> <else> argMax( <sub.sinkColumnName>, OPERATETIME) as  <sub.sinkColumnName>  <endif>   }; separator=\", \">  " +
                 "            from <table>" +
-                "           where operateFlag in ('I', 'U')" +
+                "           where OPERATEFLAG in ('I', 'U')" +
                 "             AND (<pks:{pk | <pk.sinkColumnName>}; separator=\", \">) NOT IN (SELECT <pks:{pk | <pk.sinkColumnName>}; separator=\", \"> FROM <ucTable> ut)" +
                 "           group by <pks:{pk | <pk.sinkColumnName>}; separator=\", \">" +
                 "           order by <pks:{pk | <pk.sinkColumnName>}; separator=\", \"> ) a";
@@ -183,7 +184,7 @@ public class ClickHouseDialect implements JdbcDialect {
         template1.add("columns", columnMappers);
         template1.add("pks", ucColumns);
         template1.add("ucTable", "UC_" + jdbcSinkConfig.getTable());
-        template1.add("operateTime", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        template1.add("OPERATETIME", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         String render1 = template1.render();
         PreparedStatement preparedStatement1 = null;
         try {
@@ -197,11 +198,11 @@ public class ClickHouseDialect implements JdbcDialect {
             throw new RuntimeException(e);
         }
         String insertSql = "insert into <table>" +
-                "  (<columns:{sub | <sub.sinkColumnName>  }; separator=\", \">, operateFlag, operateTime)" +
-                "  select <columns:{sub | <sub.sinkColumnName> }; separator=\", \">, 'D' operateFlag, '<operateTime>' operateTime" +
-                "    from (select <columns:{sub |   <if(sub.uc)> <sub.sinkColumnName> <else> argMax( <sub.sinkColumnName>, operateTime) as  <sub.sinkColumnName>  <endif>   }; separator=\", \">  " +
+                "  (<columns:{sub | <sub.sinkColumnName>  }; separator=\", \">, OPERATEFLAG, OPERATETIME)" +
+                "  select <columns:{sub | <sub.sinkColumnName> }; separator=\", \">, 'D' OPERATEFLAG, '<OPERATETIME>' OPERATETIME" +
+                "    from (select <columns:{sub |   <if(sub.uc)> <sub.sinkColumnName> <else> argMax( <sub.sinkColumnName>, OPERATETIME) as  <sub.sinkColumnName>  <endif>   }; separator=\", \">  " +
                 "            from <table>" +
-                "           where operateFlag in ('I', 'U')" +
+                "           where OPERATEFLAG in ('I', 'U')" +
                 "             AND (<pks:{pk | <pk.sinkColumnName>}; separator=\", \">) NOT IN (SELECT <pks:{pk | <pk.sinkColumnName>}; separator=\", \"> FROM <ucTable> ut)" +
                 "           group by <pks:{pk | <pk.sinkColumnName>}; separator=\", \">" +
                 "           order by <pks:{pk | <pk.sinkColumnName>}; separator=\", \"> ) a";
@@ -210,7 +211,7 @@ public class ClickHouseDialect implements JdbcDialect {
         template.add("columns", columnMappers);
         template.add("pks", ucColumns);
         template.add("ucTable", "UC_" + jdbcSinkConfig.getTable());
-        template.add("operateTime", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        template.add("OPERATETIME", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         String render = template.render();
         PreparedStatement preparedStatement = null;
         try {
@@ -222,4 +223,6 @@ public class ClickHouseDialect implements JdbcDialect {
         }
         return insert;
     }
+
+
 }

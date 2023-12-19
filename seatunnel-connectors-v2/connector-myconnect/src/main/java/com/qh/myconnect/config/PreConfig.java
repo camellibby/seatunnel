@@ -30,6 +30,9 @@ public class PreConfig implements Serializable {
 
         String tableName = jdbcSinkConfig.getTable();
         String schemaPattern = jdbcSinkConfig.getDbSchema();
+        if (Objects.equals(schemaPattern, "")) {
+            schemaPattern = null;
+        }
 
         DatabaseMetaData metadata = connection.getMetaData();
         ResultSet rsColumn = metadata.getColumns(null, schemaPattern, tableName, null);
