@@ -73,7 +73,7 @@
         <module>connector-rocketmq</module>
         <!--<module>connector-paimon</module>-->
         <module>connector-myconnect</module>
-        <module>connector-sql-cdc</module>
+        <module>connector-sqlcdc</module>
     </modules>
 
     <dependencyManagement>

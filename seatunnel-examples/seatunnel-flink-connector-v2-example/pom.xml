@@ -64,7 +64,7 @@
         </dependency>
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
-            <artifactId>connector-sql-cdc</artifactId>
+            <artifactId>connector-sqlcdc</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
