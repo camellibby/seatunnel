@@ -11,6 +11,9 @@ import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.net.HttpURLConnection;
@@ -175,10 +178,10 @@ public class Util {
         }
     }
 
-    public void sendPostRequest(String url, String data) throws Exception {
+    public String sendPostRequest(String url, String data) throws Exception {
         URL apiUrl = new URL(url);
         HttpURLConnection connection = (HttpURLConnection) apiUrl.openConnection();
-
+        String result = null;
         connection.setRequestMethod("POST");
         connection.setRequestProperty("Content-Type", "application/json");
         connection.setRequestProperty("Accept", "application/json");
@@ -192,11 +195,23 @@ public class Util {
         // 处理响应
         int responseCode = connection.getResponseCode();
         if (responseCode == HttpURLConnection.HTTP_OK) {
-            // 成功处理响应
+
+            InputStream is = connection.getInputStream();
+            //缓冲流包装字符输入流,放入内存中,读取效率更快
+            BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+            StringBuffer stringBuffer1 = new StringBuffer();
+            String line = null;
+            while ((line = br.readLine()) != null) {
+                //将每次读取的行进行保存
+                stringBuffer1.append(line);
+                stringBuffer1.append("\r\n");
+            }
+            result = stringBuffer1.toString();
         } else {
             // 处理失败响应
         }
         connection.disconnect();
+        return result;
     }
 
     public Connection getConnection(JdbcSinkConfig jdbcSinkConfig) {

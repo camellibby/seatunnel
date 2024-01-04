@@ -1,5 +1,6 @@
 package com.qh.myconnect.sink;
 
+import com.alibaba.fastjson.JSONObject;
 import com.qh.myconnect.config.JdbcSinkConfig;
 import com.qh.myconnect.config.Util;
 import com.qh.myconnect.converter.ColumnMapper;
@@ -11,6 +12,7 @@ import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
+
 import java.io.IOException;
 import java.sql.*;
 import java.time.LocalDateTime;
@@ -56,7 +58,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
         this.sinkTableRowType = util.initTableField(conn, this.jdbcDialect, this.jdbcSinkConfig);
         this.initColumnMappers(this.jdbcSinkConfig, this.sourceRowType, this.sinkTableRowType, conn);
         this.tableCount = tableCount;
-        String sqlQuery = jdbcDialect.getSinkQueryUpdate(this.columnMappers, 0,jdbcSinkConfig);
+        String sqlQuery = jdbcDialect.getSinkQueryUpdate(this.columnMappers, 0, jdbcSinkConfig);
         PreparedStatement preparedStatementQuery = conn.prepareStatement(sqlQuery);
         ResultSet resultSet = preparedStatementQuery.executeQuery();
         ResultSetMetaData metaData = resultSet.getMetaData();
@@ -66,6 +68,14 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
         }
         this.metaDataHash = metaDataHash;
         preparedStatementQuery.close();
+        String addLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/addRedisLock";
+        JSONObject param = new JSONObject();
+        param.put("flinkJobId", this.jobContext.getJobId());
+        try {
+            util.sendPostRequest(addLockUrl, param.toString());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -93,7 +103,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
         try (Connection conn = DriverManager.getConnection(this.jdbcSinkConfig.getUrl(), this.jdbcSinkConfig.getUser(), this.jdbcSinkConfig.getPassWord())) {
             List<String> columns = this.columnMappers.stream().map(x -> x.getSinkColumnName()).collect(Collectors.toList());
             List<String> values = this.columnMappers.stream().map(x -> "?").collect(Collectors.toList());
-            String sql = jdbcDialect.insertTableSql(this.jdbcSinkConfig,columns,values);
+            String sql = jdbcDialect.insertTableSql(this.jdbcSinkConfig, columns, values);
             PreparedStatement psUpsert = conn.prepareStatement(sql);
             for (SeaTunnelRow seaTunnelRow : this.cld) {
                 if (seaTunnelRow != null) {
@@ -115,8 +125,21 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
     }
 
     public void statisticalResults() throws Exception {
+        String reduceLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/reduceRedisLock";
+        JSONObject param = new JSONObject();
+        param.put("flinkJobId", this.jobContext.getJobId());
         LocalDateTime endTime = LocalDateTime.now();
-        util.insertLog(writeCount, 0L, tableCount, 0L, writeCount, this.jobContext.getJobId(), startTime, endTime);
+        Long deleteCount = 0L;
+        try {
+            String result = util.sendPostRequest(reduceLockUrl, param.toString());
+            if (result != null && Long.parseLong(result.replace("\"", "").replaceAll("\\n", "").replaceAll("\\r", "")) == 0) {
+                deleteCount = this.tableCount;
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        util.insertLog(writeCount, 0L, deleteCount, 0L, writeCount, this.jobContext.getJobId(), startTime, endTime);
     }
 
     private void initColumnMappers(JdbcSinkConfig jdbcSinkConfig, SeaTunnelRowType sourceRowType, SeaTunnelRowType sinkTableRowType, Connection conn) throws SQLException {
@@ -132,7 +155,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
             String typeNameSK = sinkTableRowType.getFieldType(sinkTableRowType.indexOf(v)).getTypeClass().getName();
             columnMapper.setSinkColumnTypeName(typeNameSK);
             try {
-                ResultSetMetaData metaData = this.jdbcDialect.getResultSetMetaData(conn,jdbcSinkConfig);
+                ResultSetMetaData metaData = this.jdbcDialect.getResultSetMetaData(conn, jdbcSinkConfig);
                 for (int i = 0; i < metaData.getColumnCount(); i++) {
                     String columnName = metaData.getColumnName(i + 1);
                     if (v.equalsIgnoreCase(columnName)) {

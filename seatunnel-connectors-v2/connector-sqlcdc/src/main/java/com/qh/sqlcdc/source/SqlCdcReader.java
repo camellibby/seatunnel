@@ -30,6 +30,8 @@ import org.apache.seatunnel.connectors.seatunnel.common.source.SingleSplitReader
 
 import java.io.IOException;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 public class SqlCdcReader extends AbstractSingleSplitReader<SeaTunnelRow> {
@@ -66,6 +68,8 @@ public class SqlCdcReader extends AbstractSingleSplitReader<SeaTunnelRow> {
     @Override
     public void pollNext(Collector<SeaTunnelRow> output) throws Exception {
         try {
+            List<SeaTunnelRow> tmp = new ArrayList<>();
+            List<SeaTunnelRow> tmp2 = new ArrayList<>();
             String sql = this.sqlCdcConfig.getQuery();
             while (true) {
                 PreparedStatement ps = conn.prepareStatement(sql);
@@ -74,11 +78,22 @@ public class SqlCdcReader extends AbstractSingleSplitReader<SeaTunnelRow> {
                 while (resultSet.next()) {
                     SeaTunnelRow seaTunnelRow = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
                     seaTunnelRow.setRowKind(RowKind.UPDATE_AFTER);
+                    tmp2.add(seaTunnelRow);
                     output.collect(seaTunnelRow);
                 }
                 ps.close();
-                log.info("下一轮循环开始");
-                Thread.sleep(2 * 1000);
+                Thread.sleep(3 * 1000);
+                if(tmp.size()>tmp2.size()){
+                    tmp.removeAll(tmp2);
+                    System.out.println(tmp);
+                    for (SeaTunnelRow seaTunnelRow : tmp) {
+                        seaTunnelRow.setRowKind(RowKind.DELETE);
+                        output.collect(seaTunnelRow);
+                    }
+                }
+                tmp.clear();
+                tmp.addAll(tmp2);
+                tmp2.clear();
             }
         } catch (Exception e) {
             log.warn("get row type info exception", e);

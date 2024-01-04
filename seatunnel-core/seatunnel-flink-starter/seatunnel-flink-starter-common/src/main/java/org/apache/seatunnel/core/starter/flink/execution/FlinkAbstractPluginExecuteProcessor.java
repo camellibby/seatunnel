@@ -84,7 +84,7 @@ public abstract class FlinkAbstractPluginExecuteProcessor<T>
             if (output == null) {
                 output = stream;
             } else {
-                output.union(stream);
+                output = output.union(stream);
             }
         }
         return output;

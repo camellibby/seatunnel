@@ -81,10 +81,9 @@ public class ClickHouseDialect implements JdbcDialect {
     }
 
     public String copyTableOnlyColumn(String sourceTable, String targetTable, JdbcSinkConfig jdbcSinkConfig) {
-        List<String> collect = jdbcSinkConfig.getPrimaryKeys().stream().map(x -> "\"" + x + "\"").collect(Collectors.toList());
-        return format("create  table %s ENGINE = MergeTree ORDER BY (%s) as select  %s from %s where 1=2 ",
+        List<String> collect = jdbcSinkConfig.getPrimaryKeys().stream().map(x -> "`" + x + "`").collect(Collectors.toList());
+        return format("create  table %s ENGINE = MergeTree ORDER BY tuple() as select  %s from %s where 1=2 ",
                 targetTable,
-                StringUtils.join(collect, ','),
                 StringUtils.join(collect, ','),
                 sourceTable
         );

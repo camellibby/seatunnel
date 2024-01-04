@@ -305,6 +305,26 @@ public class OracleDialect implements JdbcDialect {
         return sql;
     }
 
+    public int deleteData(Connection connection, String table, String ucTable, List<ColumnMapper> ucColumns) {
+        String delSql = "delete from  <table> a   " +
+                " where not exists " +
+                "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> b where <pks:{pk | a.<pk.sinkColumnName>=b.<pk.sinkColumnName> }; separator=\" and \">  ) ";
+        ST template = new ST(delSql);
+        template.add("table", table);
+        template.add("tmpTable", ucTable);
+        template.add("pks", ucColumns);
+        PreparedStatement preparedStatement = null;
+        int del = 0;
+        try {
+            preparedStatement = connection.prepareStatement(template.render());
+            del = preparedStatement.executeUpdate();
+            preparedStatement.close();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        return del;
+    }
+
 
     public String copyTableOnlyColumn(String sourceTable, String targetTable, JdbcSinkConfig jdbcSinkConfig) {
         List<String> collect = jdbcSinkConfig.getPrimaryKeys().stream().map(x -> "\"" + x + "\"").collect(Collectors.toList());

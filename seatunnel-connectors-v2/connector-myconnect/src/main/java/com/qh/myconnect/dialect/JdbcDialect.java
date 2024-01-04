@@ -372,9 +372,9 @@ public interface JdbcDialect extends Serializable {
     }
 
     default int deleteData(Connection connection, String table, String ucTable, List<ColumnMapper> ucColumns) {
-        String delSql = "delete from  <table> a   " +
+        String delSql = "delete from  <table>    " +
                 " where not exists " +
-                "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> b where <pks:{pk | a.<pk.sinkColumnName>=b.<pk.sinkColumnName> }; separator=\" and \">  ) ";
+                "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> where <pks:{pk | <table>.<pk.sinkColumnName>=<tmpTable>.<pk.sinkColumnName> }; separator=\" and \">  ) ";
         ST template = new ST(delSql);
         template.add("table", table);
         template.add("tmpTable", ucTable);

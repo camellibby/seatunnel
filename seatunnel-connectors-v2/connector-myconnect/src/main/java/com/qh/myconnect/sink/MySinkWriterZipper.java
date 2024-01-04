@@ -1,5 +1,6 @@
 package com.qh.myconnect.sink;
 
+import com.alibaba.fastjson.JSONObject;
 import com.qh.myconnect.config.JdbcSinkConfig;
 import com.qh.myconnect.config.Util;
 import com.qh.myconnect.converter.ColumnMapper;
@@ -80,6 +81,14 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     }
 
     private void consumeData() {
+        String addLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/addRedisLock";
+        JSONObject param = new JSONObject();
+        param.put("flinkJobId", this.jobContext.getJobId());
+        try {
+            util.sendPostRequest(addLockUrl, param.toString());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         HashMap<List<String>, SeaTunnelRow> sourceRows = new HashMap<>();
         List<ColumnMapper> ucColumns = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         for (SeaTunnelRow seaTunnelRow : cld) {
@@ -294,8 +303,19 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     }
 
     private void statisticalResults(Connection conn) throws Exception {
-        int del = this.jdbcDialect.deleteDataZipper(conn, jdbcSinkConfig, this.columnMappers, this.startTime);
-        deleteCount.add(del);
+        String reduceLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/reduceRedisLock";
+        JSONObject param = new JSONObject();
+        param.put("flinkJobId", this.jobContext.getJobId());
+        try {
+            String result = util.sendPostRequest(reduceLockUrl, param.toString());
+            if (result != null && Long.parseLong(result.replace("\"", "").replaceAll("\\n", "").replaceAll("\\r", "")) == 0) {
+                int del = this.jdbcDialect.deleteDataZipper(conn, jdbcSinkConfig, this.columnMappers, this.startTime);
+                deleteCount.add(del);
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         LocalDateTime endTime = LocalDateTime.now();
         util.insertLog(writeCount.longValue(),
                 updateCount.longValue(),

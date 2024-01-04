@@ -65,7 +65,11 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
         PreConfig preConfig = jdbcSinkConfig.getPreConfig();
         try (Connection conn = DriverManager.getConnection(jdbcSinkConfig.getUrl(), jdbcSinkConfig.getUser(), jdbcSinkConfig.getPassWord())) {
             JdbcDialect jdbcDialect = JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType());
-            this.tableCount = jdbcDialect.getTableCount(conn, jdbcSinkConfig.getTable());
+            if (jdbcSinkConfig.getDbType().equalsIgnoreCase("oracle")) {
+                this.tableCount = jdbcDialect.getTableCount(conn, jdbcSinkConfig.getDbSchema() + "." + jdbcSinkConfig.getTable());
+            } else {
+                this.tableCount = jdbcDialect.getTableCount(conn, jdbcSinkConfig.getTable());
+            }
             preConfig.doPreConfig(conn, jdbcSinkConfig);
         } catch (SQLException e) {
             throw new RuntimeException(e);

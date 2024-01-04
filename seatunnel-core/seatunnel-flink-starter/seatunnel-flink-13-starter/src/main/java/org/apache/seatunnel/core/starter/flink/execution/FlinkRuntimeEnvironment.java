@@ -178,7 +178,9 @@ public class FlinkRuntimeEnvironment implements RuntimeEnvironment {
 
     private void createStreamTableEnvironment() {
         EnvironmentSettings environmentSettings =
-                EnvironmentSettings.newInstance().inStreamingMode().useBlinkPlanner().build();
+//                EnvironmentSettings.newInstance().inStreamingMode().useBlinkPlanner().build();
+                EnvironmentSettings.newInstance().inStreamingMode().build();
+
         tableEnvironment =
                 StreamTableEnvironment.create(getStreamExecutionEnvironment(), environmentSettings);
         TableConfig config = tableEnvironment.getConfig();
