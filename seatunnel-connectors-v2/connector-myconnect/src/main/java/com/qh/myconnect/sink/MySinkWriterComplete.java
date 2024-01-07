@@ -153,7 +153,12 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
         try {
             String result = util.sendPostRequest(reduceLockUrl, param.toString());
             if (result != null && Long.parseLong(result.replace("\"", "").replaceAll("\\n", "").replaceAll("\\r", "")) == 0) {
-                deleteCount = this.tableCount;
+                if (this.writeCount == 0) {
+                    deleteCount = this.writeCount;
+                } else {
+                    deleteCount = this.tableCount;
+                }
+
             }
 
         } catch (Exception e) {
