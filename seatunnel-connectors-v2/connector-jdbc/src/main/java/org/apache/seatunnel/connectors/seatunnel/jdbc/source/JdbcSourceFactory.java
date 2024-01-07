@@ -154,7 +154,11 @@ public class JdbcSourceFactory implements TableSourceFactory {
                         config.getPartitionUpperBound().isPresent()
                                 ? config.getPartitionUpperBound().get()
                                 : rs.getLong(1);
-                min = 1;
+                if (max == 0) {
+                    min = 0;
+                } else {
+                    min = 1;
+                }
 //                        config.getPartitionLowerBound().isPresent()
 //                                ? config.getPartitionLowerBound().get()
 //                                : rs.getLong(2);

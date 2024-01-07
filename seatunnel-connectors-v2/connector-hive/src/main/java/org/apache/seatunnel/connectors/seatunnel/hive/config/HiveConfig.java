@@ -37,6 +37,24 @@ public class HiveConfig {
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Hive metastore uri");
+    public static final Option<String> JDBC_URL =
+            Options.key("jdbc_url")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Hive jdbc url");
+
+    public static final Option<String> USER =
+            Options.key("user")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Hive jdbc user");
+    public static final Option<String> PASSWORD =
+            Options.key("password")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Hive jdbc password");
+
+
     public static final String TEXT_INPUT_FORMAT_CLASSNAME =
             "org.apache.hadoop.mapred.TextInputFormat";
     public static final String TEXT_OUTPUT_FORMAT_CLASSNAME =

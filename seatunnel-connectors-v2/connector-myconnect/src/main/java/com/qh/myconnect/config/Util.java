@@ -186,7 +186,6 @@ public class Util {
         connection.setRequestProperty("Content-Type", "application/json");
         connection.setRequestProperty("Accept", "application/json");
         connection.setDoOutput(true);
-
         OutputStream outputStream = connection.getOutputStream();
         outputStream.write(data.getBytes());
         outputStream.flush();
@@ -204,7 +203,6 @@ public class Util {
             while ((line = br.readLine()) != null) {
                 //将每次读取的行进行保存
                 stringBuffer1.append(line);
-                stringBuffer1.append("\r\n");
             }
             result = stringBuffer1.toString();
         } else {
@@ -235,4 +233,24 @@ public class Util {
             throw new RuntimeException(e);
         }
     }
+
+    public void truncateTable(TruncateTable bean) {
+        String st_truncate_url = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/truncateTable";
+        JSONObject param = new JSONObject();
+        param.put("flinkJobId", bean.getFlinkJobId());
+        param.put("dataSourceId", bean.getDataSourceId());
+        param.put("tableName", bean.getTableName());
+        try {
+            for (int i = 0; i < 3600; i++) {
+                String value = this.sendPostRequest(st_truncate_url, param.toString());
+                if (value.equalsIgnoreCase("true")) {
+                    break;
+                }
+                Thread.sleep(1000);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }

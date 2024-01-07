@@ -279,6 +279,16 @@ public class JdbcInputFormat implements Serializable {
                     }
 
                 }
+            } else {
+                try {
+                    Connection dbConn = connectionProvider.getOrEstablishConnection();
+                    this.queryTemplate = String.format("select  * from  (%s) a  ",
+                            this.jdbcSourceConfig.getQuery()
+                    );
+                    this.statement = jdbcDialect.creatPreparedStatement(dbConn, queryTemplate, fetchSize);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
             }
             resultSet = statement.executeQuery();
             hasNext = resultSet.next();

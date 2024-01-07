@@ -2,6 +2,8 @@ package com.qh.myconnect.sink;
 
 import com.alibaba.fastjson.JSONObject;
 import com.qh.myconnect.config.JdbcSinkConfig;
+import com.qh.myconnect.config.PreConfig;
+import com.qh.myconnect.config.TruncateTable;
 import com.qh.myconnect.config.Util;
 import com.qh.myconnect.converter.ColumnMapper;
 import com.qh.myconnect.dialect.JdbcDialect;
@@ -46,12 +48,15 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
 
     private Long tableCount;
 
+    private PreConfig preConfig;
+
     public MySinkWriterComplete(SeaTunnelRowType seaTunnelRowType, Context context, ReadonlyConfig config, JobContext jobContext, Long tableCount) throws SQLException {
         this.jobContext = jobContext;
         this.sourceRowType = seaTunnelRowType;
         this.context = context;
         this.jdbcSinkConfig = JdbcSinkConfig.of(config);
         this.table = this.jdbcSinkConfig.getTable();
+        this.preConfig = jdbcSinkConfig.getPreConfig();
         this.startTime = LocalDateTime.now();
         this.jdbcDialect = JdbcDialectFactory.getJdbcDialect(this.jdbcSinkConfig.getDbType());
         this.conn = util.getConnection(this.jdbcSinkConfig);
@@ -81,6 +86,21 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
     @Override
     public void write(SeaTunnelRow element) throws IOException {
         this.writeCount++;
+        if (this.writeCount == 1) {
+            if (this.preConfig.getInsertMode().equalsIgnoreCase("complete")) {
+                if (this.preConfig.isCleanTableWhenComplete() && !this.preConfig.isCleanTableWhenCompleteNoDataIn()) {
+                    TruncateTable truncateTable = new TruncateTable();
+                    truncateTable.setFlinkJobId(this.jobContext.getJobId());
+                    truncateTable.setDataSourceId(this.jdbcSinkConfig.getDbDatasourceId());
+                    if (this.jdbcSinkConfig.getDbSchema() != null && !this.jdbcSinkConfig.getDbSchema().equalsIgnoreCase("")) {
+                        truncateTable.setTableName(this.jdbcSinkConfig.getDbSchema() + "." + this.jdbcSinkConfig.getTable());
+                    } else {
+                        truncateTable.setTableName(this.jdbcSinkConfig.getTable());
+                    }
+                    util.truncateTable(truncateTable);
+                }
+            }
+        }
         this.cld.add(element);
         if (this.writeCount.longValue() % batchSize == 0) {
             this.insertToDb();

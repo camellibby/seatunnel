@@ -15,11 +15,12 @@ public class PreConfig implements Serializable {
     private String insertMode;//插入模式 全量 complete  增量 increment
     @OptionMark(description = "全量模式是否清空表 true清 false不清")
     private boolean cleanTableWhenComplete;
+    @OptionMark(description = "无数据输入全量模式继续清空表 true清 false不清")
+    private boolean cleanTableWhenCompleteNoDataIn = false;
     @OptionMark(description = "增量模式 update或者zipper模式 ")
     private String incrementMode;
 
-//    @JsonIgnore
-//    private static final List<String> zipperColumns = Arrays.asList("operateFlag", "operateTime");
+
 
 
     public PreConfig() {
@@ -46,9 +47,8 @@ public class PreConfig implements Serializable {
             throw new RuntimeException("目标表不存在");
         }
 
-
         if (this.insertMode.equalsIgnoreCase("complete")) {
-            if (this.cleanTableWhenComplete) {
+            if (this.cleanTableWhenComplete && this.cleanTableWhenCompleteNoDataIn) {
                 Statement st = connection.createStatement();
                 st.execute(JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).truncateTable(jdbcSinkConfig));
                 st.close();
