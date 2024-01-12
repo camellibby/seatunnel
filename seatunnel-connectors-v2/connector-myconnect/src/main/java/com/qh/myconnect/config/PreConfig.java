@@ -21,8 +21,6 @@ public class PreConfig implements Serializable {
     private String incrementMode;
 
 
-
-
     public PreConfig() {
     }
 
@@ -75,7 +73,7 @@ public class PreConfig implements Serializable {
             preparedStatement1.execute();
             preparedStatement1.close();
             if (!jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
-                PreparedStatement preparedStatement2 = connection.prepareStatement(JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).createIndex(tmpTableName, jdbcSinkConfig));
+                PreparedStatement preparedStatement2 = connection.prepareStatement(JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).createIndex( tmpTableName, jdbcSinkConfig));
                 preparedStatement2.execute();
                 preparedStatement2.close();
             }

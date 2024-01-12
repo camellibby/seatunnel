@@ -3,6 +3,7 @@ package com.qh.myconnect.dialect;
 import com.qh.myconnect.dialect.ClickHouse.ClickHouseDialect;
 import com.qh.myconnect.dialect.mysql.MysqlDialect;
 import com.qh.myconnect.dialect.oracle.OracleDialect;
+import com.qh.myconnect.dialect.pgsql.PostgresDialect;
 
 import java.util.HashMap;
 
@@ -13,6 +14,7 @@ public class JdbcDialectFactory {
             put("oracle", new OracleDialect());
             put("mysql", new MysqlDialect());
             put("clickhouse", new ClickHouseDialect());
+            put("pgsql", new PostgresDialect());
         }
     };
 
