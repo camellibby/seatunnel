@@ -67,6 +67,7 @@ public class MyHiveSource extends AbstractSingleSplitSource<SeaTunnelRow> {
             if (null != hiveConfig.getPassword() && !hiveConfig.getPassword().equalsIgnoreCase("")) {
                 password = hiveConfig.getPassword();
             }
+            DriverManager.setLoginTimeout(10);
             Connection conn = DriverManager.getConnection(hiveConfig.getJdbc_url(), hiveConfig.getUser(), password);
 
             String tableName = this.hiveConfig.getTableName();
@@ -75,13 +76,14 @@ public class MyHiveSource extends AbstractSingleSplitSource<SeaTunnelRow> {
             ResultSet rs = ps.executeQuery();
             ResultSetMetaData metaData = rs.getMetaData();
             for (int i = 1; i <= metaData.getColumnCount(); i++) {
-                fieldNames.add(metaData.getColumnName(i).replace("qinhuanbieming.",""));
+                fieldNames.add(metaData.getColumnName(i).replace("qinhuanbieming.", ""));
                 seaTunnelDataTypes.add(mapping(metaData, i));
             }
             ps.close();
             conn.close();
         } catch (Exception e) {
             log.warn("get row type info exception", e);
+            throw new RuntimeException(e);
         }
         return new SeaTunnelRowType(
                 fieldNames.toArray(new String[0]),
@@ -121,7 +123,7 @@ public class MyHiveSource extends AbstractSingleSplitSource<SeaTunnelRow> {
 
             // Doesn't support yet
             case "ARRAY":
-                return  STRING_ARRAY_TYPE;
+                return STRING_ARRAY_TYPE;
             case "MAP":
             case "STRUCT":
             case "UNION":

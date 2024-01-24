@@ -10,7 +10,9 @@ import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.seatunnel.core.starter.flink.utils.HttpUtil;
 
 import javax.annotation.Nullable;
+import java.io.PrintWriter;
 import java.io.Serializable;
+import java.io.StringWriter;
 
 @Slf4j
 public class MyJobListener implements JobListener, Serializable {
@@ -29,7 +31,7 @@ public class MyJobListener implements JobListener, Serializable {
 
     @Override
     public void onJobExecuted(@Nullable JobExecutionResult jobExecutionResult, @Nullable Throwable throwable) {
-        String st_log_back_url = System.getenv("ST_LOG_BACK_URL");
+        String st_log_back_url = System.getenv("ST_SERVICE_URL")+"/SeaTunnelJob/flinkCallBack";
         if (throwable == null) {
             try {
                 ObjectMapper mapper = new ObjectMapper();
@@ -46,16 +48,11 @@ public class MyJobListener implements JobListener, Serializable {
                 ObjectNode objectNode = mapper.createObjectNode();
                 objectNode.put("jobId", this.jobId);
                 objectNode.put("status", "FAILED");
-                Throwable cause = throwable.getCause();
-                while (true) {
-                    if (cause != null) {
-//                        System.out.println(cause.getMessage());
-                        objectNode.put("error", cause.getMessage());
-                        cause = cause.getCause();
-                    } else {
-                        break;
-                    }
-                }
+                StringWriter sw = new StringWriter();
+                PrintWriter pw = new PrintWriter(sw);
+                throwable.printStackTrace(pw);
+                String exceptionString = sw.toString();
+                objectNode.put("error", exceptionString);
                 HttpUtil.sendPostRequest(st_log_back_url, objectNode.toString());
             } catch (Exception e) {
                 throw new RuntimeException(e);

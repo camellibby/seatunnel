@@ -32,25 +32,25 @@ public class SeaTunnelApiExample {
 
     public static void main(String[] args)
             throws FileNotFoundException, URISyntaxException, CommandException {
-        String configurePath = args.length > 0 ? args[0] : "/examples/a6.json";
-        String configFile = getTestConfigFile(configurePath);
-        FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
-        flinkCommandArgs.setConfigFile(configFile);
-        flinkCommandArgs.setCheckConfig(false);
-        flinkCommandArgs.setVariables(null);
-        System.setProperty("HADOOP_USER_NAME", "hdfs");
-        SeaTunnel.run(flinkCommandArgs.buildCommand());
-
+//        String configurePath = args.length > 0 ? args[0] : "/examples/a6.json";
+//        String configFile = getTestConfigFile(configurePath);
 //        FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
-//        flinkCommandArgs.setDb(true);
-//        flinkCommandArgs.setConfigFile("1735842327763320833");
-//        String fid= UUID.randomUUID().toString().replaceAll("-", "");
-//        System.out.println("---------------------------------------fid---------------------------"+fid);
-//        flinkCommandArgs.setFlinkJobId(fid);
+//        flinkCommandArgs.setConfigFile(configFile);
 //        flinkCommandArgs.setCheckConfig(false);
 //        flinkCommandArgs.setVariables(null);
 //        System.setProperty("HADOOP_USER_NAME", "hdfs");
 //        SeaTunnel.run(flinkCommandArgs.buildCommand());
+
+        FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
+        flinkCommandArgs.setDb(true);
+        flinkCommandArgs.setConfigFile("1750048514242052097");
+        String fid= UUID.randomUUID().toString().replaceAll("-", "");
+        System.out.println("---------------------------------------fid---------------------------"+fid);
+        flinkCommandArgs.setFlinkJobId(fid);
+        flinkCommandArgs.setCheckConfig(false);
+        flinkCommandArgs.setVariables(null);
+        System.setProperty("HADOOP_USER_NAME", "hdfs");
+        SeaTunnel.run(flinkCommandArgs.buildCommand());
 
     }
 

@@ -3,6 +3,7 @@ package com.qh.sqlcdc.dialect;
 import com.qh.sqlcdc.dialect.ClickHouse.ClickHouseDialect;
 import com.qh.sqlcdc.dialect.mysql.MysqlDialect;
 import com.qh.sqlcdc.dialect.oracle.OracleDialect;
+import com.qh.sqlcdc.dialect.pgsql.PgSqlDialect;
 
 import java.util.HashMap;
 
@@ -13,6 +14,7 @@ public class JdbcDialectFactory {
             put("oracle", new OracleDialect());
             put("mysql", new MysqlDialect());
             put("clickhouse", new ClickHouseDialect());
+            put("pgsql", new PgSqlDialect());
         }
     };
 
