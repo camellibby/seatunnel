@@ -20,6 +20,8 @@ package com.qh.sqlcdc.config;
 import org.apache.seatunnel.api.configuration.Option;
 import org.apache.seatunnel.api.configuration.Options;
 
+import java.util.List;
+
 public class SqlCdcConfigOptions {
     private static final int DEFAULT_MAX_RETRIES = 3;
 
@@ -42,4 +44,12 @@ public class SqlCdcConfigOptions {
             Options.key("password").stringType().noDefaultValue().withDescription("password");
 
 
+    public static Option<List<String>> PRIMARY_KEYS =
+            Options.key("primary_keys").listType().noDefaultValue().withDescription("primary keys");
+
+    public static Option<String> PARTITION_COLUMN =
+            Options.key("partition_column")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("partition column");
 }

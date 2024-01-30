@@ -80,7 +80,13 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
     private void consumeData() {
         String addLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/addRedisLock";
         JSONObject param = new JSONObject();
-        param.put("flinkJobId", this.jobContext.getJobId());
+        String lockId = String.format("%s:%s:%s:%s:count",
+                this.jobContext.getJobId(),
+                this.jdbcSinkConfig.getDbDatasourceId(),
+                this.jdbcSinkConfig.getDbSchema(),
+                this.jdbcSinkConfig.getTable()
+        );
+        param.put("lockId", lockId);
         try {
             util.sendPostRequest(addLockUrl, param.toString());
         } catch (Exception e) {
@@ -251,7 +257,13 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         LocalDateTime endTime = LocalDateTime.now();
         String reduceLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/reduceRedisLock";
         JSONObject param = new JSONObject();
-        param.put("flinkJobId", this.jobContext.getJobId());
+        String lockId = String.format("%s:%s:%s:%s:count",
+                this.jobContext.getJobId(),
+                this.jdbcSinkConfig.getDbDatasourceId(),
+                this.jdbcSinkConfig.getDbSchema(),
+                this.jdbcSinkConfig.getTable()
+        );
+        param.put("lockId", lockId);
         try {
             String result = util.sendPostRequest(reduceLockUrl, param.toString());
             if (result != null && Long.parseLong(result.replace("\"", "").replaceAll("\\n", "").replaceAll("\\r", "")) == 0) {

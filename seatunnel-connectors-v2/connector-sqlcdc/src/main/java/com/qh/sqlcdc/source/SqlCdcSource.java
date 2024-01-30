@@ -16,6 +16,7 @@
  */
 
 package com.qh.sqlcdc.source;
+
 import com.google.auto.service.AutoService;
 import com.qh.sqlcdc.config.SqlCdcConfig;
 import com.qh.sqlcdc.config.Util;
@@ -25,23 +26,23 @@ import com.qh.sqlcdc.dialect.JdbcDialectTypeMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.common.PrepareFailException;
-import org.apache.seatunnel.api.source.Boundedness;
-import org.apache.seatunnel.api.source.SeaTunnelSource;
+import org.apache.seatunnel.api.source.*;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.constants.JobMode;
-import org.apache.seatunnel.connectors.seatunnel.common.source.AbstractSingleSplitReader;
-import org.apache.seatunnel.connectors.seatunnel.common.source.AbstractSingleSplitSource;
-import org.apache.seatunnel.connectors.seatunnel.common.source.SingleSplitReaderContext;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSetMetaData;
 import java.util.ArrayList;
+
 @AutoService(SeaTunnelSource.class)
 @Slf4j
-public class SqlCdcSource extends AbstractSingleSplitSource<SeaTunnelRow> {
+public class SqlCdcSource implements SeaTunnelSource<SeaTunnelRow, SqlCdcSourceSplit, ArrayList<SqlCdcSourceSplit>>,
+        SupportParallelism,
+        SupportColumnProjection {
     private SqlCdcConfig sqlCdcConfig;
     private JobContext jobContext;
     private JdbcDialect jdbcDialect;
@@ -78,9 +79,19 @@ public class SqlCdcSource extends AbstractSingleSplitSource<SeaTunnelRow> {
     }
 
     @Override
-    public AbstractSingleSplitReader<SeaTunnelRow> createReader(
-            SingleSplitReaderContext readerContext) throws Exception {
+    public SourceReader<SeaTunnelRow, SqlCdcSourceSplit> createReader(SourceReader.Context readerContext) throws Exception {
         return new SqlCdcReader(this.sqlCdcConfig, readerContext, jdbcDialect, typeInfo);
+    }
+
+    @Override
+    public SourceSplitEnumerator<SqlCdcSourceSplit, ArrayList<SqlCdcSourceSplit>> createEnumerator(SourceSplitEnumerator.Context<SqlCdcSourceSplit> enumeratorContext) throws Exception {
+        return new SqlCdcSourceSplitEnumerator(
+                enumeratorContext, sqlCdcConfig);
+    }
+
+    @Override
+    public SourceSplitEnumerator<SqlCdcSourceSplit, ArrayList<SqlCdcSourceSplit>> restoreEnumerator(SourceSplitEnumerator.Context<SqlCdcSourceSplit> enumeratorContext, ArrayList<SqlCdcSourceSplit> checkpointState) throws Exception {
+        return null;
     }
 
 

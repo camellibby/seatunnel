@@ -21,34 +21,48 @@ import com.qh.sqlcdc.config.SqlCdcConfig;
 import com.qh.sqlcdc.config.Util;
 import com.qh.sqlcdc.dialect.JdbcDialect;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.source.Collector;
-import org.apache.seatunnel.api.table.type.RowKind;
-import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
-import org.apache.seatunnel.connectors.seatunnel.common.source.AbstractSingleSplitReader;
-import org.apache.seatunnel.connectors.seatunnel.common.source.SingleSplitReaderContext;
+import org.apache.seatunnel.api.source.SourceReader;
+import org.apache.seatunnel.api.table.type.*;
+import org.apache.seatunnel.common.exception.CommonErrorCode;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.Date;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
-public class SqlCdcReader extends AbstractSingleSplitReader<SeaTunnelRow> {
+public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSplit> {
     private final SqlCdcConfig sqlCdcConfig;
-    private final SingleSplitReaderContext context;
+    private final SourceReader.Context context;
 
     private Connection conn;
 
     private final JdbcDialect jdbcDialect;
     private final SeaTunnelRowType typeInfo;
 
-    SqlCdcReader(SqlCdcConfig sqlCdcConfig, SingleSplitReaderContext context, JdbcDialect jdbcDialect, SeaTunnelRowType typeInfo) {
+    private final Integer currentTaskId;
+    private final Integer allTask;
+
+    private long startRowNumber;
+    private long endRowNumber;
+
+
+    SqlCdcReader(SqlCdcConfig sqlCdcConfig, SourceReader.Context context, JdbcDialect jdbcDialect, SeaTunnelRowType typeInfo) {
         this.conn = new Util().getConnection(sqlCdcConfig);
         this.sqlCdcConfig = sqlCdcConfig;
         this.context = context;
         this.jdbcDialect = jdbcDialect;
         this.typeInfo = typeInfo;
+        this.currentTaskId = context.getIndexOfSubtask();
+        this.allTask = this.sqlCdcConfig.getPartitionNum();
+//        System.out.println("currentTaskId" + currentTaskId);
     }
 
     @Override
@@ -68,35 +82,208 @@ public class SqlCdcReader extends AbstractSingleSplitReader<SeaTunnelRow> {
     @Override
     public void pollNext(Collector<SeaTunnelRow> output) throws Exception {
         try {
-            List<SeaTunnelRow> tmp = new ArrayList<>();
-            List<SeaTunnelRow> tmp2 = new ArrayList<>();
+            conn.setAutoCommit(false);
             String sql = this.sqlCdcConfig.getQuery();
+            String totalCountSql = String.format("select count(1) sl from (%s) t", sql);
+            PreparedStatement psTotal = conn.prepareStatement(totalCountSql);
+            ResultSet resultSet1 = psTotal.executeQuery();
+            long totalSl = 0;
+            int interval = 0;
+            while (resultSet1.next()) {
+                totalSl = resultSet1.getLong("sl");
+                interval = (int) Math.ceil((double) totalSl / this.allTask);
+            }
+            psTotal.close();
+            for (int i = 0; i < allTask; i++) {
+                if (i == currentTaskId) {
+                    long startHang = i * interval + 1;
+                    long endHang = (i + 1) * interval;
+                    if (endHang > totalSl) {
+                        endHang = totalSl;
+                    }
+                    String start = String.format("SELECT " +
+                            " %s  " +
+                            "FROM " +
+                            " ( SELECT %s, ROW_NUMBER ( ) OVER ( ORDER BY %s ) hang FROM (%s) t ) A  " +
+                            "WHERE " +
+                            " A.hang =%s", this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getPartitionColumn(), sql, startHang);
+                    PreparedStatement startPs = conn.prepareStatement(start);
+                    ResultSet rsStart = startPs.executeQuery();
+                    while (rsStart.next()) {
+                        startRowNumber = rsStart.getLong(this.sqlCdcConfig.getPartitionColumn());
+                    }
+                    String end = String.format("SELECT " +
+                            " %s  " +
+                            "FROM " +
+                            " ( SELECT %s, ROW_NUMBER ( ) OVER ( ORDER BY %s ) hang FROM (%s) t ) A  " +
+                            "WHERE " +
+                            " A.hang =%s", this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getPartitionColumn(), sql, endHang);
+                    PreparedStatement endPs = conn.prepareStatement(end);
+                    ResultSet rsEnd = endPs.executeQuery();
+                    while (rsEnd.next()) {
+                        endRowNumber = rsEnd.getLong(this.sqlCdcConfig.getPartitionColumn());
+                    }
+                    startPs.close();
+                    endPs.close();
+
+                }
+            }
+            String newSql = String.format("select  * from (%s) t where %s between %s and  %s",
+                    sql,
+                    this.sqlCdcConfig.getPartitionColumn(),
+                    startRowNumber,
+                    endRowNumber
+            );
+            Map<String, Integer> mapPosition = new HashMap<>();
+            Map<String, java.util.Date> map = new HashMap<>();
+            for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
+                int i = typeInfo.indexOf(primaryKey);
+                mapPosition.put(primaryKey, i);
+            }
             while (true) {
-                PreparedStatement ps = conn.prepareStatement(sql);
+                Date versionDate = new Date();
+                PreparedStatement ps = conn.prepareStatement(newSql);
+                ps.setFetchSize(10000);
                 ps.executeQuery();
                 ResultSet resultSet = ps.getResultSet();
                 while (resultSet.next()) {
                     SeaTunnelRow seaTunnelRow = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
-                    seaTunnelRow.setRowKind(RowKind.UPDATE_AFTER);
-                    tmp2.add(seaTunnelRow);
-                    output.collect(seaTunnelRow);
-                }
-                ps.close();
-                Thread.sleep(3 * 1000);
-                if(tmp.size()>tmp2.size()){
-                    tmp.removeAll(tmp2);
-                    System.out.println(tmp);
-                    for (SeaTunnelRow seaTunnelRow : tmp) {
-                        seaTunnelRow.setRowKind(RowKind.DELETE);
-                        output.collect(seaTunnelRow);
+                    List<String> keys = new ArrayList<>();
+                    for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
+                        Integer i = mapPosition.get(primaryKey);
+                        Object field = seaTunnelRow.getField(i);
+                        keys.add(field.toString());
                     }
+                    keys.add(String.valueOf(seaTunnelRow.hashCode()));
+                    seaTunnelRow.setRowKind(RowKind.UPDATE_AFTER);
+                    if (!map.containsKey(StringUtils.join(keys, ","))) {
+                        output.collect(seaTunnelRow);
+                        String join = StringUtils.join(keys, ",");
+                        int lastCommaIndex = join.lastIndexOf(",");
+                        String keyword = join.substring(0, lastCommaIndex);
+                        Pattern pattern = Pattern.compile(keyword);
+                        for (String key : map.keySet()) {
+                            Matcher matcher = pattern.matcher(key);
+                            if (matcher.find()) {
+                                map.remove(key);
+                            }
+                        }
+//                        log.info("有一条数据变换了" + seaTunnelRow.toString());
+                    }
+                    map.put(StringUtils.join(keys, ","), versionDate);
                 }
-                tmp.clear();
-                tmp.addAll(tmp2);
-                tmp2.clear();
+                map.forEach((k, v) -> {
+                    Date nowDate = new Date();
+                    long diffSeconds = Math.abs((nowDate.getTime() - v.getTime()) / 1000);
+                    if (diffSeconds > 600) {
+//                        log.info("有一条数据删除了");
+                        SeaTunnelRow seaTunnelRow = new SeaTunnelRow(typeInfo.getTotalFields());
+                        seaTunnelRow.setRowKind(RowKind.DELETE);
+                        String[] keys = k.split(",");
+                        for (int i = 0; i < this.sqlCdcConfig.getPrimaryKeys().size(); i++) {
+                            String column = this.sqlCdcConfig.getPrimaryKeys().get(i);
+                            Integer position = mapPosition.get(column);
+                            SeaTunnelDataType<?> fieldType = typeInfo.getFieldType(position);
+                            SqlType sqlType = fieldType.getSqlType();
+                            switch (sqlType) {
+                                case STRING:
+                                    seaTunnelRow.setField(position, keys[i]);
+                                    break;
+                                case BOOLEAN:
+                                    seaTunnelRow.setField(position, Boolean.parseBoolean(keys[i]));
+                                    break;
+                                case TINYINT:
+                                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
+                                    break;
+                                case SMALLINT:
+                                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
+                                    break;
+                                case INT:
+                                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
+                                    break;
+                                case BIGINT:
+                                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
+                                    break;
+                                case FLOAT:
+                                    seaTunnelRow.setField(position, Float.parseFloat(keys[i]));
+                                    break;
+                                case DOUBLE:
+                                    seaTunnelRow.setField(position, Double.parseDouble(keys[i]));
+                                    break;
+                                case DECIMAL:
+                                    seaTunnelRow.setField(position, new BigDecimal(keys[i]));
+                                    break;
+                                case DATE:
+                                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                                    Date date = null;
+                                    try {
+                                        date = sdf.parse(keys[i]);
+                                    } catch (ParseException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                    java.sql.Date sqlDate = new java.sql.Date(date.getTime());
+                                    seaTunnelRow.setField(position, sqlDate);
+                                    break;
+                                case TIME:
+                                    SimpleDateFormat sdf1 = new SimpleDateFormat("HH:mm:ss");
+                                    Date date1 = null;
+                                    try {
+                                        date1 = sdf1.parse(keys[i]);
+                                    } catch (ParseException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                    java.sql.Time sqlTime = new java.sql.Time(date1.getTime());
+                                    seaTunnelRow.setField(position, sqlTime);
+                                    break;
+                                case TIMESTAMP:
+                                    String dateStr = keys[i];
+                                    SimpleDateFormat sdf3 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                                    Timestamp timestamp = null;
+                                    try {
+                                        timestamp = new Timestamp(sdf3.parse(dateStr).getTime());
+                                    } catch (ParseException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                    seaTunnelRow.setField(position, timestamp);
+                                    break;
+                                case MAP:
+                                case ARRAY:
+                                case ROW:
+                                default:
+                                    throw new RuntimeException(
+                                            CommonErrorCode.UNSUPPORTED_DATA_TYPE +
+                                                    "Unexpected value: " + sqlType.toString());
+                            }
+                        }
+//                        log.info(seaTunnelRow.toString());
+                        output.collect(seaTunnelRow);
+                        map.remove(k);
+                    }
+                });
+                ps.close();
             }
         } catch (Exception e) {
             log.warn("get row type info exception", e);
         }
+    }
+
+    @Override
+    public List<SqlCdcSourceSplit> snapshotState(long checkpointId) throws Exception {
+        return null;
+    }
+
+    @Override
+    public void addSplits(List<SqlCdcSourceSplit> splits) {
+
+    }
+
+    @Override
+    public void handleNoMoreSplits() {
+
+    }
+
+    @Override
+    public void notifyCheckpointComplete(long checkpointId) throws Exception {
+
     }
 }

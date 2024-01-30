@@ -18,9 +18,11 @@
 package com.qh.sqlcdc.config;
 
 import lombok.Data;
+import org.apache.seatunnel.api.common.CommonOptions;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import java.io.Serializable;
+import java.util.List;
 
 
 @Data
@@ -31,6 +33,9 @@ public class SqlCdcConfig implements Serializable {
     private String user;
     private String passWord;
     private String dbType;
+    private int partitionNum;
+    private String partitionColumn;
+    private List<String> primaryKeys;
 
     public SqlCdcConfig(Config config) {
         this.driver = config.getString(SqlCdcConfigOptions.DRIVER.key());
@@ -38,6 +43,9 @@ public class SqlCdcConfig implements Serializable {
         this.url = config.getString(SqlCdcConfigOptions.URL.key());
         this.user = config.getString(SqlCdcConfigOptions.USER.key());
         this.passWord = config.getString(SqlCdcConfigOptions.PASSWORD.key());
-        this.dbType=config.getString(SqlCdcConfigOptions.DBTYPE.key());
+        this.dbType = config.getString(SqlCdcConfigOptions.DBTYPE.key());
+        this.partitionNum = config.getInt(CommonOptions.PARALLELISM.key());
+        this.partitionColumn = config.getString(SqlCdcConfigOptions.PARTITION_COLUMN.key());
+        this.primaryKeys = config.getStringList(SqlCdcConfigOptions.PRIMARY_KEYS.key());
     }
 }

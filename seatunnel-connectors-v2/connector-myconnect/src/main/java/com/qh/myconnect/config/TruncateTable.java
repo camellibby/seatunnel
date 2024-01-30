@@ -9,5 +9,6 @@ public class TruncateTable implements Serializable {
     private static final long serialVersionUID = -1L;
     private String flinkJobId;
     private String dataSourceId;
+    private String dbSchema;
     private String tableName;
 }

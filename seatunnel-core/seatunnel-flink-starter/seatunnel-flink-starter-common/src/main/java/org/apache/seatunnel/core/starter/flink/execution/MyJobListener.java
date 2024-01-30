@@ -38,6 +38,7 @@ public class MyJobListener implements JobListener, Serializable {
                 ObjectNode objectNode = mapper.createObjectNode();
                 objectNode.put("jobId", jobExecutionResult.getJobID().toHexString());
                 objectNode.put("status", "FINISHED");
+                objectNode.put("runtime",jobExecutionResult.getNetRuntime());
                 HttpUtil.sendPostRequest(st_log_back_url, objectNode.toString());
             } catch (Exception e) {
                 throw new RuntimeException(e);

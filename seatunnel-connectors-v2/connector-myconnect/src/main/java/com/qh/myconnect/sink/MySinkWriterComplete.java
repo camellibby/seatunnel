@@ -75,7 +75,13 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
         preparedStatementQuery.close();
         String addLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/addRedisLock";
         JSONObject param = new JSONObject();
-        param.put("flinkJobId", this.jobContext.getJobId());
+        String lockId = String.format("%s:%s:%s:%s:count",
+                this.jobContext.getJobId(),
+                this.jdbcSinkConfig.getDbDatasourceId(),
+                this.jdbcSinkConfig.getDbSchema(),
+                this.jdbcSinkConfig.getTable()
+        );
+        param.put("lockId", lockId);
         try {
             util.sendPostRequest(addLockUrl, param.toString());
         } catch (Exception e) {
@@ -93,6 +99,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
                     truncateTable.setFlinkJobId(this.jobContext.getJobId());
                     truncateTable.setDataSourceId(this.jdbcSinkConfig.getDbDatasourceId());
                     if (this.jdbcSinkConfig.getDbSchema() != null && !this.jdbcSinkConfig.getDbSchema().equalsIgnoreCase("")) {
+                        truncateTable.setDbSchema(this.jdbcSinkConfig.getDbSchema());
                         truncateTable.setTableName(this.jdbcSinkConfig.getDbSchema() + "." + this.jdbcSinkConfig.getTable());
                     } else {
                         truncateTable.setTableName(this.jdbcSinkConfig.getTable());
@@ -147,7 +154,13 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
     public void statisticalResults() throws Exception {
         String reduceLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/reduceRedisLock";
         JSONObject param = new JSONObject();
-        param.put("flinkJobId", this.jobContext.getJobId());
+        String lockId = String.format("%s:%s:%s:%s:count",
+                this.jobContext.getJobId(),
+                this.jdbcSinkConfig.getDbDatasourceId(),
+                this.jdbcSinkConfig.getDbSchema(),
+                this.jdbcSinkConfig.getTable()
+        );
+        param.put("lockId", lockId);
         LocalDateTime endTime = LocalDateTime.now();
         Long deleteCount = 0L;
         try {
