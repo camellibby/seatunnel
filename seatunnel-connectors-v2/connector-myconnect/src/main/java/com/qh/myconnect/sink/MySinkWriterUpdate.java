@@ -2,6 +2,7 @@ package com.qh.myconnect.sink;
 
 import com.alibaba.fastjson.JSONObject;
 import com.qh.myconnect.config.JdbcSinkConfig;
+import com.qh.myconnect.config.StatisticalLog;
 import com.qh.myconnect.config.Util;
 import com.qh.myconnect.converter.ColumnMapper;
 import com.qh.myconnect.dialect.JdbcDialect;
@@ -50,6 +51,8 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     private Util util = new Util();
 
+    private final Integer currentTaskId;
+
     public MySinkWriterUpdate(SeaTunnelRowType seaTunnelRowType,
                               Context context,
                               ReadonlyConfig config,
@@ -60,6 +63,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         this.jdbcSinkConfig = JdbcSinkConfig.of(config);
         this.startTime = startTime;
         this.table = this.jdbcSinkConfig.getTable();
+        this.currentTaskId=context.getIndexOfSubtask();
         this.tmpTable = "UC_" + this.jdbcSinkConfig.getTable();
         this.jdbcDialect = JdbcDialectFactory.getJdbcDialect(this.jdbcSinkConfig.getDbType());
         this.conn = util.getConnection(this.jdbcSinkConfig);
@@ -78,20 +82,6 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
     }
 
     private void consumeData() {
-        String addLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/addRedisLock";
-        JSONObject param = new JSONObject();
-        String lockId = String.format("%s:%s:%s:%s:count",
-                this.jobContext.getJobId(),
-                this.jdbcSinkConfig.getDbDatasourceId(),
-                this.jdbcSinkConfig.getDbSchema(),
-                this.jdbcSinkConfig.getTable()
-        );
-        param.put("lockId", lockId);
-        try {
-            util.sendPostRequest(addLockUrl, param.toString());
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
         HashMap<List<String>, SeaTunnelRow> sourceRows = new HashMap<>();
         List<SeaTunnelRow> oldRows = new ArrayList<>();
         List<ColumnMapper> ucColumns = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
@@ -254,19 +244,8 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
     }
 
     private void statisticalResults(Connection conn) throws Exception {
-        LocalDateTime endTime = LocalDateTime.now();
-        String reduceLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/reduceRedisLock";
-        JSONObject param = new JSONObject();
-        String lockId = String.format("%s:%s:%s:%s:count",
-                this.jobContext.getJobId(),
-                this.jdbcSinkConfig.getDbDatasourceId(),
-                this.jdbcSinkConfig.getDbSchema(),
-                this.jdbcSinkConfig.getTable()
-        );
-        param.put("lockId", lockId);
         try {
-            String result = util.sendPostRequest(reduceLockUrl, param.toString());
-            if (result != null && Long.parseLong(result.replace("\"", "").replaceAll("\\n", "").replaceAll("\\r", "")) == 0) {
+            if (this.currentTaskId == 0) {
                 List<ColumnMapper> ucColumns = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
                 int del = 0;
                 if (this.jdbcSinkConfig.getDbSchema() != null && !this.jdbcSinkConfig.getDbSchema().equals("")) {
@@ -280,15 +259,17 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-
-        util.insertLog(writeCount.longValue(),
-                updateCount.longValue(),
-                deleteCount.longValue(),
-                keepCount.longValue(),
-                insertCount.longValue(),
-                this.jobContext.getJobId(),
-                startTime,
-                endTime);
+        StatisticalLog statisticalLog = new StatisticalLog();
+        LocalDateTime endTime = LocalDateTime.now();
+        statisticalLog.setFlinkJobId(this.jobContext.getJobId());
+        statisticalLog.setWriteCount(writeCount.longValue());
+        statisticalLog.setModifyCount(updateCount.longValue());
+        statisticalLog.setDeleteCount(deleteCount.longValue());
+        statisticalLog.setInsertCount(insertCount.longValue());
+        statisticalLog.setKeepCount(keepCount.longValue());
+        statisticalLog.setStartTime(startTime);
+        statisticalLog.setEndTime(endTime);
+        util.insertLog(statisticalLog);
     }
 
     private void insertTmpUks(List<SeaTunnelRow> oldRows, Map<String, String> metaDataHash, Connection conn) throws SQLException {

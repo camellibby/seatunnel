@@ -1,10 +1,6 @@
 package com.qh.myconnect.sink;
 
-import com.alibaba.fastjson.JSONObject;
-import com.qh.myconnect.config.JdbcSinkConfig;
-import com.qh.myconnect.config.PreConfig;
-import com.qh.myconnect.config.TruncateTable;
-import com.qh.myconnect.config.Util;
+import com.qh.myconnect.config.*;
 import com.qh.myconnect.converter.ColumnMapper;
 import com.qh.myconnect.dialect.JdbcDialect;
 import com.qh.myconnect.dialect.JdbcDialectFactory;
@@ -50,10 +46,14 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
 
     private PreConfig preConfig;
 
+    private final Integer currentTaskId;
+
     public MySinkWriterComplete(SeaTunnelRowType seaTunnelRowType, Context context, ReadonlyConfig config, JobContext jobContext, Long tableCount) throws SQLException {
         this.jobContext = jobContext;
         this.sourceRowType = seaTunnelRowType;
         this.context = context;
+        this.currentTaskId=context.getIndexOfSubtask();
+        log.info("currentTaskId:"+this.currentTaskId);
         this.jdbcSinkConfig = JdbcSinkConfig.of(config);
         this.table = this.jdbcSinkConfig.getTable();
         this.preConfig = jdbcSinkConfig.getPreConfig();
@@ -72,21 +72,6 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
             metaDataHash.put(metaData.getColumnName(i + 1), metaData.getColumnTypeName(i + 1));
         }
         this.metaDataHash = metaDataHash;
-        preparedStatementQuery.close();
-        String addLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/addRedisLock";
-        JSONObject param = new JSONObject();
-        String lockId = String.format("%s:%s:%s:%s:count",
-                this.jobContext.getJobId(),
-                this.jdbcSinkConfig.getDbDatasourceId(),
-                this.jdbcSinkConfig.getDbSchema(),
-                this.jdbcSinkConfig.getTable()
-        );
-        param.put("lockId", lockId);
-        try {
-            util.sendPostRequest(addLockUrl, param.toString());
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
     @Override
@@ -152,32 +137,25 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
     }
 
     public void statisticalResults() throws Exception {
-        String reduceLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/reduceRedisLock";
-        JSONObject param = new JSONObject();
-        String lockId = String.format("%s:%s:%s:%s:count",
-                this.jobContext.getJobId(),
-                this.jdbcSinkConfig.getDbDatasourceId(),
-                this.jdbcSinkConfig.getDbSchema(),
-                this.jdbcSinkConfig.getTable()
-        );
-        param.put("lockId", lockId);
         LocalDateTime endTime = LocalDateTime.now();
         Long deleteCount = 0L;
         try {
-            String result = util.sendPostRequest(reduceLockUrl, param.toString());
-            if (result != null && Long.parseLong(result.replace("\"", "").replaceAll("\\n", "").replaceAll("\\r", "")) == 0) {
-                if (this.writeCount == 0) {
-                    deleteCount = this.writeCount;
-                } else {
-                    deleteCount = this.tableCount;
-                }
-
+            if (this.currentTaskId == 0) {
+                deleteCount = this.tableCount;
             }
-
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        util.insertLog(writeCount, 0L, deleteCount, 0L, writeCount, this.jobContext.getJobId(), startTime, endTime);
+        StatisticalLog statisticalLog = new StatisticalLog();
+        statisticalLog.setFlinkJobId(this.jobContext.getJobId());
+        statisticalLog.setWriteCount(writeCount);
+        statisticalLog.setModifyCount(0L);
+        statisticalLog.setDeleteCount(deleteCount);
+        statisticalLog.setInsertCount(writeCount);
+        statisticalLog.setKeepCount(0L);
+        statisticalLog.setStartTime(startTime);
+        statisticalLog.setEndTime(endTime);
+        util.insertLog(statisticalLog);
     }
 
     private void initColumnMappers(JdbcSinkConfig jdbcSinkConfig, SeaTunnelRowType sourceRowType, SeaTunnelRowType sinkTableRowType, Connection conn) throws SQLException {

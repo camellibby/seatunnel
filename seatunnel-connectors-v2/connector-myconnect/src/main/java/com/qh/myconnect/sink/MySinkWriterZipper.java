@@ -2,6 +2,7 @@ package com.qh.myconnect.sink;
 
 import com.alibaba.fastjson.JSONObject;
 import com.qh.myconnect.config.JdbcSinkConfig;
+import com.qh.myconnect.config.StatisticalLog;
 import com.qh.myconnect.config.Util;
 import com.qh.myconnect.converter.ColumnMapper;
 import com.qh.myconnect.dialect.JdbcDialect;
@@ -51,7 +52,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     private final List<String> zipperColumns = Arrays.asList("OPERATEFLAG", "OPERATETIME");
 
     private final Util util = new Util();
-
+    private final Integer currentTaskId;
     public MySinkWriterZipper(SeaTunnelRowType seaTunnelRowType,
                               Context context,
                               ReadonlyConfig config,
@@ -61,6 +62,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         this.sourceRowType = seaTunnelRowType;
         this.jdbcSinkConfig = JdbcSinkConfig.of(config);
         this.startTime = startTime;
+        this.currentTaskId=context.getIndexOfSubtask();
         this.table = this.jdbcSinkConfig.getTable();
         this.tmpTable = "UC_" + this.jdbcSinkConfig.getTable();
         this.jdbcDialect = JdbcDialectFactory.getJdbcDialect(this.jdbcSinkConfig.getDbType());
@@ -81,20 +83,6 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     }
 
     private void consumeData() {
-        String addLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/addRedisLock";
-        JSONObject param = new JSONObject();
-        String lockId = String.format("%s:%s:%s:%s:count",
-                this.jobContext.getJobId(),
-                this.jdbcSinkConfig.getDbDatasourceId(),
-                this.jdbcSinkConfig.getDbSchema(),
-                this.jdbcSinkConfig.getTable()
-        );
-        param.put("lockId", lockId);
-        try {
-            util.sendPostRequest(addLockUrl, param.toString());
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
         HashMap<List<String>, SeaTunnelRow> sourceRows = new HashMap<>();
         List<ColumnMapper> ucColumns = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         for (SeaTunnelRow seaTunnelRow : cld) {
@@ -309,18 +297,8 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     }
 
     private void statisticalResults(Connection conn) throws Exception {
-        String reduceLockUrl = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/reduceRedisLock";
-        JSONObject param = new JSONObject();
-        String lockId = String.format("%s:%s:%s:%s:count",
-                this.jobContext.getJobId(),
-                this.jdbcSinkConfig.getDbDatasourceId(),
-                this.jdbcSinkConfig.getDbSchema(),
-                this.jdbcSinkConfig.getTable()
-        );
-        param.put("lockId", lockId);
         try {
-            String result = util.sendPostRequest(reduceLockUrl, param.toString());
-            if (result != null && Long.parseLong(result.replace("\"", "").replaceAll("\\n", "").replaceAll("\\r", "")) == 0) {
+            if (this.currentTaskId == 0) {
                 int del = this.jdbcDialect.deleteDataZipper(conn, jdbcSinkConfig, this.columnMappers, this.startTime);
                 deleteCount.add(del);
             }
@@ -329,14 +307,16 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             throw new RuntimeException(e);
         }
         LocalDateTime endTime = LocalDateTime.now();
-        util.insertLog(writeCount.longValue(),
-                updateCount.longValue(),
-                deleteCount.longValue(),
-                keepCount.longValue(),
-                insertCount.longValue(),
-                this.jobContext.getJobId(),
-                startTime,
-                endTime);
+        StatisticalLog statisticalLog = new StatisticalLog();
+        statisticalLog.setFlinkJobId(this.jobContext.getJobId());
+        statisticalLog.setWriteCount(writeCount.longValue());
+        statisticalLog.setModifyCount(updateCount.longValue());
+        statisticalLog.setDeleteCount(deleteCount.longValue());
+        statisticalLog.setInsertCount(insertCount.longValue());
+        statisticalLog.setKeepCount(keepCount.longValue());
+        statisticalLog.setStartTime(startTime);
+        statisticalLog.setEndTime(endTime);
+        util.insertLog(statisticalLog);
     }
 
     @Override

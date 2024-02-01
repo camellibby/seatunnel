@@ -25,8 +25,6 @@ public class PreConfig implements Serializable {
     }
 
     public void doPreConfig(Connection connection, JdbcSinkConfig jdbcSinkConfig) throws SQLException {
-
-
         String tableName = jdbcSinkConfig.getTable();
         String schemaPattern = jdbcSinkConfig.getDbSchema();
         if (Objects.equals(schemaPattern, "")) {

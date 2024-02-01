@@ -141,16 +141,16 @@ public class Util {
 
     }
 
-    public void insertLog(Long writeCount, Long modifyCount, Long deleteCount, Long keepCount, Long insertCount, String flinkJobId, LocalDateTime startTime, LocalDateTime endTime) throws Exception {
+    public void insertLog(StatisticalLog statisticalLog) throws Exception {
         JSONObject param = new JSONObject();
-        param.put("flinkJobId", flinkJobId);
-        param.put("writeCount", writeCount);
-        param.put("modifyCount", modifyCount);
-        param.put("deleteCount", deleteCount);
-        param.put("keepCount", keepCount);
-        param.put("insertCount", insertCount);
-        param.put("startTime", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-        param.put("endTime", endTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        param.put("flinkJobId", statisticalLog.getFlinkJobId());
+        param.put("writeCount", statisticalLog.getWriteCount());
+        param.put("modifyCount", statisticalLog.getModifyCount());
+        param.put("deleteCount", statisticalLog.getDeleteCount());
+        param.put("keepCount", statisticalLog.getKeepCount());
+        param.put("insertCount", statisticalLog.getInsertCount());
+        param.put("startTime", statisticalLog.getStartTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        param.put("endTime", statisticalLog.getEndTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         String st_log_url = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/gatherJobLog";
         this.sendPostRequest(st_log_url, param.toString());
 
