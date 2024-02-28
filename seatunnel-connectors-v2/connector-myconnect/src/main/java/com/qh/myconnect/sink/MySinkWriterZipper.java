@@ -1,7 +1,10 @@
 package com.qh.myconnect.sink;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.qh.myconnect.config.JdbcSinkConfig;
+import com.qh.myconnect.config.SeaTunnelJobsHistoryErrorRecord;
 import com.qh.myconnect.config.StatisticalLog;
 import com.qh.myconnect.config.Util;
 import com.qh.myconnect.converter.ColumnMapper;
@@ -34,7 +37,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     private LongAdder updateCount = new LongAdder();
     private LongAdder deleteCount = new LongAdder();
     private LongAdder insertCount = new LongAdder();
-    //切记不要换成hashmap
+    private LongAdder errorCount = new LongAdder();
 
     private final JdbcSinkConfig jdbcSinkConfig;
     private JobContext jobContext;
@@ -52,7 +55,10 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     private final List<String> zipperColumns = Arrays.asList("OPERATEFLAG", "OPERATETIME");
 
     private final Util util = new Util();
+
+    private Set sqlErrorType = new HashSet();
     private final Integer currentTaskId;
+
     public MySinkWriterZipper(SeaTunnelRowType seaTunnelRowType,
                               Context context,
                               ReadonlyConfig config,
@@ -62,11 +68,12 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         this.sourceRowType = seaTunnelRowType;
         this.jdbcSinkConfig = JdbcSinkConfig.of(config);
         this.startTime = startTime;
-        this.currentTaskId=context.getIndexOfSubtask();
+        this.currentTaskId = context.getIndexOfSubtask();
         this.table = this.jdbcSinkConfig.getTable();
         this.tmpTable = "UC_" + this.jdbcSinkConfig.getTable();
         this.jdbcDialect = JdbcDialectFactory.getJdbcDialect(this.jdbcSinkConfig.getDbType());
         this.conn = util.getConnection(this.jdbcSinkConfig);
+        conn.setAutoCommit(false);
         this.sinkTableRowType = util.initTableField(conn, this.jdbcDialect, this.jdbcSinkConfig);
         this.initColumnMappers(this.jdbcSinkConfig, this.sourceRowType, this.sinkTableRowType, conn);
 
@@ -119,13 +126,11 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             if (null != sinkRow) {
                 if (!sourceRow.equals(sinkRow)) {
                     needUpdate.put(k, sourceRow);
-                    this.updateCount.increment();
                 } else {
                     this.keepCount.increment();
                 }
             } else {
                 needInsertRows.add(sourceRow);
-                this.insertCount.increment();
             }
         });
         doInsert(needInsertRows, this.metaDataHash, conn);
@@ -198,10 +203,60 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             }
             jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 1, preparedStatement, "VARCHAR2", "I");
             jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 2, preparedStatement, "VARCHAR2", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-            preparedStatement.addBatch();
+            try {
+                preparedStatement.addBatch();
+                this.insertCount.increment();
+            } catch (SQLException e) {
+                this.insertCount.decrement();
+            }
         }
-        preparedStatement.executeBatch();
-        preparedStatement.close();
+        try {
+            preparedStatement.executeBatch();
+            conn.commit();
+            preparedStatement.clearBatch();
+        } catch (SQLException e) {
+            //批量提交失败 回滚此批数据 拆成1条条的提交
+            conn.rollback();
+            log.info(String.format("错误%s", e.getMessage()));
+            for (SeaTunnelRow row : rows) {
+                for (int i = 0; i < columnMappers.size(); i++) {
+                    String column = newColumns.get(i);
+                    String dbType = metaDataHash.get(column);
+                    jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, (String) row.getField(i));
+                }
+                jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 1, preparedStatement, "VARCHAR2", "I");
+                jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 2, preparedStatement, "VARCHAR2", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                try {
+                    preparedStatement.addBatch();
+                    preparedStatement.executeBatch();
+                    conn.commit();
+                    preparedStatement.clearBatch();
+                } catch (SQLException ee) {
+                    this.insertCount.decrement();
+                    this.errorCount.increment();
+                    if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount.longValue() <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(ee.getMessage())) {
+                        JSONObject jsonObject = new JSONObject();
+                        for (int i = 0; i < sinkTableRowType.getTotalFields(); i++) {
+                            jsonObject.put(sinkTableRowType.getFieldName(i), row.getField(i));
+                        }
+                        log.info(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
+                        SeaTunnelJobsHistoryErrorRecord errorRecord = new SeaTunnelJobsHistoryErrorRecord();
+                        errorRecord.setFlinkJobId(this.jobContext.getJobId());
+                        errorRecord.setDataSourceId(jdbcSinkConfig.getDbDatasourceId());
+                        errorRecord.setDbSchema(jdbcSinkConfig.getDbSchema());
+                        errorRecord.setTableName(jdbcSinkConfig.getTable());
+                        errorRecord.setErrorData(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
+                        errorRecord.setErrorMessage(ee.getMessage());
+                        sqlErrorType.add(ee.getMessage());
+                        try {
+                            util.insertErrorData(errorRecord);
+                        } catch (Exception ex) {
+                            throw new RuntimeException(ex);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private void doUpdate(HashMap<List<String>, SeaTunnelRow> rows, Map<String, String> metaDataHash, Connection connection) throws SQLException {
@@ -225,10 +280,60 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             }
             jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 1, preparedStatement, "VARCHAR2", "U");
             jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 2, preparedStatement, "VARCHAR2", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-            preparedStatement.addBatch();
+            try {
+                preparedStatement.addBatch();
+                this.updateCount.increment();
+            } catch (SQLException e) {
+                this.updateCount.decrement();
+            }
         }
-        preparedStatement.executeBatch();
-        preparedStatement.close();
+        try {
+            preparedStatement.executeBatch();
+            conn.commit();
+            preparedStatement.clearBatch();
+        } catch (SQLException e) {
+            //批量提交失败 回滚此批数据 拆成1条条的提交
+            conn.rollback();
+            log.info(String.format("错误%s", e.getMessage()));
+            for (SeaTunnelRow row : rows.values()) {
+                for (int i = 0; i < columnMappers.size(); i++) {
+                    String column = newColumns.get(i);
+                    String dbType = metaDataHash.get(column);
+                    jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, (String) row.getField(i));
+                }
+                jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 1, preparedStatement, "VARCHAR2", "U");
+                jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 2, preparedStatement, "VARCHAR2", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                try {
+                    preparedStatement.addBatch();
+                    preparedStatement.executeBatch();
+                    conn.commit();
+                    preparedStatement.clearBatch();
+                } catch (SQLException ee) {
+                    this.updateCount.decrement();
+                    this.errorCount.increment();
+                    if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount.longValue() <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(ee.getMessage())) {
+                        JSONObject jsonObject = new JSONObject();
+                        for (int i = 0; i < sinkTableRowType.getTotalFields(); i++) {
+                            jsonObject.put(sinkTableRowType.getFieldName(i), row.getField(i));
+                        }
+                        log.info(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
+                        SeaTunnelJobsHistoryErrorRecord errorRecord = new SeaTunnelJobsHistoryErrorRecord();
+                        errorRecord.setFlinkJobId(this.jobContext.getJobId());
+                        errorRecord.setDataSourceId(jdbcSinkConfig.getDbDatasourceId());
+                        errorRecord.setDbSchema(jdbcSinkConfig.getDbSchema());
+                        errorRecord.setTableName(jdbcSinkConfig.getTable());
+                        errorRecord.setErrorData(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
+                        errorRecord.setErrorMessage(ee.getMessage());
+                        sqlErrorType.add(ee.getMessage());
+                        try {
+                            util.insertErrorData(errorRecord);
+                        } catch (Exception ex) {
+                            throw new RuntimeException(ex);
+                        }
+                    }
+                }
+            }
+        }
     }
 
 
@@ -253,7 +358,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         }
         preparedStatement.executeBatch();
         preparedStatement.close();
-
+        conn.commit();
     }
 
     private HashMap<List<String>, SeaTunnelRow> getSinkRows(Connection conn, HashMap<List<String>, SeaTunnelRow> sourceRows) {
@@ -301,6 +406,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             if (this.currentTaskId == 0) {
                 int del = this.jdbcDialect.deleteDataZipper(conn, jdbcSinkConfig, this.columnMappers, this.startTime);
                 deleteCount.add(del);
+                conn.commit();
             }
 
         } catch (Exception e) {
@@ -309,11 +415,17 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         LocalDateTime endTime = LocalDateTime.now();
         StatisticalLog statisticalLog = new StatisticalLog();
         statisticalLog.setFlinkJobId(this.jobContext.getJobId());
+        statisticalLog.setDataSourceId(this.jdbcSinkConfig.getDbDatasourceId());
+        if (this.jdbcSinkConfig.getDbSchema() != null) {
+            statisticalLog.setDbSchema(this.jdbcSinkConfig.getDbSchema());
+        }
+        statisticalLog.setTableName(this.jdbcSinkConfig.getTable());
         statisticalLog.setWriteCount(writeCount.longValue());
         statisticalLog.setModifyCount(updateCount.longValue());
         statisticalLog.setDeleteCount(deleteCount.longValue());
         statisticalLog.setInsertCount(insertCount.longValue());
         statisticalLog.setKeepCount(keepCount.longValue());
+        statisticalLog.setErrorCount(errorCount.longValue());
         statisticalLog.setStartTime(startTime);
         statisticalLog.setEndTime(endTime);
         util.insertLog(statisticalLog);

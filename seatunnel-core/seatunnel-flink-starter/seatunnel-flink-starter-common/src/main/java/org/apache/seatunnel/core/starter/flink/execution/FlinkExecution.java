@@ -104,7 +104,14 @@ public class FlinkExecution implements TaskExecution {
         }
         registerPlugin(config.getConfig("env"));
         jobContext.setJobMode(RuntimeEnvironment.getJobMode(config));
-
+        try {
+            int isRecordErrorData = config.getConfig("env").getInt("isRecordErrorData");
+            int maxRecordNumber = config.getConfig("env").getInt("maxRecordNumber");
+            jobContext.setIsRecordErrorData(isRecordErrorData);
+            jobContext.setMaxRecordNumber(maxRecordNumber);
+        } catch (Exception e) {
+            log.info("");
+        }
         this.sourcePluginExecuteProcessor =
                 new SourceExecuteProcessor(
                         jarPaths, config.getConfigList(Constants.SOURCE), jobContext);
@@ -129,6 +136,14 @@ public class FlinkExecution implements TaskExecution {
     public FlinkExecution(Config config, String jobid) {
         this.jobContext = new JobContext();
         jobContext.setJobId(jobid);
+        try {
+            int isRecordErrorData = config.getConfig("env").getInt("isRecordErrorData");
+            int maxRecordNumber = config.getConfig("env").getInt("maxRecordNumber");
+            jobContext.setIsRecordErrorData(isRecordErrorData);
+            jobContext.setMaxRecordNumber(maxRecordNumber);
+        } catch (Exception e) {
+            log.info("");
+        }
         try {
             jarPaths =
                     new ArrayList<>(
@@ -163,7 +178,7 @@ public class FlinkExecution implements TaskExecution {
             this.flinkRuntimeEnvironment =
                     FlinkRuntimeEnvironment.getInstance(this.registerPlugin(config, jarPaths), jobContext);
         } catch (Exception e) {
-            String st_log_back_url = System.getenv("ST_SERVICE_URL")+"/SeaTunnelJob/flinkCallBack";
+            String st_log_back_url = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/flinkCallBack";
             ObjectMapper mapper = new ObjectMapper();
             ObjectNode objectNode = mapper.createObjectNode();
             objectNode.put("jobId", jobid);

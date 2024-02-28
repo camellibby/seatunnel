@@ -18,9 +18,11 @@
 package com.qh.sqlcdc.dialect.pgsql;
 
 
+import com.qh.sqlcdc.config.SqlCdcConfig;
 import com.qh.sqlcdc.converter.JdbcRowConverter;
 import com.qh.sqlcdc.dialect.JdbcDialect;
 import com.qh.sqlcdc.dialect.JdbcDialectTypeMapper;
+import org.stringtemplate.v4.ST;
 
 public class PgSqlDialect implements JdbcDialect {
 
@@ -40,6 +42,5 @@ public class PgSqlDialect implements JdbcDialect {
     public JdbcDialectTypeMapper getJdbcDialectTypeMapper() {
         return new PgSqlTypeMapper();
     }
-
 
 }

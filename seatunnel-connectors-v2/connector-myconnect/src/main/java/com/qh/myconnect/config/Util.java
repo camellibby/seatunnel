@@ -144,17 +144,37 @@ public class Util {
     public void insertLog(StatisticalLog statisticalLog) throws Exception {
         JSONObject param = new JSONObject();
         param.put("flinkJobId", statisticalLog.getFlinkJobId());
+        param.put("dataSourceId", statisticalLog.getDataSourceId());
+        if (null != statisticalLog.getDbSchema()) {
+            param.put("dbSchema", statisticalLog.getDbSchema());
+        }
+        param.put("tableName", statisticalLog.getTableName());
         param.put("writeCount", statisticalLog.getWriteCount());
         param.put("modifyCount", statisticalLog.getModifyCount());
         param.put("deleteCount", statisticalLog.getDeleteCount());
         param.put("keepCount", statisticalLog.getKeepCount());
         param.put("insertCount", statisticalLog.getInsertCount());
+        param.put("errorCount",statisticalLog.getErrorCount());
         param.put("startTime", statisticalLog.getStartTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         param.put("endTime", statisticalLog.getEndTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         String st_log_url = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/gatherJobLog";
         this.sendPostRequest(st_log_url, param.toString());
-
     }
+
+    public void insertErrorData(SeaTunnelJobsHistoryErrorRecord errorRecord) throws Exception {
+        JSONObject param = new JSONObject();
+        param.put("flinkJobId", errorRecord.getFlinkJobId());
+        param.put("dataSourceId", errorRecord.getDataSourceId());
+        if (null != errorRecord.getDbSchema()) {
+            param.put("dbSchema", errorRecord.getDbSchema());
+        }
+        param.put("tableName", errorRecord.getTableName());
+        param.put("errorData", errorRecord.getErrorData());
+        param.put("errorMessage", errorRecord.getErrorMessage());
+        String st_log_url = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/recordErrorData";
+        this.sendPostRequest(st_log_url, param.toString());
+    }
+
 
 
     public java.sql.Driver loadDriver(String driverName) throws ClassNotFoundException {

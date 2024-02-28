@@ -17,10 +17,17 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.sqlserver;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcSourceConfig;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.converter.JdbcRowConverter;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDialect;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDialectTypeMapper;
+import org.stringtemplate.v4.ST;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -99,5 +106,42 @@ public class SqlServerDialect implements JdbcDialect {
                         insertValues);
 
         return Optional.of(upsertSQL);
+    }
+
+    public  String getPartitionColumnCount(String columnName, JdbcSourceConfig config) {
+        String template = "select sum(sl) " +
+                "  from (SELECT COUNT(DISTINCT <columnName>) sl " +
+                "          FROM (<tableName>) a" +
+                "        union all " +
+                "        select top 1 1 " +
+                "          from (<tableName>) a " +
+                "         where <columnName> is null " +
+                "          ) a";
+        ST st = new ST(template);
+        st.add("columnName", columnName);
+        st.add("tableName", config.getQuery());
+        return st.render();
+    }
+
+    public ResultSet getSplitValue(Connection conn, JdbcSourceConfig jdbcSourceConfig, Object[] parameterValues) {
+        String template = "select * " +
+                "  from (select <partitionColumn>, " +
+                "               Row_number() over(order by <partitionColumn>) hang " +
+                "          from (select distinct  <partitionColumn>  <partitionColumn> " +
+                "                  from (<query>) a ) a ) a" +
+                " where hang in (<parameterValues>) " +
+                " order by <partitionColumn>, case when <partitionColumn> is null then 0 else 1 end desc  ";
+        ST st = new ST(template);
+        st.add("partitionColumn", jdbcSourceConfig.getPartitionColumn().orElseThrow(() -> new NullPointerException("分区列为空")));
+        st.add("query", jdbcSourceConfig.getQuery());
+        List<Long> parameterValuesInt = Arrays.stream(parameterValues).map(x -> (Long) x).collect(Collectors.toList());
+        st.add("parameterValues", StringUtils.join(parameterValuesInt, ","));
+        String render = st.render();
+        try {
+            PreparedStatement preparedStatement = conn.prepareStatement(render);
+            return preparedStatement.executeQuery();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

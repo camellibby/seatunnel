@@ -50,8 +50,8 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
     private final Integer currentTaskId;
     private final Integer allTask;
 
-    private long startRowNumber;
-    private long endRowNumber;
+    private Object startRowNumber;
+    private Object endRowNumber;
 
 
     SqlCdcReader(SqlCdcConfig sqlCdcConfig, SourceReader.Context context, JdbcDialect jdbcDialect, SeaTunnelRowType typeInfo) {
@@ -83,66 +83,52 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
     public void pollNext(Collector<SeaTunnelRow> output) throws Exception {
         try {
             conn.setAutoCommit(false);
-            String sql = this.sqlCdcConfig.getQuery();
-            String totalCountSql = String.format("select count(1) sl from (%s) t", sql);
-            PreparedStatement psTotal = conn.prepareStatement(totalCountSql);
-            ResultSet resultSet1 = psTotal.executeQuery();
-            long totalSl = 0;
-            int interval = 0;
-            while (resultSet1.next()) {
-                totalSl = resultSet1.getLong("sl");
-                interval = (int) Math.ceil((double) totalSl / this.allTask);
+            if (sqlCdcConfig.getDbType().equalsIgnoreCase("mysql")) {
+                conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
             }
-            psTotal.close();
-            for (int i = 0; i < allTask; i++) {
-                if (i == currentTaskId) {
-                    long startHang = i * interval + 1;
-                    long endHang = (i + 1) * interval;
-                    if (endHang > totalSl) {
-                        endHang = totalSl;
-                    }
-                    String start = String.format("SELECT " +
-                            " %s  " +
-                            "FROM " +
-                            " ( SELECT %s, ROW_NUMBER ( ) OVER ( ORDER BY %s ) hang FROM (%s) t ) A  " +
-                            "WHERE " +
-                            " A.hang =%s", this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getPartitionColumn(), sql, startHang);
-                    PreparedStatement startPs = conn.prepareStatement(start);
-                    ResultSet rsStart = startPs.executeQuery();
-                    while (rsStart.next()) {
-                        startRowNumber = rsStart.getLong(this.sqlCdcConfig.getPartitionColumn());
-                    }
-                    String end = String.format("SELECT " +
-                            " %s  " +
-                            "FROM " +
-                            " ( SELECT %s, ROW_NUMBER ( ) OVER ( ORDER BY %s ) hang FROM (%s) t ) A  " +
-                            "WHERE " +
-                            " A.hang =%s", this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getPartitionColumn(), sql, endHang);
-                    PreparedStatement endPs = conn.prepareStatement(end);
-                    ResultSet rsEnd = endPs.executeQuery();
-                    while (rsEnd.next()) {
-                        endRowNumber = rsEnd.getLong(this.sqlCdcConfig.getPartitionColumn());
-                    }
-                    startPs.close();
-                    endPs.close();
-
-                }
-            }
-            String newSql = String.format("select  * from (%s) t where %s between %s and  %s",
-                    sql,
-                    this.sqlCdcConfig.getPartitionColumn(),
-                    startRowNumber,
-                    endRowNumber
-            );
             Map<String, Integer> mapPosition = new HashMap<>();
-            Map<String, java.util.Date> map = new HashMap<>();
             for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
                 int i = typeInfo.indexOf(primaryKey);
                 mapPosition.put(primaryKey, i);
             }
+            Map<String, java.util.Date> map = new HashMap<>();
             while (true) {
+                String partitionColumnCountSql = this.jdbcDialect.getColumnDistinctCount(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig);
+                PreparedStatement psTotal = conn.prepareStatement(partitionColumnCountSql);
+                ResultSet resultSet1 = psTotal.executeQuery();
+                long totalSl = 0;
+                int interval = 0;
+                while (resultSet1.next()) {
+                    totalSl = resultSet1.getLong("sl");
+                    interval = (int) Math.ceil((double) totalSl / this.allTask);
+                }
+                psTotal.close();
+                for (int i = 0; i < allTask; i++) {
+                    if (i == currentTaskId) {
+                        long startHang = i * interval + 1;
+                        long endHang = (i + 1) * interval;
+                        if (endHang > totalSl) {
+                            endHang = totalSl;
+                        }
+                        PreparedStatement startPs = conn.prepareStatement(this.jdbcDialect.getHangValueSql(this.sqlCdcConfig, startHang));
+                        ResultSet rsStart = startPs.executeQuery();
+                        while (rsStart.next()) {
+                            startRowNumber = rsStart.getObject(this.sqlCdcConfig.getPartitionColumn());
+                        }
+                        PreparedStatement endPs = conn.prepareStatement(this.jdbcDialect.getHangValueSql(this.sqlCdcConfig, endHang));
+                        ResultSet rsEnd = endPs.executeQuery();
+                        while (rsEnd.next()) {
+                            endRowNumber = rsEnd.getObject(this.sqlCdcConfig.getPartitionColumn());
+                        }
+                        startPs.close();
+                        endPs.close();
+                    }
+                }
+                String newSql = this.jdbcDialect.getPartitionSql(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getQuery());
                 Date versionDate = new Date();
                 PreparedStatement ps = conn.prepareStatement(newSql);
+                ps.setObject(1, startRowNumber);
+                ps.setObject(2, endRowNumber);
                 ps.setFetchSize(10000);
                 ps.executeQuery();
                 ResultSet resultSet = ps.getResultSet();
@@ -160,26 +146,31 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
                         output.collect(seaTunnelRow);
                         String join = StringUtils.join(keys, ",");
                         int lastCommaIndex = join.lastIndexOf(",");
-                        String keyword = join.substring(0, lastCommaIndex);
-                        Pattern pattern = Pattern.compile(keyword);
-                        for (String key : map.keySet()) {
-                            Matcher matcher = pattern.matcher(key);
-                            if (matcher.find()) {
-                                map.remove(key);
+                        String prefix = join.substring(0, lastCommaIndex);
+                        Iterator<Map.Entry<String, Date>> iterator1 = map.entrySet().iterator();
+                        while (iterator1.hasNext()) {
+                            Map.Entry<String, Date> entry = iterator1.next();
+                            if (entry.getKey().startsWith(prefix)) {
+                                iterator1.remove();
                             }
                         }
-//                        log.info("有一条数据变换了" + seaTunnelRow.toString());
                     }
                     map.put(StringUtils.join(keys, ","), versionDate);
                 }
-                map.forEach((k, v) -> {
-                    Date nowDate = new Date();
-                    long diffSeconds = Math.abs((nowDate.getTime() - v.getTime()) / 1000);
-                    if (diffSeconds > 600) {
-//                        log.info("有一条数据删除了");
+                Iterator<Map.Entry<String, Date>> iterator = map.entrySet().iterator();
+                while (iterator.hasNext()) {
+                    Map.Entry<String, Date> entry = iterator.next();
+                    if (!versionDate.equals(entry.getValue())) {
                         SeaTunnelRow seaTunnelRow = new SeaTunnelRow(typeInfo.getTotalFields());
                         seaTunnelRow.setRowKind(RowKind.DELETE);
-                        String[] keys = k.split(",");
+                        String checkRealDelete = this.jdbcDialect.checkRealDelete(this.sqlCdcConfig.getPrimaryKeys(), this.sqlCdcConfig.getQuery());
+                        PreparedStatement checkRealDeleteStatement = null;
+                        try {
+                            checkRealDeleteStatement = conn.prepareStatement(checkRealDelete);
+                        } catch (SQLException e) {
+                            throw new RuntimeException(e);
+                        }
+                        String[] keys = entry.getKey().split(",");
                         for (int i = 0; i < this.sqlCdcConfig.getPrimaryKeys().size(); i++) {
                             String column = this.sqlCdcConfig.getPrimaryKeys().get(i);
                             Integer position = mapPosition.get(column);
@@ -188,30 +179,39 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
                             switch (sqlType) {
                                 case STRING:
                                     seaTunnelRow.setField(position, keys[i]);
+                                    checkRealDeleteStatement.setString(i + 1, keys[i]);
                                     break;
                                 case BOOLEAN:
                                     seaTunnelRow.setField(position, Boolean.parseBoolean(keys[i]));
+                                    checkRealDeleteStatement.setBoolean(i + 1, Boolean.parseBoolean(keys[i]));
                                     break;
                                 case TINYINT:
                                     seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
+                                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
                                     break;
                                 case SMALLINT:
                                     seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
+                                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
                                     break;
                                 case INT:
                                     seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
+                                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
                                     break;
                                 case BIGINT:
                                     seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
+                                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
                                     break;
                                 case FLOAT:
                                     seaTunnelRow.setField(position, Float.parseFloat(keys[i]));
+                                    checkRealDeleteStatement.setFloat(i + 1, Float.parseFloat(keys[i]));
                                     break;
                                 case DOUBLE:
                                     seaTunnelRow.setField(position, Double.parseDouble(keys[i]));
+                                    checkRealDeleteStatement.setDouble(i + 1, Double.parseDouble(keys[i]));
                                     break;
                                 case DECIMAL:
                                     seaTunnelRow.setField(position, new BigDecimal(keys[i]));
+                                    checkRealDeleteStatement.setBigDecimal(i + 1,new BigDecimal(keys[i]));
                                     break;
                                 case DATE:
                                     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -223,6 +223,7 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
                                     }
                                     java.sql.Date sqlDate = new java.sql.Date(date.getTime());
                                     seaTunnelRow.setField(position, sqlDate);
+                                    checkRealDeleteStatement.setDate(i + 1,sqlDate);
                                     break;
                                 case TIME:
                                     SimpleDateFormat sdf1 = new SimpleDateFormat("HH:mm:ss");
@@ -234,6 +235,7 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
                                     }
                                     java.sql.Time sqlTime = new java.sql.Time(date1.getTime());
                                     seaTunnelRow.setField(position, sqlTime);
+                                    checkRealDeleteStatement.setTime(i + 1,sqlTime);
                                     break;
                                 case TIMESTAMP:
                                     String dateStr = keys[i];
@@ -245,6 +247,7 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
                                         throw new RuntimeException(e);
                                     }
                                     seaTunnelRow.setField(position, timestamp);
+                                    checkRealDeleteStatement.setTimestamp(i + 1,timestamp);
                                     break;
                                 case MAP:
                                 case ARRAY:
@@ -255,12 +258,24 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
                                                     "Unexpected value: " + sqlType.toString());
                             }
                         }
-//                        log.info(seaTunnelRow.toString());
-                        output.collect(seaTunnelRow);
-                        map.remove(k);
+                        try {
+                            ResultSet resultSet2 = checkRealDeleteStatement.executeQuery();
+                            while (resultSet2.next()) {
+                                long aLong = resultSet2.getLong("sl");
+                                if (aLong == 0) {
+                                    output.collect(seaTunnelRow);
+                                    iterator.remove();
+                                }
+                            }
+                            checkRealDeleteStatement.close();
+                        } catch (SQLException e) {
+                            throw new RuntimeException(e);
+                        }
+
                     }
-                });
+                }
                 ps.close();
+                Thread.sleep(1000);
             }
         } catch (Exception e) {
             log.warn("get row type info exception", e);
