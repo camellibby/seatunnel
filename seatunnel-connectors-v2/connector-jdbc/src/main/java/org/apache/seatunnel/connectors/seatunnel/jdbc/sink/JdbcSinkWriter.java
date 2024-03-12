@@ -18,10 +18,12 @@
 package org.apache.seatunnel.connectors.seatunnel.jdbc.sink;
 
 import org.apache.seatunnel.api.sink.SinkWriter;
+import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcSinkConfig;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.config.SeaTunnelDataValueIndex;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorException;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.JdbcOutputFormat;
@@ -32,9 +34,6 @@ import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDiale
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.executor.JdbcBatchStatementExecutor;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.state.JdbcSinkState;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.state.XidInfo;
-
-import org.apache.commons.lang3.SerializationUtils;
-
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collections;
@@ -48,17 +47,30 @@ public class JdbcSinkWriter implements SinkWriter<SeaTunnelRow, XidInfo, JdbcSin
     private final SinkWriter.Context context;
     private final JdbcConnectionProvider connectionProvider;
     private transient boolean isOpen;
+    private List<SeaTunnelDataValueIndex> seaTunnelDataValueIndices;
+
+    private SeaTunnelRowType rowType;
 
     public JdbcSinkWriter(
             SinkWriter.Context context,
             JdbcDialect dialect,
             JdbcSinkConfig jdbcSinkConfig,
-            SeaTunnelRowType rowType) {
+            SeaTunnelRowType rowType,
+            List<SeaTunnelDataValueIndex> seaTunnelDataValueIndices) {
         this.context = context;
+        this.seaTunnelDataValueIndices = seaTunnelDataValueIndices;
+        String[] fieldNames = new String[seaTunnelDataValueIndices.size()];
+        SeaTunnelDataType<?>[] fieldTypes = new SeaTunnelDataType[seaTunnelDataValueIndices.size()];
+        for (int i = 0; i < seaTunnelDataValueIndices.size(); i++) {
+            SeaTunnelDataValueIndex seaTunnelDataValueIndex = seaTunnelDataValueIndices.get(i);
+            fieldNames[i] = seaTunnelDataValueIndex.getNewColumnName();
+            fieldTypes[i] = seaTunnelDataValueIndex.getSeaTunnelDataType();
+        }
+        this.rowType = new SeaTunnelRowType(fieldNames, fieldTypes);
         this.connectionProvider =
                 new SimpleJdbcConnectionProvider(jdbcSinkConfig.getJdbcConnectionConfig());
         this.outputFormat =
-                new JdbcOutputFormatBuilder(dialect, connectionProvider, jdbcSinkConfig, rowType)
+                new JdbcOutputFormatBuilder(dialect, connectionProvider, jdbcSinkConfig, this.rowType)
                         .build();
     }
 
@@ -77,8 +89,21 @@ public class JdbcSinkWriter implements SinkWriter<SeaTunnelRow, XidInfo, JdbcSin
     @Override
     public void write(SeaTunnelRow element) throws IOException {
         tryOpen();
-        SeaTunnelRow copy = SerializationUtils.clone(element);
-        outputFormat.writeRecord(copy);
+        Object[] fields = element.getFields();
+        Object[] newfields = new Object[seaTunnelDataValueIndices.size()];
+        for (int i = 0; i < this.rowType.getTotalFields(); i++) {
+            String fieldName = this.rowType.getFieldName(i);
+            int finalI = i;
+            this.seaTunnelDataValueIndices.stream().filter(x -> x.getNewColumnName().equalsIgnoreCase(fieldName)).findFirst()
+                    .ifPresent(x -> {
+                        Object field = fields[x.getOriginColumnValueIndex()];
+                        newfields[finalI] = field;
+                    });
+        }
+        SeaTunnelRow newRow = new SeaTunnelRow(newfields);
+        newRow.setRowKind(element.getRowKind());
+        newRow.setTableId(element.getTableId());
+        outputFormat.writeRecord(newRow);
     }
 
     @Override
@@ -100,7 +125,8 @@ public class JdbcSinkWriter implements SinkWriter<SeaTunnelRow, XidInfo, JdbcSin
     }
 
     @Override
-    public void abortPrepare() {}
+    public void abortPrepare() {
+    }
 
     @Override
     public void close() throws IOException {

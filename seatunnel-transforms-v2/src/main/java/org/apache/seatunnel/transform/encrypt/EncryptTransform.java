@@ -16,6 +16,7 @@ import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.transform.common.AbstractCatalogSupportTransform;
 import org.apache.seatunnel.transform.exception.FieldMapperTransformErrorCode;
 import org.apache.seatunnel.transform.exception.TransformException;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -29,6 +30,7 @@ public class EncryptTransform extends AbstractCatalogSupportTransform {
 
     private List<Integer> needEncryptColIndex;
     private static final String KEY = "86C63180C2806ED1F47B859DE501215B";
+
     public EncryptTransform(
             @NonNull EncryptTransformConfig config, @NonNull CatalogTable catalogTable) {
         super(catalogTable);
@@ -77,7 +79,9 @@ public class EncryptTransform extends AbstractCatalogSupportTransform {
             if (needEncryptColIndex.contains(i)) {
                 String encryptHex = null;
                 try {
-                    encryptHex = SM4Util.encryptEcb(KEY,(String) inputRow.getField(i));
+                    if (null != inputRow.getField(i)) {
+                        encryptHex = SM4Util.encryptEcb(KEY, (String) inputRow.getField(i));
+                    }
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }

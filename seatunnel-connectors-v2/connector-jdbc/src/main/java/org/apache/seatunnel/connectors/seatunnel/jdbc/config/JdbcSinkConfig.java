@@ -24,6 +24,7 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcOptions.SUPPORT_UPSERT_BY_QUERY_PRIMARY_KEY_EXIST;
 
@@ -39,6 +40,7 @@ public class JdbcSinkConfig implements Serializable {
     private String table;
     private List<String> primaryKeys;
     private boolean supportUpsertByQueryPrimaryKeyExist;
+    private Map<String,String> fieldMapper;
 
     public static JdbcSinkConfig of(ReadonlyConfig config) {
         JdbcSinkConfig.Builder builder = JdbcSinkConfig.builder();
@@ -50,6 +52,7 @@ public class JdbcSinkConfig implements Serializable {
         config.getOptional(SUPPORT_UPSERT_BY_QUERY_PRIMARY_KEY_EXIST)
                 .ifPresent(builder::supportUpsertByQueryPrimaryKeyExist);
         config.getOptional(JdbcOptions.QUERY).ifPresent(builder::simpleSql);
+        config.getOptional(JdbcOptions.FIELD_MAPPER).ifPresent(builder::fieldMapper);
         return builder.build();
     }
 }

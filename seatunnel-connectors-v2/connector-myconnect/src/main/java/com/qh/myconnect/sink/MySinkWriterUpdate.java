@@ -3,10 +3,7 @@ package com.qh.myconnect.sink;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
-import com.qh.myconnect.config.JdbcSinkConfig;
-import com.qh.myconnect.config.SeaTunnelJobsHistoryErrorRecord;
-import com.qh.myconnect.config.StatisticalLog;
-import com.qh.myconnect.config.Util;
+import com.qh.myconnect.config.*;
 import com.qh.myconnect.converter.ColumnMapper;
 import com.qh.myconnect.dialect.JdbcDialect;
 import com.qh.myconnect.dialect.JdbcDialectFactory;
@@ -83,6 +80,18 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         }
         this.metaDataHash = metaDataHash;
         preparedStatementQuery.close();
+        try {
+            SubTaskStatus subTaskStatus = new SubTaskStatus();
+            subTaskStatus.setFlinkJobId(this.jobContext.getJobId());
+            subTaskStatus.setDataSourceId(this.jdbcSinkConfig.getDbDatasourceId());
+            subTaskStatus.setDbSchema(this.jdbcSinkConfig.getDbSchema());
+            subTaskStatus.setTableName(this.jdbcSinkConfig.getTable());
+            subTaskStatus.setSubtaskIndexId(this.currentTaskId + "");
+            subTaskStatus.setStatus("start");
+            util.setSubTaskStatus(subTaskStatus);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void consumeData() {
@@ -252,6 +261,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     private void doUpdate(HashMap<List<String>, SeaTunnelRow> rows, Map<String, String> metaDataHash) throws SQLException {
         List<ColumnMapper> listUc = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
+        List<ColumnMapper> columnMappers = this.columnMappers.stream().filter(x->!x.isUc()).collect(Collectors.toList());
         String templateInsert = "update <table> set " + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> " + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
         ST template = new ST(templateInsert);
         template.add("table", jdbcSinkConfig.getTable());
@@ -371,7 +381,17 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     private void statisticalResults(Connection conn) throws Exception {
         try {
-            if (this.currentTaskId == 0) {
+            SubTaskStatus subTaskStatus = new SubTaskStatus();
+            subTaskStatus.setFlinkJobId(this.jobContext.getJobId());
+            subTaskStatus.setDataSourceId(this.jdbcSinkConfig.getDbDatasourceId());
+            subTaskStatus.setDbSchema(this.jdbcSinkConfig.getDbSchema());
+            subTaskStatus.setTableName(this.jdbcSinkConfig.getTable());
+            subTaskStatus.setSubtaskIndexId(this.currentTaskId + "");
+            subTaskStatus.setStatus("done");
+            util.setSubTaskStatus(subTaskStatus);
+            List<SubTaskStatus> subTaskStatus1 = util.getSubTaskStatus(subTaskStatus);
+            int done = (int) subTaskStatus1.stream().filter(x -> !x.getStatus().equalsIgnoreCase("done")).count();
+            if (done == 0) {
                 List<ColumnMapper> ucColumns = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
                 int del = 0;
                 if (this.jdbcSinkConfig.getDbSchema() != null && !this.jdbcSinkConfig.getDbSchema().equals("")) {

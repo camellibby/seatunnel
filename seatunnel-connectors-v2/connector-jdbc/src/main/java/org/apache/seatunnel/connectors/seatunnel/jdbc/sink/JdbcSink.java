@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.sink;
 
+import org.apache.seatunnel.connectors.seatunnel.jdbc.config.SeaTunnelDataValueIndex;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import org.apache.seatunnel.api.common.CommonOptions;
@@ -63,7 +64,7 @@ import static org.apache.seatunnel.api.common.SeaTunnelAPIErrorCode.HANDLE_SAVE_
 @AutoService(SeaTunnelSink.class)
 public class JdbcSink
         implements SeaTunnelSink<SeaTunnelRow, JdbcSinkState, XidInfo, JdbcAggregatedCommitInfo>,
-                SupportDataSaveMode {
+        SupportDataSaveMode {
 
     private SeaTunnelRowType seaTunnelRowType;
 
@@ -78,6 +79,7 @@ public class JdbcSink
     private DataSaveMode dataSaveMode;
 
     private CatalogTable catalogTable;
+    private List<SeaTunnelDataValueIndex> seaTunnelDataValueIndices;
 
     public JdbcSink(
             ReadonlyConfig config,
@@ -90,10 +92,32 @@ public class JdbcSink
         this.dialect = dialect;
         this.dataSaveMode = dataSaveMode;
         this.catalogTable = catalogTable;
-        this.seaTunnelRowType = catalogTable.getTableSchema().toPhysicalRowDataType();
+        Map<String, String> fieldMapper = this.jdbcSinkConfig.getFieldMapper();
+        String[] fieldNames = new String[seaTunnelRowType.getFieldNames().length];
+        SeaTunnelDataType<?>[] fieldTypes = new SeaTunnelDataType[seaTunnelRowType.getFieldNames().length];
+        List<SeaTunnelDataValueIndex> list = new ArrayList<>();
+        for (int i = 0; i < seaTunnelRowType.getFieldNames().length; i++) {
+            String fileName = fieldMapper.get(seaTunnelRowType.getFieldName(i));
+            if (fileName != null) {
+                fieldNames[i] = fieldMapper.get(seaTunnelRowType.getFieldName(i));
+                fieldTypes[i] = seaTunnelRowType.getFieldType(i);
+                SeaTunnelDataValueIndex seaTunnelDataValueIndex = new SeaTunnelDataValueIndex();
+                seaTunnelDataValueIndex.setOriginColumnName(seaTunnelRowType.getFieldName(i));
+                seaTunnelDataValueIndex.setNewColumnName(fileName);
+                seaTunnelDataValueIndex.setOriginColumnValueIndex(i);
+                seaTunnelDataValueIndex.setSeaTunnelDataType(seaTunnelRowType.getFieldType(i));
+                list.add(seaTunnelDataValueIndex);
+            }else{
+                fieldNames[i] = seaTunnelRowType.getFieldName(i);
+                fieldTypes[i] = seaTunnelRowType.getFieldType(i);
+            }
+        }
+        this.seaTunnelDataValueIndices = list;
+        this.seaTunnelRowType = new SeaTunnelRowType(fieldNames, fieldTypes);
     }
 
-    public JdbcSink() {}
+    public JdbcSink() {
+    }
 
     @Override
     public String getPluginName() {
@@ -120,9 +144,10 @@ public class JdbcSink
                             dialect,
                             jdbcSinkConfig,
                             seaTunnelRowType,
-                            new ArrayList<>());
+                            new ArrayList<>(),
+                            this.seaTunnelDataValueIndices);
         } else {
-            sinkWriter = new JdbcSinkWriter(context, dialect, jdbcSinkConfig, seaTunnelRowType);
+            sinkWriter = new JdbcSinkWriter(context, dialect, jdbcSinkConfig, seaTunnelRowType, this.seaTunnelDataValueIndices);
         }
 
         return sinkWriter;
@@ -133,14 +158,14 @@ public class JdbcSink
             SinkWriter.Context context, List<JdbcSinkState> states) throws IOException {
         if (jdbcSinkConfig.isExactlyOnce()) {
             return new JdbcExactlyOnceSinkWriter(
-                    context, jobContext, dialect, jdbcSinkConfig, seaTunnelRowType, states);
+                    context, jobContext, dialect, jdbcSinkConfig, seaTunnelRowType, states, this.seaTunnelDataValueIndices);
         }
         return SeaTunnelSink.super.restoreWriter(context, states);
     }
 
     @Override
     public Optional<SinkAggregatedCommitter<XidInfo, JdbcAggregatedCommitInfo>>
-            createAggregatedCommitter() {
+    createAggregatedCommitter() {
         if (jdbcSinkConfig.isExactlyOnce()) {
             return Optional.of(new JdbcSinkAggregatedCommitter(jdbcSinkConfig));
         }
@@ -149,7 +174,28 @@ public class JdbcSink
 
     @Override
     public void setTypeInfo(SeaTunnelRowType seaTunnelRowType) {
-        this.seaTunnelRowType = seaTunnelRowType;
+        Map<String, String> fieldMapper = this.jdbcSinkConfig.getFieldMapper();
+        String[] fieldNames = new String[seaTunnelRowType.getFieldNames().length];
+        SeaTunnelDataType<?>[] fieldTypes = new SeaTunnelDataType[seaTunnelRowType.getFieldNames().length];
+        List<SeaTunnelDataValueIndex> list = new ArrayList<>();
+        for (int i = 0; i < seaTunnelRowType.getFieldNames().length; i++) {
+            String fileName = fieldMapper.get(seaTunnelRowType.getFieldName(i));
+            if (fileName != null) {
+                fieldNames[i] = fieldMapper.get(seaTunnelRowType.getFieldName(i));
+                fieldTypes[i] = seaTunnelRowType.getFieldType(i);
+                SeaTunnelDataValueIndex seaTunnelDataValueIndex = new SeaTunnelDataValueIndex();
+                seaTunnelDataValueIndex.setOriginColumnName(seaTunnelRowType.getFieldName(i));
+                seaTunnelDataValueIndex.setNewColumnName(fileName);
+                seaTunnelDataValueIndex.setOriginColumnValueIndex(i);
+                seaTunnelDataValueIndex.setSeaTunnelDataType(seaTunnelRowType.getFieldType(i));
+                list.add(seaTunnelDataValueIndex);
+            }else{
+                fieldNames[i] = seaTunnelRowType.getFieldName(i);
+                fieldTypes[i] = seaTunnelRowType.getFieldType(i);
+            }
+        }
+        this.seaTunnelDataValueIndices = list;
+        this.seaTunnelRowType = new SeaTunnelRowType(fieldNames, fieldTypes);
     }
 
     @Override
@@ -194,15 +240,15 @@ public class JdbcSink
             Map<String, String> catalogOptions = config.get(CatalogOptions.CATALOG_OPTIONS);
             if (catalogOptions != null
                     && TiDBCatalogFactory.IDENTIFIER.equalsIgnoreCase(
-                            catalogOptions.get(CommonOptions.FACTORY_ID.key()))) {
+                    catalogOptions.get(CommonOptions.FACTORY_ID.key()))) {
                 if (StringUtils.isBlank(jdbcSinkConfig.getDatabase())) {
                     return;
                 }
                 try (Catalog catalog =
-                        new TiDBCatalogFactory()
-                                .createCatalog(
-                                        TiDBCatalogFactory.IDENTIFIER,
-                                        ReadonlyConfig.fromMap(new HashMap<>(catalogOptions)))) {
+                             new TiDBCatalogFactory()
+                                     .createCatalog(
+                                             TiDBCatalogFactory.IDENTIFIER,
+                                             ReadonlyConfig.fromMap(new HashMap<>(catalogOptions)))) {
                     catalog.open();
                     TablePath tablePath =
                             TablePath.of(jdbcSinkConfig.getDatabase(), jdbcSinkConfig.getTable());

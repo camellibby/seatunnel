@@ -17,40 +17,29 @@
 
 package org.apache.seatunnel.transform.replace;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.seatunnel.api.configuration.Option;
 import org.apache.seatunnel.api.configuration.Options;
+import org.apache.seatunnel.api.configuration.ReadonlyConfig;
+import org.apache.seatunnel.transform.encrypt.EncryptTransformConfig;
 
 import java.io.Serializable;
+import java.util.List;
 
+@Getter
+@Setter
 public class ReplaceTransformConfig implements Serializable {
-
-    public static final Option<String> KEY_REPLACE_FIELD =
-            Options.key("replace_field")
-                    .stringType()
+    public static final Option<List<XjReplaceConfig>> REPLACE_FIELDS =
+            Options.key("replace_fields")
+                    .listType(XjReplaceConfig.class)
                     .noDefaultValue()
-                    .withDescription("The field you want to replace");
+                    .withDescription("need replace fields");
+    private List<XjReplaceConfig> replaceFields;
 
-    public static final Option<String> KEY_PATTERN =
-            Options.key("pattern")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("The old string that will be replaced");
-
-    public static final Option<String> KEY_REPLACEMENT =
-            Options.key("replacement")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("The new string for replace");
-
-    public static final Option<Boolean> KEY_IS_REGEX =
-            Options.key("is_regex")
-                    .booleanType()
-                    .defaultValue(false)
-                    .withDescription("Use regex for string match");
-
-    public static final Option<Boolean> KEY_REPLACE_FIRST =
-            Options.key("replace_first")
-                    .booleanType()
-                    .noDefaultValue()
-                    .withDescription("Replace the first match string");
+    public static ReplaceTransformConfig of(ReadonlyConfig config) {
+        ReplaceTransformConfig replaceTransformConfig = new ReplaceTransformConfig();
+        replaceTransformConfig.setReplaceFields(config.get(REPLACE_FIELDS));
+        return replaceTransformConfig;
+    }
 }

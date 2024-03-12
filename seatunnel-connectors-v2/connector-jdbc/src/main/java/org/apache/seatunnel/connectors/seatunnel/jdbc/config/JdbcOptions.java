@@ -21,6 +21,7 @@ import org.apache.seatunnel.api.configuration.Option;
 import org.apache.seatunnel.api.configuration.Options;
 
 import java.util.List;
+import java.util.Map;
 
 @SuppressWarnings("checkstyle:MagicNumber")
 public interface JdbcOptions {
@@ -137,4 +138,11 @@ public interface JdbcOptions {
                     .intType()
                     .noDefaultValue()
                     .withDescription("partition num");
+
+    Option<Map<String, String>> FIELD_MAPPER =
+            Options.key("field_mapper")
+                    .mapType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Specify the field mapping relationship between input and output");
 }

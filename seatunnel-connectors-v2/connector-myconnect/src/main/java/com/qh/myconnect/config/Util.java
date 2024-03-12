@@ -1,5 +1,7 @@
 package com.qh.myconnect.config;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.qh.myconnect.dialect.JdbcConnectorErrorCode;
 import com.qh.myconnect.dialect.JdbcConnectorException;
@@ -154,7 +156,7 @@ public class Util {
         param.put("deleteCount", statisticalLog.getDeleteCount());
         param.put("keepCount", statisticalLog.getKeepCount());
         param.put("insertCount", statisticalLog.getInsertCount());
-        param.put("errorCount",statisticalLog.getErrorCount());
+        param.put("errorCount", statisticalLog.getErrorCount());
         param.put("startTime", statisticalLog.getStartTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         param.put("endTime", statisticalLog.getEndTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         String st_log_url = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/gatherJobLog";
@@ -175,6 +177,43 @@ public class Util {
         this.sendPostRequest(st_log_url, param.toString());
     }
 
+    public void setSubTaskStatus(SubTaskStatus subTaskStatus) throws Exception {
+        JSONObject param = new JSONObject();
+        param.put("flinkJobId", subTaskStatus.getFlinkJobId());
+        param.put("dataSourceId", subTaskStatus.getDataSourceId());
+        if (null != subTaskStatus.getDbSchema()) {
+            param.put("dbSchema", subTaskStatus.getDbSchema());
+        }
+        param.put("tableName", subTaskStatus.getTableName());
+        param.put("subtaskIndexId", subTaskStatus.getSubtaskIndexId());
+        param.put("status", subTaskStatus.getStatus());
+        String st_log_url = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/setSubTaskStatus";
+        this.sendPostRequest(st_log_url, param.toString());
+    }
+
+
+    public List<SubTaskStatus> getSubTaskStatus(SubTaskStatus subTaskStatus) throws Exception {
+        JSONObject param = new JSONObject();
+        param.put("flinkJobId", subTaskStatus.getFlinkJobId());
+        param.put("dataSourceId", subTaskStatus.getDataSourceId());
+        if (null != subTaskStatus.getDbSchema()) {
+            param.put("dbSchema", subTaskStatus.getDbSchema());
+        }
+        param.put("tableName", subTaskStatus.getTableName());
+        String st_log_url = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/getSubTaskStatus";
+        String response = this.sendPostRequest(st_log_url, param.toString());
+        List<SubTaskStatus> list = new ArrayList<>();
+        JSONObject jsonObject = JSONObject.parseObject(response);
+        if (jsonObject.getInteger("code") == 10000) {
+            JSONArray jsonArray = jsonObject.getJSONArray("result");
+            for (Object value : jsonArray) {
+                JSONObject tmp = (JSONObject) value;
+                SubTaskStatus subTaskStatusReBean = JSON.toJavaObject(tmp, SubTaskStatus.class);
+                list.add(subTaskStatusReBean);
+            }
+        }
+        return list;
+    }
 
 
     public java.sql.Driver loadDriver(String driverName) throws ClassNotFoundException {

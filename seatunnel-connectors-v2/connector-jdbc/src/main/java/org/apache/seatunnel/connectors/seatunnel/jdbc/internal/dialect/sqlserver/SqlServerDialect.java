@@ -126,11 +126,11 @@ public class SqlServerDialect implements JdbcDialect {
     public ResultSet getSplitValue(Connection conn, JdbcSourceConfig jdbcSourceConfig, Object[] parameterValues) {
         String template = "select * " +
                 "  from (select <partitionColumn>, " +
-                "               Row_number() over(order by <partitionColumn>) hang " +
+                "               Row_number() over(order by case when  <partitionColumn> is null then 1 else 0 end,  <partitionColumn> asc) hang " +
                 "          from (select distinct  <partitionColumn>  <partitionColumn> " +
                 "                  from (<query>) a ) a ) a" +
                 " where hang in (<parameterValues>) " +
-                " order by <partitionColumn>, case when <partitionColumn> is null then 0 else 1 end desc  ";
+                " order by case when  <partitionColumn> is null then 1 else 0 end,  <partitionColumn> asc  ";
         ST st = new ST(template);
         st.add("partitionColumn", jdbcSourceConfig.getPartitionColumn().orElseThrow(() -> new NullPointerException("分区列为空")));
         st.add("query", jdbcSourceConfig.getQuery());

@@ -19,10 +19,12 @@ package org.apache.seatunnel.connectors.seatunnel.jdbc.sink;
 
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.sink.SinkWriter;
+import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcSinkConfig;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.config.SeaTunnelDataValueIndex;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorException;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.JdbcOutputFormat;
@@ -74,13 +76,17 @@ public class JdbcExactlyOnceSinkWriter implements SinkWriter<SeaTunnelRow, XidIn
     private transient Xid currentXid;
     private transient Xid prepareXid;
 
+    private List<SeaTunnelDataValueIndex> seaTunnelDataValueIndices;
+    private SeaTunnelRowType rowType;
+
     public JdbcExactlyOnceSinkWriter(
             SinkWriter.Context sinkcontext,
             JobContext context,
             JdbcDialect dialect,
             JdbcSinkConfig jdbcSinkConfig,
             SeaTunnelRowType rowType,
-            List<JdbcSinkState> states) {
+            List<JdbcSinkState> states,
+            List<SeaTunnelDataValueIndex> seaTunnelDataValueIndices) {
         checkArgument(
                 jdbcSinkConfig.getJdbcConnectionConfig().getMaxRetries() == 0,
                 "JDBC XA sink requires maxRetries equal to 0, otherwise it could "
@@ -89,12 +95,21 @@ public class JdbcExactlyOnceSinkWriter implements SinkWriter<SeaTunnelRow, XidIn
         this.context = context;
         this.sinkcontext = sinkcontext;
         this.recoverStates = states;
+        this.seaTunnelDataValueIndices = seaTunnelDataValueIndices;
+        String[] fieldNames = new String[seaTunnelDataValueIndices.size()];
+        SeaTunnelDataType<?>[] fieldTypes = new SeaTunnelDataType[seaTunnelDataValueIndices.size()];
+        for (int i = 0; i < seaTunnelDataValueIndices.size(); i++) {
+            SeaTunnelDataValueIndex seaTunnelDataValueIndex = seaTunnelDataValueIndices.get(i);
+            fieldNames[i]=seaTunnelDataValueIndex.getNewColumnName();
+            fieldTypes[i]=seaTunnelDataValueIndex.getSeaTunnelDataType();
+        }
+        this.rowType = new SeaTunnelRowType(fieldNames,fieldTypes);
         this.xidGenerator = XidGenerator.semanticXidGenerator();
         checkState(jdbcSinkConfig.isExactlyOnce(), "is_exactly_once config error");
         this.xaFacade =
                 XaFacade.fromJdbcConnectionOptions(jdbcSinkConfig.getJdbcConnectionConfig());
         this.outputFormat =
-                new JdbcOutputFormatBuilder(dialect, xaFacade, jdbcSinkConfig, rowType).build();
+                new JdbcOutputFormatBuilder(dialect, xaFacade, jdbcSinkConfig, this.rowType).build();
         this.xaGroupOps = new XaGroupOpsImpl(xaFacade);
     }
 
@@ -130,8 +145,22 @@ public class JdbcExactlyOnceSinkWriter implements SinkWriter<SeaTunnelRow, XidIn
     public void write(SeaTunnelRow element) {
         tryOpen();
         checkState(currentXid != null, "current xid must not be null");
-        SeaTunnelRow copy = SerializationUtils.clone(element);
-        outputFormat.writeRecord(copy);
+//        SeaTunnelRow copy = SerializationUtils.clone(element);
+        Object[] fields = element.getFields();
+        Object[] newfields = new Object[seaTunnelDataValueIndices.size()];
+        for (int i = 0; i < this.rowType.getTotalFields(); i++) {
+            String fieldName = this.rowType.getFieldName(i);
+            int finalI = i;
+            this.seaTunnelDataValueIndices.stream().filter(x->x.getNewColumnName().equalsIgnoreCase(fieldName)).findFirst()
+                    .ifPresent(x->{
+                        Object field = fields[x.getOriginColumnValueIndex()];
+                        newfields[finalI]=field;
+                    });
+        }
+        SeaTunnelRow newRow= new SeaTunnelRow(newfields);
+        newRow.setRowKind(element.getRowKind());
+        newRow.setTableId(element.getTableId());
+        outputFormat.writeRecord(newRow);
     }
 
     @Override
@@ -145,7 +174,8 @@ public class JdbcExactlyOnceSinkWriter implements SinkWriter<SeaTunnelRow, XidIn
     }
 
     @Override
-    public void abortPrepare() {}
+    public void abortPrepare() {
+    }
 
     @Override
     public void close() throws IOException {
