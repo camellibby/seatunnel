@@ -32,7 +32,7 @@ public class SqlserverTypeMapper implements JdbcDialectTypeMapper {
     // ============================data types=====================
 
     private static final String SQLSERVER_UNKNOWN = "UNKNOWN";
-
+    private static final String SQLSERVER_UNIQUEIDENTIFIER="UNIQUEIDENTIFIER";
     // -------------------------number----------------------------
     private static final String SQLSERVER_BIT = "BIT";
     private static final String SQLSERVER_TINYINT = "TINYINT";
@@ -100,6 +100,7 @@ public class SqlserverTypeMapper implements JdbcDialectTypeMapper {
             case SQLSERVER_VARCHAR:
             case SQLSERVER_NTEXT:
             case SQLSERVER_NVARCHAR:
+            case SQLSERVER_UNIQUEIDENTIFIER:
             case SQLSERVER_TEXT:
                 return BasicType.STRING_TYPE;
             case SQLSERVER_DATE:

@@ -29,13 +29,13 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
     private final SeaTunnelRowType sourceRowType;
     private SeaTunnelRowType sinkTableRowType;
     private List<SeaTunnelRow> cld = new ArrayList<>();
-    private LongAdder writeCount = new LongAdder();
-    private LongAdder keepCount = new LongAdder();
-    private LongAdder updateCount = new LongAdder();
-    private LongAdder deleteCount = new LongAdder();
-    private LongAdder insertCount = new LongAdder();
+    private Long writeCount = 0L;
+    private Long keepCount = 0L;
+    private Long updateCount = 0L;
+    private Long deleteCount = 0L;
+    private Long insertCount = 0L;
 
-    private LongAdder errorCount = new LongAdder();
+    private Long errorCount = 0L;
 
     private final JdbcSinkConfig jdbcSinkConfig;
     private JobContext jobContext;
@@ -132,9 +132,9 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
             if (null != sinkRow) {
                 if (!sourceRow.equals(sinkRow)) {
                     needUpdate.put(k, sourceRow);
-//                    this.updateCount.increment();
+//                    this.updateCount++;
                 } else {
-                    this.keepCount.increment();
+                    this.keepCount++;
                 }
             } else {
                 needInsertRows.add(sourceRow);
@@ -180,7 +180,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     @Override
     public void write(SeaTunnelRow element) throws IOException {
-        this.writeCount.increment();
+        this.writeCount++;
         this.cld.add(element);
         if (this.writeCount.longValue() % batchSize == 0) {
             this.consumeData();
@@ -189,53 +189,74 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
     }
 
     private void doInsert(List<SeaTunnelRow> rows, Map<String, String> metaDataHash, Connection connection) throws SQLException {
-        List<String> newColumns = new ArrayList<>();
-        List<String> newValues = new ArrayList<>();
-        for (ColumnMapper column : columnMappers) {
-            newColumns.add(column.getSinkColumnName());
-            newValues.add("?");
-        }
-        String insertSql = jdbcDialect.insertTableSql(jdbcSinkConfig, newColumns, newValues);
-        PreparedStatement preparedStatement = connection.prepareStatement(insertSql);
-        for (SeaTunnelRow row : rows) {
-            for (int i = 0; i < columnMappers.size(); i++) {
-                String column = newColumns.get(i);
-                String dbType = metaDataHash.get(column);
-                jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, (String) row.getField(i));
-            }
-            try {
-                preparedStatement.addBatch();
-                this.insertCount.increment();
-            } catch (SQLException e) {
-                this.insertCount.decrement();
-            }
-        }
+        Long tmpInsertCount = null;
         try {
+            List<String> newColumns = new ArrayList<>();
+            List<String> newValues = new ArrayList<>();
+            for (ColumnMapper column : columnMappers) {
+                newColumns.add(column.getSinkColumnName());
+                newValues.add("?");
+            }
+            String insertSql = jdbcDialect.insertTableSql(jdbcSinkConfig, newColumns, newValues);
+            PreparedStatement preparedStatement = connection.prepareStatement(insertSql);
+            tmpInsertCount = this.insertCount;
+            boolean hasError = false;
+            for (SeaTunnelRow row : rows) {
+                for (int i = 0; i < columnMappers.size(); i++) {
+                    String column = newColumns.get(i);
+                    String dbType = metaDataHash.get(column);
+                    jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, (String) row.getField(i));
+                }
+                this.insertCount++;
+                try {
+                    preparedStatement.addBatch();
+                } catch (SQLException e) {
+                    hasError = true;
+                    break;
+                }
+            }
+            if (hasError) {
+                throw new RuntimeException();
+            }
             preparedStatement.executeBatch();
             conn.commit();
             preparedStatement.clearBatch();
-        } catch (SQLException e) {
-            //批量提交失败 回滚此批数据 拆成1条条的提交
+            preparedStatement.close();
+        } catch (Exception e) {
             conn.rollback();
-            log.info(String.format("错误%s", e.getMessage()));
-            for (SeaTunnelRow row : rows) {
-                if (row != null) {
+            this.insertCount = tmpInsertCount;
+            insertToDbOneByOne(rows);
+        }
+    }
+
+    private void insertToDbOneByOne(List<SeaTunnelRow> rows) {
+        try {
+            List<String> columns = this.columnMappers.stream().map(x -> x.getSinkColumnName()).collect(Collectors.toList());
+            List<String> values = this.columnMappers.stream().map(x -> "?").collect(Collectors.toList());
+            String sql = jdbcDialect.insertTableSql(this.jdbcSinkConfig, columns, values);
+            for (SeaTunnelRow seaTunnelRow : rows) {
+                if (seaTunnelRow != null) {
+                    PreparedStatement psUpsert = conn.prepareStatement(sql);
                     for (int i = 0; i < this.columnMappers.size(); i++) {
-                        String column = newColumns.get(i);
+                        Integer valueIndex = this.columnMappers.get(i).getSourceRowPosition();
+                        Object field = seaTunnelRow.getField(valueIndex);
+                        String column = columns.get(i);
                         String dbType = metaDataHash.get(column);
-                        jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, (String) row.getField(i));
+                        jdbcDialect.setPreparedStatementValueByDbType(i + 1, psUpsert, dbType, util.Object2String(field));
                     }
                     try {
-                        preparedStatement.addBatch();
-                        preparedStatement.executeBatch();
+                        psUpsert.addBatch();
+                        psUpsert.executeBatch();
                         conn.commit();
+                        psUpsert.clearBatch();
+                        psUpsert.close();
+                        this.insertCount++;
                     } catch (SQLException ee) {
-                        this.insertCount.decrement();
-                        this.errorCount.increment();
-                        if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount.longValue() <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(ee.getMessage())) {
+                        this.errorCount++;
+                        if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(ee.getMessage())) {
                             JSONObject jsonObject = new JSONObject();
-                            for (int i = 0; i < sinkTableRowType.getTotalFields(); i++) {
-                                jsonObject.put(sinkTableRowType.getFieldName(i), row.getField(i));
+                            for (int i = 0; i < sourceRowType.getTotalFields(); i++) {
+                                jsonObject.put(sourceRowType.getFieldName(i), seaTunnelRow.getField(i));
                             }
                             log.info(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
                             SeaTunnelJobsHistoryErrorRecord errorRecord = new SeaTunnelJobsHistoryErrorRecord();
@@ -255,47 +276,77 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                     }
                 }
             }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
-        preparedStatement.close();
+
     }
 
     private void doUpdate(HashMap<List<String>, SeaTunnelRow> rows, Map<String, String> metaDataHash) throws SQLException {
-        List<ColumnMapper> listUc = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
-        List<ColumnMapper> columnMappers = this.columnMappers.stream().filter(x->!x.isUc()).collect(Collectors.toList());
-        String templateInsert = "update <table> set " + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> " + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
-        ST template = new ST(templateInsert);
-        template.add("table", jdbcSinkConfig.getTable());
-        template.add("columns", columnMappers);
-        template.add("pks", listUc);
-        String updateSql = template.render();
-        PreparedStatement preparedStatement = conn.prepareStatement(updateSql);
-        for (SeaTunnelRow row : rows.values()) {
-            for (int i = 0; i < columnMappers.size(); i++) {
-                String column = columnMappers.get(i).getSinkColumnName();
-                String dbType = metaDataHash.get(column);
-                this.jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, (String) row.getField(columnMappers.get(i).getSinkRowPosition()));
-            }
-            for (int i = 0; i < listUc.size(); i++) {
-                String column = listUc.get(i).getSinkColumnName();
-                String dbType = metaDataHash.get(column);
-                this.jdbcDialect.setPreparedStatementValueByDbType(i + 1 + columnMappers.size(), preparedStatement, dbType, (String) row.getField(listUc.get(i).getSinkRowPosition()));
-            }
-            try {
-                preparedStatement.addBatch();
-                this.updateCount.increment();
-            } catch (SQLException e) {
-                this.updateCount.decrement();
-            }
-        }
+        Long tmpUpdateCount = null;
         try {
+            List<ColumnMapper> listUc = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
+            List<ColumnMapper> columnMappers = this.columnMappers.stream().filter(x -> !x.isUc()).collect(Collectors.toList());
+            String templateInsert = "update <table> set " + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> " + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
+            ST template = new ST(templateInsert);
+            template.add("table", jdbcSinkConfig.getTable());
+            template.add("columns", columnMappers);
+            template.add("pks", listUc);
+            String updateSql = template.render();
+            PreparedStatement preparedStatement = conn.prepareStatement(updateSql);
+            tmpUpdateCount = this.updateCount;
+            boolean hasError = false;
+            for (SeaTunnelRow row : rows.values()) {
+                for (int i = 0; i < columnMappers.size(); i++) {
+                    String column = columnMappers.get(i).getSinkColumnName();
+                    String dbType = metaDataHash.get(column);
+                    this.jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, (String) row.getField(columnMappers.get(i).getSinkRowPosition()));
+                }
+                for (int i = 0; i < listUc.size(); i++) {
+                    String column = listUc.get(i).getSinkColumnName();
+                    String dbType = metaDataHash.get(column);
+                    this.jdbcDialect.setPreparedStatementValueByDbType(i + 1 + columnMappers.size(), preparedStatement, dbType, (String) row.getField(listUc.get(i).getSinkRowPosition()));
+                }
+                try {
+                    preparedStatement.addBatch();
+                    this.updateCount++;
+                } catch (SQLException e) {
+                    hasError = true;
+                    break;
+                }
+            }
+            if (hasError) {
+                throw new RuntimeException();
+            }
             preparedStatement.executeBatch();
             conn.commit();
             preparedStatement.clearBatch();
-        } catch (SQLException e) {
-            //批量提交失败 回滚此批数据 拆成1条条的提交
-            conn.rollback();
-            log.info(String.format("错误%s", e.getMessage()));
+            preparedStatement.close();
+        } catch (Exception e) {
+            try {
+                conn.rollback();
+                this.updateCount = tmpUpdateCount;
+            } catch (SQLException ex) {
+                throw new RuntimeException(ex);
+            }
+            updateDbOneByOne(rows);
+        }
+
+    }
+
+
+    private void updateDbOneByOne(HashMap<List<String>, SeaTunnelRow> rows) {
+        try {
+            List<ColumnMapper> listUc = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
+            List<ColumnMapper> columnMappers = this.columnMappers.stream().filter(x -> !x.isUc()).collect(Collectors.toList());
+            String templateInsert = "update <table> set " + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> " + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
+            ST template = new ST(templateInsert);
+            template.add("table", jdbcSinkConfig.getTable());
+            template.add("columns", columnMappers);
+            template.add("pks", listUc);
+            String updateSql = template.render();
             for (SeaTunnelRow row : rows.values()) {
+                PreparedStatement preparedStatement = conn.prepareStatement(updateSql);
                 for (int i = 0; i < columnMappers.size(); i++) {
                     String column = columnMappers.get(i).getSinkColumnName();
                     String dbType = metaDataHash.get(column);
@@ -310,9 +361,11 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                     preparedStatement.addBatch();
                     preparedStatement.executeBatch();
                     conn.commit();
+                    this.updateCount++;
+                    preparedStatement.clearBatch();
+                    preparedStatement.close();
                 } catch (SQLException ee) {
-                    this.updateCount.decrement();
-                    this.errorCount.increment();
+                    this.errorCount++;
                     if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount.longValue() <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(ee.getMessage())) {
                         JSONObject jsonObject = new JSONObject();
                         for (int i = 0; i < sinkTableRowType.getTotalFields(); i++) {
@@ -335,9 +388,10 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                     }
                 }
             }
-
-
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
+
     }
 
     private HashMap<List<String>, SeaTunnelRow> getSinkRows(Connection conn, HashMap<List<String>, SeaTunnelRow> sourceRows) {
@@ -393,14 +447,14 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
             int done = (int) subTaskStatus1.stream().filter(x -> !x.getStatus().equalsIgnoreCase("done")).count();
             if (done == 0) {
                 List<ColumnMapper> ucColumns = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
-                int del = 0;
+                long del = 0;
                 if (this.jdbcSinkConfig.getDbSchema() != null && !this.jdbcSinkConfig.getDbSchema().equals("")) {
                     del = this.jdbcDialect.deleteData(conn, this.jdbcSinkConfig.getDbSchema() + "." + table, this.jdbcSinkConfig.getDbSchema() + "." + tmpTable, ucColumns);
                 } else {
                     del = this.jdbcDialect.deleteData(conn, table, tmpTable, ucColumns);
                 }
                 conn.commit();
-                deleteCount.add(del);
+                deleteCount = del;
             }
 
         } catch (Exception e) {

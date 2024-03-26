@@ -32,12 +32,12 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     private final SeaTunnelRowType sourceRowType;
     private SeaTunnelRowType sinkTableRowType;
     private List<SeaTunnelRow> cld = new ArrayList<>();
-    private LongAdder writeCount = new LongAdder();
-    private LongAdder keepCount = new LongAdder();
-    private LongAdder updateCount = new LongAdder();
-    private LongAdder deleteCount = new LongAdder();
-    private LongAdder insertCount = new LongAdder();
-    private LongAdder errorCount = new LongAdder();
+    private Long writeCount = 0L;
+    private Long keepCount = 0L;
+    private Long updateCount = 0L;
+    private Long deleteCount = 0L;
+    private Long insertCount = 0L;
+    private Long errorCount = 0L;
 
     private final JdbcSinkConfig jdbcSinkConfig;
     private JobContext jobContext;
@@ -111,13 +111,13 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         try {
             insertTmpUks(this.cld, this.metaDataHash, conn);
             compareData(sourceRows);
-        } catch (SQLException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
     }
 
-    private void compareData(HashMap<List<String>, SeaTunnelRow> sourceRows) throws SQLException {
+    private void compareData(HashMap<List<String>, SeaTunnelRow> sourceRows) throws Exception {
         HashMap<List<String>, SeaTunnelRow> sinkRows = getSinkRows(conn, sourceRows);
         List<SeaTunnelRow> needInsertRows = new ArrayList<>();
         HashMap<List<String>, SeaTunnelRow> needUpdate = new HashMap<>();
@@ -127,7 +127,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                 if (!sourceRow.equals(sinkRow)) {
                     needUpdate.put(k, sourceRow);
                 } else {
-                    this.keepCount.increment();
+                    this.keepCount++;
                 }
             } else {
                 needInsertRows.add(sourceRow);
@@ -138,7 +138,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     }
 
-    private void initColumnMappers(JdbcSinkConfig jdbcSinkConfig, SeaTunnelRowType sourceRowType, SeaTunnelRowType sinkTableRowType, Connection conn) throws SQLException {
+    private void initColumnMappers(JdbcSinkConfig jdbcSinkConfig, SeaTunnelRowType sourceRowType, SeaTunnelRowType sinkTableRowType, Connection conn) {
         Map<String, String> fieldMapper = jdbcSinkConfig.getFieldMapper();
         fieldMapper.forEach((k, v) -> {
             ColumnMapper columnMapper = new ColumnMapper();
@@ -174,8 +174,8 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     }
 
     @Override
-    public void write(SeaTunnelRow element) throws IOException {
-        this.writeCount.increment();
+    public void write(SeaTunnelRow element) {
+        this.writeCount++;
         this.cld.add(element);
         if (this.writeCount.longValue() % batchSize == 0) {
             this.consumeData();
@@ -183,7 +183,53 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         }
     }
 
-    private void doInsert(List<SeaTunnelRow> rows, Map<String, String> metaDataHash, Connection connection) throws SQLException {
+    private void doInsert(List<SeaTunnelRow> rows, Map<String, String> metaDataHash, Connection connection) throws Exception {
+        Long tmpInsertCount = null;
+        try {
+            List<String> newColumns = new ArrayList<>();
+            List<String> newValues = new ArrayList<>();
+            for (ColumnMapper column : columnMappers) {
+                newColumns.add(column.getSinkColumnName());
+            }
+            newColumns.addAll(this.zipperColumns);
+            for (String newColumn : newColumns) {
+                newValues.add("?");
+            }
+            String insertSql = jdbcDialect.insertTableSql(jdbcSinkConfig, newColumns, newValues);
+            PreparedStatement preparedStatement = connection.prepareStatement(insertSql);
+            tmpInsertCount = this.insertCount;
+            boolean hasError = false;
+            for (SeaTunnelRow row : rows) {
+                for (int i = 0; i < columnMappers.size(); i++) {
+                    String column = newColumns.get(i);
+                    String dbType = metaDataHash.get(column);
+                    jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, (String) row.getField(i));
+                }
+                jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 1, preparedStatement, "VARCHAR2", "I");
+                jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 2, preparedStatement, "VARCHAR2", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                this.insertCount++;
+                try {
+                    preparedStatement.addBatch();
+                } catch (SQLException e) {
+                    hasError = true;
+                    break;
+                }
+            }
+            if (hasError) {
+                throw new RuntimeException();
+            }
+            preparedStatement.executeBatch();
+            conn.commit();
+            preparedStatement.clearBatch();
+            preparedStatement.close();
+        } catch (Exception e) {
+            conn.rollback();
+            this.insertCount = tmpInsertCount;
+            doInsertOneByOne(rows);
+        }
+    }
+
+    private void doInsertOneByOne(List<SeaTunnelRow> rows) throws Exception {
         List<String> newColumns = new ArrayList<>();
         List<String> newValues = new ArrayList<>();
         for (ColumnMapper column : columnMappers) {
@@ -194,8 +240,8 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             newValues.add("?");
         }
         String insertSql = jdbcDialect.insertTableSql(jdbcSinkConfig, newColumns, newValues);
-        PreparedStatement preparedStatement = connection.prepareStatement(insertSql);
         for (SeaTunnelRow row : rows) {
+            PreparedStatement preparedStatement = conn.prepareStatement(insertSql);
             for (int i = 0; i < columnMappers.size(); i++) {
                 String column = newColumns.get(i);
                 String dbType = metaDataHash.get(column);
@@ -205,96 +251,53 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 2, preparedStatement, "VARCHAR2", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             try {
                 preparedStatement.addBatch();
-                this.insertCount.increment();
+                preparedStatement.executeBatch();
+                conn.commit();
+                preparedStatement.clearBatch();
+                this.insertCount++;
+                preparedStatement.close();
             } catch (SQLException e) {
-                this.insertCount.decrement();
-            }
-        }
-        try {
-            preparedStatement.executeBatch();
-            conn.commit();
-            preparedStatement.clearBatch();
-        } catch (SQLException e) {
-            //批量提交失败 回滚此批数据 拆成1条条的提交
-            conn.rollback();
-            log.info(String.format("错误%s", e.getMessage()));
-            for (SeaTunnelRow row : rows) {
-                for (int i = 0; i < columnMappers.size(); i++) {
-                    String column = newColumns.get(i);
-                    String dbType = metaDataHash.get(column);
-                    jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, (String) row.getField(i));
-                }
-                jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 1, preparedStatement, "VARCHAR2", "I");
-                jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 2, preparedStatement, "VARCHAR2", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                try {
-                    preparedStatement.addBatch();
-                    preparedStatement.executeBatch();
-                    conn.commit();
-                    preparedStatement.clearBatch();
-                } catch (SQLException ee) {
-                    this.insertCount.decrement();
-                    this.errorCount.increment();
-                    if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount.longValue() <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(ee.getMessage())) {
-                        JSONObject jsonObject = new JSONObject();
-                        for (int i = 0; i < sinkTableRowType.getTotalFields(); i++) {
-                            jsonObject.put(sinkTableRowType.getFieldName(i), row.getField(i));
-                        }
-                        log.info(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
-                        SeaTunnelJobsHistoryErrorRecord errorRecord = new SeaTunnelJobsHistoryErrorRecord();
-                        errorRecord.setFlinkJobId(this.jobContext.getJobId());
-                        errorRecord.setDataSourceId(jdbcSinkConfig.getDbDatasourceId());
-                        errorRecord.setDbSchema(jdbcSinkConfig.getDbSchema());
-                        errorRecord.setTableName(jdbcSinkConfig.getTable());
-                        errorRecord.setErrorData(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
-                        errorRecord.setErrorMessage(ee.getMessage());
-                        sqlErrorType.add(ee.getMessage());
-                        try {
-                            util.insertErrorData(errorRecord);
-                        } catch (Exception ex) {
-                            throw new RuntimeException(ex);
-                        }
+                this.errorCount++;
+                if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(e.getMessage())) {
+                    JSONObject jsonObject = new JSONObject();
+                    for (int i = 0; i < sinkTableRowType.getTotalFields(); i++) {
+                        jsonObject.put(sinkTableRowType.getFieldName(i), row.getField(i));
+                    }
+                    log.info(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
+                    SeaTunnelJobsHistoryErrorRecord errorRecord = new SeaTunnelJobsHistoryErrorRecord();
+                    errorRecord.setFlinkJobId(this.jobContext.getJobId());
+                    errorRecord.setDataSourceId(jdbcSinkConfig.getDbDatasourceId());
+                    errorRecord.setDbSchema(jdbcSinkConfig.getDbSchema());
+                    errorRecord.setTableName(jdbcSinkConfig.getTable());
+                    errorRecord.setErrorData(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
+                    errorRecord.setErrorMessage(e.getMessage());
+                    sqlErrorType.add(e.getMessage());
+                    try {
+                        util.insertErrorData(errorRecord);
+                    } catch (Exception ex) {
+                        throw new RuntimeException(ex);
                     }
                 }
             }
         }
     }
 
-    private void doUpdate(HashMap<List<String>, SeaTunnelRow> rows, Map<String, String> metaDataHash, Connection connection) throws SQLException {
-        List<ColumnMapper> listUc = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
-        List<String> newColumns = new ArrayList<>();
-        List<String> newValues = new ArrayList<>();
-        for (ColumnMapper column : columnMappers) {
-            newColumns.add(column.getSinkColumnName());
-        }
-        newColumns.addAll(this.zipperColumns);
-        for (String newColumn : newColumns) {
-            newValues.add("?");
-        }
-        String insertSql = jdbcDialect.insertTableSql(jdbcSinkConfig, newColumns, newValues);
-        PreparedStatement preparedStatement = connection.prepareStatement(insertSql);
-        for (SeaTunnelRow row : rows.values()) {
-            for (int i = 0; i < columnMappers.size(); i++) {
-                String column = newColumns.get(i);
-                String dbType = metaDataHash.get(column);
-                jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, (String) row.getField(i));
-            }
-            jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 1, preparedStatement, "VARCHAR2", "U");
-            jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 2, preparedStatement, "VARCHAR2", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-            try {
-                preparedStatement.addBatch();
-                this.updateCount.increment();
-            } catch (SQLException e) {
-                this.updateCount.decrement();
-            }
-        }
+    private void doUpdate(HashMap<List<String>, SeaTunnelRow> rows, Map<String, String> metaDataHash, Connection connection) throws Exception {
+        Long tmpUpdateCount = null;
         try {
-            preparedStatement.executeBatch();
-            conn.commit();
-            preparedStatement.clearBatch();
-        } catch (SQLException e) {
-            //批量提交失败 回滚此批数据 拆成1条条的提交
-            conn.rollback();
-            log.info(String.format("错误%s", e.getMessage()));
+            List<String> newColumns = new ArrayList<>();
+            List<String> newValues = new ArrayList<>();
+            for (ColumnMapper column : columnMappers) {
+                newColumns.add(column.getSinkColumnName());
+            }
+            newColumns.addAll(this.zipperColumns);
+            for (String newColumn : newColumns) {
+                newValues.add("?");
+            }
+            String insertSql = jdbcDialect.insertTableSql(jdbcSinkConfig, newColumns, newValues);
+            PreparedStatement preparedStatement = connection.prepareStatement(insertSql);
+            tmpUpdateCount = this.updateCount;
+            boolean hasError = false;
             for (SeaTunnelRow row : rows.values()) {
                 for (int i = 0; i < columnMappers.size(); i++) {
                     String column = newColumns.get(i);
@@ -305,13 +308,57 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                 jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 2, preparedStatement, "VARCHAR2", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 try {
                     preparedStatement.addBatch();
+                    this.updateCount++;
+                } catch (SQLException e) {
+                    hasError = true;
+                    break;
+                }
+            }
+            if (hasError) {
+                throw new RuntimeException();
+            }
+            preparedStatement.executeBatch();
+            conn.commit();
+            preparedStatement.clearBatch();
+            preparedStatement.close();
+        } catch (Exception e) {
+            conn.rollback();
+            this.updateCount = tmpUpdateCount;
+            updateDbOneByOne(rows);
+        }
+    }
+
+    private void updateDbOneByOne(HashMap<List<String>, SeaTunnelRow> rows) {
+        try {
+            List<String> newColumns = new ArrayList<>();
+            List<String> newValues = new ArrayList<>();
+            for (ColumnMapper column : columnMappers) {
+                newColumns.add(column.getSinkColumnName());
+            }
+            newColumns.addAll(this.zipperColumns);
+            for (String newColumn : newColumns) {
+                newValues.add("?");
+            }
+            String insertSql = jdbcDialect.insertTableSql(jdbcSinkConfig, newColumns, newValues);
+            for (SeaTunnelRow row : rows.values()) {
+                PreparedStatement preparedStatement = conn.prepareStatement(insertSql);
+                for (int i = 0; i < columnMappers.size(); i++) {
+                    String column = newColumns.get(i);
+                    String dbType = metaDataHash.get(column);
+                    jdbcDialect.setPreparedStatementValueByDbType(i + 1, preparedStatement, dbType, (String) row.getField(i));
+                }
+                jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 1, preparedStatement, "VARCHAR2", "U");
+                jdbcDialect.setPreparedStatementValueByDbType(columnMappers.size() + 2, preparedStatement, "VARCHAR2", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                try {
+                    preparedStatement.addBatch();
+                    this.updateCount++;
                     preparedStatement.executeBatch();
                     conn.commit();
                     preparedStatement.clearBatch();
-                } catch (SQLException ee) {
-                    this.updateCount.decrement();
-                    this.errorCount.increment();
-                    if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount.longValue() <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(ee.getMessage())) {
+                    preparedStatement.close();
+                } catch (SQLException e) {
+                    this.errorCount++;
+                    if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(e.getMessage())) {
                         JSONObject jsonObject = new JSONObject();
                         for (int i = 0; i < sinkTableRowType.getTotalFields(); i++) {
                             jsonObject.put(sinkTableRowType.getFieldName(i), row.getField(i));
@@ -323,8 +370,8 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                         errorRecord.setDbSchema(jdbcSinkConfig.getDbSchema());
                         errorRecord.setTableName(jdbcSinkConfig.getTable());
                         errorRecord.setErrorData(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
-                        errorRecord.setErrorMessage(ee.getMessage());
-                        sqlErrorType.add(ee.getMessage());
+                        errorRecord.setErrorMessage(e.getMessage());
+                        sqlErrorType.add(e.getMessage());
                         try {
                             util.insertErrorData(errorRecord);
                         } catch (Exception ex) {
@@ -333,7 +380,10 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                     }
                 }
             }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
+
     }
 
 
@@ -376,7 +426,6 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                         throw new RuntimeException(e);
                     }
                 }
-                ;
                 tmp.getAndIncrement();
             });
             ResultSet resultSet = preparedStatementQuery.executeQuery();
@@ -405,7 +454,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         try {
             if (this.currentTaskId == 0) {
                 int del = this.jdbcDialect.deleteDataZipper(conn, jdbcSinkConfig, this.columnMappers, this.startTime);
-                deleteCount.add(del);
+                this.deleteCount = (long) del;
                 conn.commit();
             }
 

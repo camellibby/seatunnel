@@ -190,8 +190,10 @@ public class JdbcSourceFactory implements TableSourceFactory {
             throw new JdbcConnectorException(
                     CommonErrorCode.ILLEGAL_ARGUMENT,
                     String.format(
-                            "Partitioned column(%s) don't exist in the table columns",
-                            partitionColumn));
+                            "Partitioned column(%s) don't exist in the table columns %s",
+                            partitionColumn,
+                            fieldTypes
+                            ));
         }
 //        SeaTunnelDataType<?> partitionColumnType = fieldTypes.get(partitionColumn);
 //        if (!isNumericType(partitionColumnType)) {

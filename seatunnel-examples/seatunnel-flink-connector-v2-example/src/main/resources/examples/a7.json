@@ -1,0 +1,218 @@
+{
+  "env": {
+    "job.mode": "BATCH",
+    "isRecordErrorData": 1,
+    "execution.parallelism": 1,
+    "maxRecordNumber": 100,
+    "job.name": "aa"
+  },
+  "source": [
+    {
+      "plugin_name": "JDBC",
+      "input_type": "table",
+      "query": "select \"id\",\"name\",\"age\",\"data\",\"bz\" from \"dbo\".\"user\"",
+      "db_type": "SQLSERVER",
+      "url": "jdbc:sqlserver://192.168.10.70:1433;databaseName=test11;",
+      "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+      "user": "sa",
+      "password": "Xjcz80882488",
+      "db_datasource_id": "1770745900559466497",
+      "database": "test11",
+      "dbSchema": "dbo",
+      "table_name": "user",
+      "columns": [
+        "id",
+        "name",
+        "age",
+        "data",
+        "bz"
+      ],
+      "result_columns": [
+        {
+          "schema": "dbo",
+          "fullAlias": "(ID)id",
+          "nullable": false,
+          "typeName": "int",
+          "remark": "ID",
+          "type": "int",
+          "decimalDigit": 0,
+          "database": "test11",
+          "size": 10,
+          "autoincrement": false,
+          "name": "id",
+          "table": "user",
+          "finalAlias": "ID",
+          "order": 1,
+          "primaryKey": true,
+          "sourceColumn": "1770745900559466497.dbo.user.id"
+        },
+        {
+          "schema": "dbo",
+          "fullAlias": "(姓名)name",
+          "nullable": true,
+          "typeName": "varchar",
+          "remark": "姓名",
+          "type": "varchar",
+          "decimalDigit": 0,
+          "database": "test11",
+          "size": 255,
+          "autoincrement": false,
+          "name": "name",
+          "table": "user",
+          "finalAlias": "姓名",
+          "order": 2,
+          "primaryKey": false,
+          "sourceColumn": "1770745900559466497.dbo.user.name"
+        },
+        {
+          "schema": "dbo",
+          "fullAlias": "(年纪)age",
+          "nullable": true,
+          "typeName": "int",
+          "remark": "年纪",
+          "type": "int",
+          "decimalDigit": 0,
+          "database": "test11",
+          "size": 10,
+          "autoincrement": false,
+          "name": "age",
+          "table": "user",
+          "finalAlias": "年纪",
+          "order": 3,
+          "primaryKey": false,
+          "sourceColumn": "1770745900559466497.dbo.user.age"
+        },
+        {
+          "schema": "dbo",
+          "fullAlias": "(日期)data",
+          "nullable": true,
+          "typeName": "date",
+          "remark": "日期",
+          "type": "date",
+          "decimalDigit": 0,
+          "database": "test11",
+          "size": 0,
+          "autoincrement": false,
+          "name": "data",
+          "table": "user",
+          "finalAlias": "日期",
+          "order": 4,
+          "primaryKey": false,
+          "sourceColumn": "1770745900559466497.dbo.user.data"
+        },
+        {
+          "schema": "dbo",
+          "fullAlias": "(备注)bz",
+          "nullable": true,
+          "typeName": "varchar",
+          "remark": "备注",
+          "type": "varchar",
+          "decimalDigit": 0,
+          "database": "test11",
+          "size": 255,
+          "autoincrement": false,
+          "name": "bz",
+          "table": "user",
+          "finalAlias": "备注",
+          "order": 5,
+          "primaryKey": false,
+          "sourceColumn": "1770745900559466497.dbo.user.bz"
+        }
+      ],
+      "result_table_name": "t1"
+    }
+  ],
+  "transform": [],
+  "sink": [
+    {
+      "plugin_name": "XJJDBC",
+      "query": "select * from TEST16",
+      "url": "jdbc:clickhouse://192.168.11.228:8123/ssb",
+      "driver": "com.clickhouse.jdbc.ClickHouseDriver",
+      "user": "default",
+      "password": "xjgreat",
+      "db_datasource_id": "1704699193694552065",
+      "db_type": "CLICKHOUSE",
+      "dbSchema": "",
+      "table": "TEST16",
+      "primary_keys": [
+        "id"
+      ],
+      "field_mapper": {
+        "data": "data",
+        "name": "name",
+        "bz": "bz",
+        "id": "id",
+        "age": "age"
+      },
+      "pre_config": {
+        "cleanTableWhenComplete": true,
+        "cleanTableWhenCompleteNoDataIn": false,
+        "insertMode": "complete",
+        "incrementMode": "update"
+      },
+      "source_table_name": [
+        "t1"
+      ]
+    },
+    {
+      "plugin_name": "XJJDBC",
+      "url": "jdbc:clickhouse://192.168.11.228:8123/ssb",
+      "driver": "com.clickhouse.jdbc.ClickHouseDriver",
+      "user": "default",
+      "password": "xjgreat",
+      "db_datasource_id": "1704699193694552065",
+      "db_type": "CLICKHOUSE",
+      "dbSchema": "",
+      "table": "TEST17",
+      "primary_keys": [
+        "id"
+      ],
+      "field_mapper": {
+        "data": "data",
+        "name": "name",
+        "bz": "bz",
+        "id": "id",
+        "age": "age"
+      },
+      "pre_config": {
+        "cleanTableWhenCompleteNoDataIn": false,
+        "insertMode": "increment",
+        "incrementMode": "update"
+      },
+      "source_table_name": [
+        "t1"
+      ]
+    },
+    {
+      "plugin_name": "XJJDBC",
+      "query": "select * from TEST18",
+      "url": "jdbc:clickhouse://192.168.11.228:8123/ssb",
+      "driver": "com.clickhouse.jdbc.ClickHouseDriver",
+      "user": "default",
+      "password": "xjgreat",
+      "db_datasource_id": "1704699193694552065",
+      "db_type": "CLICKHOUSE",
+      "dbSchema": "",
+      "table": "TEST18",
+      "field_mapper": {
+        "id": "id",
+        "name": "name",
+        "age": "age",
+        "data": "data",
+        "bz": "bz"
+      },
+      "primary_keys": [
+        "id"
+      ],
+      "pre_config": {
+        "cleanTableWhenCompleteNoDataIn": false,
+        "insertMode": "increment",
+        "incrementMode": "zipper"
+      },
+      "source_table_name": [
+        "t1"
+      ]
+    }
+  ]
+}

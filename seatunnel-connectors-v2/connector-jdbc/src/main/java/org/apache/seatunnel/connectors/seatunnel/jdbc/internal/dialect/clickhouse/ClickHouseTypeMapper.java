@@ -15,20 +15,20 @@
  * limitations under the License.
  */
 
-package com.qh.myconnect.dialect.ClickHouse;
+package org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.clickhouse;
 
-import com.qh.myconnect.dialect.JdbcConnectorException;
-import com.qh.myconnect.dialect.JdbcDialect;
-import com.qh.myconnect.dialect.JdbcDialectTypeMapper;
 import org.apache.seatunnel.api.table.type.*;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.exception.JdbcConnectorException;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDialect;
+import org.apache.seatunnel.connectors.seatunnel.jdbc.internal.dialect.JdbcDialectTypeMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 
-public class ClickHouseMapper implements JdbcDialectTypeMapper {
+public class ClickHouseTypeMapper implements JdbcDialectTypeMapper {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcDialect.class);
 

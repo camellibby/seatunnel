@@ -28,6 +28,7 @@ import java.time.LocalDateTime;
 @AutoService(SeaTunnelSink.class)
 @Slf4j
 public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
+
     private SeaTunnelRowType seaTunnelRowType;
     private ReadonlyConfig config;
 

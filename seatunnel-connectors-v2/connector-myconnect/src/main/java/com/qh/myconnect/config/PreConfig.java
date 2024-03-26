@@ -15,7 +15,7 @@ public class PreConfig implements Serializable {
     private String insertMode;//插入模式 全量 complete  增量 increment
     @OptionMark(description = "全量模式是否清空表 true清 false不清")
     private boolean cleanTableWhenComplete;
-    @OptionMark(description = "无数据输入全量模式继续清空表 true清 false不清")
+    @OptionMark(description = "无数据输入继续清空表 true清 false不清")
     private boolean cleanTableWhenCompleteNoDataIn = false;
     @OptionMark(description = "增量模式 update或者zipper模式 ")
     private String incrementMode;
@@ -43,13 +43,13 @@ public class PreConfig implements Serializable {
             throw new RuntimeException("目标表不存在");
         }
 
-        if (this.insertMode.equalsIgnoreCase("complete")) {
-            if (this.cleanTableWhenComplete && this.cleanTableWhenCompleteNoDataIn) {
-                Statement st = connection.createStatement();
-                st.execute(JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).truncateTable(jdbcSinkConfig));
-                st.close();
-            }
+
+        if (this.insertMode.equalsIgnoreCase("complete") && this.cleanTableWhenComplete && this.cleanTableWhenCompleteNoDataIn) {
+            Statement st = connection.createStatement();
+            st.execute(JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).truncateTable(jdbcSinkConfig));
+            st.close();
         }
+
 
         if (this.insertMode.equalsIgnoreCase("increment")) {
             if (null == jdbcSinkConfig.getPrimaryKeys() || jdbcSinkConfig.getPrimaryKeys().isEmpty()) {
@@ -71,7 +71,7 @@ public class PreConfig implements Serializable {
             preparedStatement1.execute();
             preparedStatement1.close();
             if (!jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
-                PreparedStatement preparedStatement2 = connection.prepareStatement(JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).createIndex( tmpTableName, jdbcSinkConfig));
+                PreparedStatement preparedStatement2 = connection.prepareStatement(JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).createIndex(tmpTableName, jdbcSinkConfig));
                 preparedStatement2.execute();
                 preparedStatement2.close();
             }

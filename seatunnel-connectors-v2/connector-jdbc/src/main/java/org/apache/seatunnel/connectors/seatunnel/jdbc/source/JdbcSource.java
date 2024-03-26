@@ -55,8 +55,8 @@ import java.util.ArrayList;
 @NoArgsConstructor
 public class JdbcSource
         implements SeaTunnelSource<SeaTunnelRow, JdbcSourceSplit, JdbcSourceState>,
-                SupportParallelism,
-                SupportColumnProjection {
+        SupportParallelism,
+        SupportColumnProjection {
     protected static final Logger LOG = LoggerFactory.getLogger(JdbcSource.class);
 
     private JdbcSourceConfig jdbcSourceConfig;
@@ -102,6 +102,9 @@ public class JdbcSource
                 JdbcDialectLoader.load(jdbcSourceConfig.getJdbcConnectionConfig().getUrl());
         try (Connection connection = jdbcConnectionProvider.getOrEstablishConnection()) {
             this.typeInfo = initTableField(connection);
+            if (this.typeInfo.getFieldNames().length == 0) {
+                throw new RuntimeException("读取到的表字段:" + this.typeInfo.getFieldNames().toString());
+            }
             this.partitionParameter =
                     createPartitionParameter(jdbcConnectionProvider.getOrEstablishConnection());
         } catch (Exception e) {
@@ -109,7 +112,7 @@ public class JdbcSource
         }
 
         if (partitionParameter != null) {
-            this.query =jdbcDialect.getPartitionSql(partitionParameter.getPartitionColumnName(),jdbcSourceConfig.getQuery());
+            this.query = jdbcDialect.getPartitionSql(partitionParameter.getPartitionColumnName(), jdbcSourceConfig.getQuery());
 //                    JdbcSourceFactory.obtainPartitionSql(
 //                            partitionParameter.getPartitionColumnName(),
 //                            jdbcSourceConfig.getQuery(),
@@ -180,6 +183,7 @@ public class JdbcSource
             }
         } catch (Exception e) {
             LOG.warn("get row type info exception", e);
+            throw new RuntimeException(e);
         }
         return new SeaTunnelRowType(
                 fieldNames.toArray(new String[0]),
