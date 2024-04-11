@@ -30,6 +30,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
@@ -70,10 +71,17 @@ public interface JdbcDialect extends Serializable {
         return st.render();
     }
 
-    default String getPartitionSql(String partitionColumn, String nativeSql) {
-        return String.format(
-                "SELECT * FROM (%s) tt where %s >= ? AND %s <= ?",
-                nativeSql, partitionColumn, partitionColumn);
+    default String getPartitionSql(String partitionColumn, String nativeSql, Optional<List<String>> columns) {
+        if (columns.isPresent()) {
+            return String.format(
+                    "SELECT %s FROM (%s) tt where %s >= ? AND %s <= ?",
+                    StringUtils.join(columns.get(), ","), nativeSql, partitionColumn, partitionColumn);
+        } else {
+            return String.format(
+                    "SELECT * FROM (%s) tt where %s >= ? AND %s <= ?",
+                    nativeSql, partitionColumn, partitionColumn);
+        }
+
     }
 
 

@@ -17,6 +17,7 @@
 
 package com.qh.sqlcdc.source;
 
+import com.alibaba.fastjson2.JSONObject;
 import com.qh.sqlcdc.config.SqlCdcConfig;
 import com.qh.sqlcdc.config.Util;
 import com.qh.sqlcdc.dialect.JdbcDialect;
@@ -81,7 +82,7 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
     @Override
     public void pollNext(Collector<SeaTunnelRow> output) throws Exception {
         if(this.sqlCdcConfig.getDirectCompare()){
-            System.out.println("直接对比");
+            directCompare(output);
         }else{
             normalCompare(output);
         }
@@ -220,6 +221,75 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
 
     }
 
+    private void directCompare(Collector<SeaTunnelRow> output){
+        try {
+            conn.setAutoCommit(false);
+            if (sqlCdcConfig.getDbType().equalsIgnoreCase("mysql")) {
+                conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+            }
+            Map<String, Integer> mapPosition = new HashMap<>();
+            for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
+                int i = typeInfo.indexOf(primaryKey);
+                mapPosition.put(primaryKey, i);
+            }
+            while (true) {
+                String partitionColumnCountSql = this.jdbcDialect.getColumnDistinctCount(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig);
+                PreparedStatement psTotal = conn.prepareStatement(partitionColumnCountSql);
+                ResultSet resultSet1 = psTotal.executeQuery();
+                long totalSl = 0;
+                int interval = 0;
+                while (resultSet1.next()) {
+                    totalSl = resultSet1.getLong("sl");
+                    interval = (int) Math.ceil((double) totalSl / this.allTask);
+                }
+                psTotal.close();
+                for (int i = 0; i < allTask; i++) {
+                    if (i == currentTaskId) {
+                        long startHang = i * interval + 1;
+                        long endHang = (i + 1) * interval;
+                        if (endHang > totalSl) {
+                            endHang = totalSl;
+                        }
+                        PreparedStatement startPs = conn.prepareStatement(this.jdbcDialect.getHangValueSql(this.sqlCdcConfig, startHang));
+                        ResultSet rsStart = startPs.executeQuery();
+                        while (rsStart.next()) {
+                            startRowNumber = rsStart.getObject(this.sqlCdcConfig.getPartitionColumn());
+                        }
+                        PreparedStatement endPs = conn.prepareStatement(this.jdbcDialect.getHangValueSql(this.sqlCdcConfig, endHang));
+                        ResultSet rsEnd = endPs.executeQuery();
+                        while (rsEnd.next()) {
+                            endRowNumber = rsEnd.getObject(this.sqlCdcConfig.getPartitionColumn());
+                        }
+                        startPs.close();
+                        endPs.close();
+                    }
+                }
+                JSONObject fieldMapper = this.sqlCdcConfig.getDirectSinkConfig().getJSONObject("field_mapper");
+                List<String> sourceColumns= new ArrayList<>();
+                fieldMapper.forEach((key,value)->sourceColumns.add(key));
+                String newSql = this.jdbcDialect.getPartitionSql(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getQuery(),Optional.of(sourceColumns));
+                PreparedStatement ps = conn.prepareStatement(newSql);
+                ps.setObject(1, startRowNumber);
+                ps.setObject(2, endRowNumber);
+                ps.setFetchSize(10000);
+                ps.executeQuery();
+                ResultSet resultSet = ps.getResultSet();
+                while (resultSet.next()) {
+                    SeaTunnelRow seaTunnelRowInsert = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
+                    List<String> keys = new ArrayList<>();
+                    for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
+                        Integer i = mapPosition.get(primaryKey);
+                        Object field = seaTunnelRowInsert.getField(i);
+                        keys.add(field.toString());
+                    }
+                }
+                ps.close();
+                Thread.sleep(1000);
+            }
+        } catch (Exception e) {
+            log.warn("get row type info exception", e);
+        }
+    }
     private void normalCompare(Collector<SeaTunnelRow> output){
         try {
             conn.setAutoCommit(false);
@@ -264,7 +334,7 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
                         endPs.close();
                     }
                 }
-                String newSql = this.jdbcDialect.getPartitionSql(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getQuery());
+                String newSql = this.jdbcDialect.getPartitionSql(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getQuery(),Optional.empty());
                 Date versionDate = new Date();
                 PreparedStatement ps = conn.prepareStatement(newSql);
                 ps.setObject(1, startRowNumber);

@@ -15,7 +15,7 @@
         "CUSTOMERID"
       ],
       "db_type": "ORACLE",
-      "url": "jdbc:oracle:thin:@192.168.10.46:1521:orcl",
+      "url": "jdbc:oracle:thin:@111.172.106.210:41521:orcl",
       "driver": "oracle.jdbc.driver.OracleDriver",
       "user": "tydb",
       "password": "oracle",
@@ -141,7 +141,7 @@
           "CUSTOMERID"
         ],
         "db_type": "ORACLE",
-        "url": "jdbc:oracle:thin:@192.168.10.46:1521:orcl",
+        "url": "jdbc:oracle:thin:@111.172.106.210:41521:orcl",
         "driver": "oracle.jdbc.driver.OracleDriver",
         "user": "tydb",
         "database": "orcl",
@@ -181,7 +181,7 @@
         "CUSTOMERID"
       ],
       "db_type": "ORACLE",
-      "url": "jdbc:oracle:thin:@192.168.10.46:1521:orcl",
+      "url": "jdbc:oracle:thin:@111.172.106.210:41521:orcl",
       "driver": "oracle.jdbc.driver.OracleDriver",
       "user": "tydb",
       "database": "orcl",
