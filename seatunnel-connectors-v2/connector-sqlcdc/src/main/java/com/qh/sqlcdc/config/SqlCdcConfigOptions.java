@@ -17,6 +17,7 @@
 
 package com.qh.sqlcdc.config;
 
+import com.alibaba.fastjson2.JSONObject;
 import org.apache.seatunnel.api.configuration.Option;
 import org.apache.seatunnel.api.configuration.Options;
 
@@ -52,4 +53,14 @@ public class SqlCdcConfigOptions {
                     .stringType()
                     .noDefaultValue()
                     .withDescription("partition column");
+    public static Option<Boolean> directCompare =
+            Options.key("directCompare")
+                    .booleanType()
+                    .noDefaultValue()
+                    .withDescription("directCompare");
+    public static Option<JSONObject> directSinkConfig =
+            Options.key("directSinkConfig")
+                    .objectType(JSONObject.class)
+                    .noDefaultValue()
+                    .withDescription("directSinkConfig");
 }

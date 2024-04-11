@@ -62,7 +62,6 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
         this.typeInfo = typeInfo;
         this.currentTaskId = context.getIndexOfSubtask();
         this.allTask = this.sqlCdcConfig.getPartitionNum();
-//        System.out.println("currentTaskId" + currentTaskId);
     }
 
     @Override
@@ -81,95 +80,10 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
 
     @Override
     public void pollNext(Collector<SeaTunnelRow> output) throws Exception {
-        try {
-            conn.setAutoCommit(false);
-            if (sqlCdcConfig.getDbType().equalsIgnoreCase("mysql")) {
-                conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
-            }
-            Map<String, Integer> mapPosition = new HashMap<>();
-            for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
-                int i = typeInfo.indexOf(primaryKey);
-                mapPosition.put(primaryKey, i);
-            }
-            Map<String, java.util.Date> map = new HashMap<>();
-            while (true) {
-                String partitionColumnCountSql = this.jdbcDialect.getColumnDistinctCount(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig);
-                PreparedStatement psTotal = conn.prepareStatement(partitionColumnCountSql);
-                ResultSet resultSet1 = psTotal.executeQuery();
-                long totalSl = 0;
-                int interval = 0;
-                while (resultSet1.next()) {
-                    totalSl = resultSet1.getLong("sl");
-                    interval = (int) Math.ceil((double) totalSl / this.allTask);
-                }
-                psTotal.close();
-                for (int i = 0; i < allTask; i++) {
-                    if (i == currentTaskId) {
-                        long startHang = i * interval + 1;
-                        long endHang = (i + 1) * interval;
-                        if (endHang > totalSl) {
-                            endHang = totalSl;
-                        }
-                        PreparedStatement startPs = conn.prepareStatement(this.jdbcDialect.getHangValueSql(this.sqlCdcConfig, startHang));
-                        ResultSet rsStart = startPs.executeQuery();
-                        while (rsStart.next()) {
-                            startRowNumber = rsStart.getObject(this.sqlCdcConfig.getPartitionColumn());
-                        }
-                        PreparedStatement endPs = conn.prepareStatement(this.jdbcDialect.getHangValueSql(this.sqlCdcConfig, endHang));
-                        ResultSet rsEnd = endPs.executeQuery();
-                        while (rsEnd.next()) {
-                            endRowNumber = rsEnd.getObject(this.sqlCdcConfig.getPartitionColumn());
-                        }
-                        startPs.close();
-                        endPs.close();
-                    }
-                }
-                String newSql = this.jdbcDialect.getPartitionSql(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getQuery());
-                Date versionDate = new Date();
-                PreparedStatement ps = conn.prepareStatement(newSql);
-                ps.setObject(1, startRowNumber);
-                ps.setObject(2, endRowNumber);
-                ps.setFetchSize(10000);
-                ps.executeQuery();
-                ResultSet resultSet = ps.getResultSet();
-                while (resultSet.next()) {
-                    SeaTunnelRow seaTunnelRowInsert = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
-                    List<String> keys = new ArrayList<>();
-                    for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
-                        Integer i = mapPosition.get(primaryKey);
-                        Object field = seaTunnelRowInsert.getField(i);
-                        keys.add(field.toString());
-                    }
-                    keys.add(String.valueOf(seaTunnelRowInsert.hashCode()));
-                    seaTunnelRowInsert.setRowKind(RowKind.INSERT);
-                    SeaTunnelRow seaTunnelRowDelete=seaTunnelRowInsert.copy();
-                    seaTunnelRowDelete.setRowKind(RowKind.DELETE);
-                    if (!map.containsKey(StringUtils.join(keys, ","))) {
-                        output.collect(seaTunnelRowDelete);
-                        output.collect(seaTunnelRowInsert);
-                        String join = StringUtils.join(keys, ",");
-                        int lastCommaIndex = join.lastIndexOf(",");
-                        String prefix = join.substring(0, lastCommaIndex);
-                        Iterator<Map.Entry<String, Date>> iterator1 = map.entrySet().iterator();
-                        while (iterator1.hasNext()) {
-                            Map.Entry<String, Date> entry = iterator1.next();
-                            if (entry.getKey().startsWith(prefix)) {
-                                iterator1.remove();
-                            }
-                        }
-                    }
-                    map.put(StringUtils.join(keys, ","), versionDate);
-                }
-                Iterator<Map.Entry<String, Date>> iterator = map.entrySet().iterator();
-                while (iterator.hasNext()) {
-                    Map.Entry<String, Date> entry = iterator.next();
-                    if (!versionDate.equals(entry.getValue())) checkDelete(output, entry, mapPosition, iterator);
-                }
-                ps.close();
-                Thread.sleep(1000);
-            }
-        } catch (Exception e) {
-            log.warn("get row type info exception", e);
+        if(this.sqlCdcConfig.getDirectCompare()){
+            System.out.println("直接对比");
+        }else{
+            normalCompare(output);
         }
     }
 
@@ -304,5 +218,98 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
     @Override
     public void notifyCheckpointComplete(long checkpointId) throws Exception {
 
+    }
+
+    private void normalCompare(Collector<SeaTunnelRow> output){
+        try {
+            conn.setAutoCommit(false);
+            if (sqlCdcConfig.getDbType().equalsIgnoreCase("mysql")) {
+                conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+            }
+            Map<String, Integer> mapPosition = new HashMap<>();
+            for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
+                int i = typeInfo.indexOf(primaryKey);
+                mapPosition.put(primaryKey, i);
+            }
+            Map<String, java.util.Date> map = new HashMap<>();
+            while (true) {
+                String partitionColumnCountSql = this.jdbcDialect.getColumnDistinctCount(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig);
+                PreparedStatement psTotal = conn.prepareStatement(partitionColumnCountSql);
+                ResultSet resultSet1 = psTotal.executeQuery();
+                long totalSl = 0;
+                int interval = 0;
+                while (resultSet1.next()) {
+                    totalSl = resultSet1.getLong("sl");
+                    interval = (int) Math.ceil((double) totalSl / this.allTask);
+                }
+                psTotal.close();
+                for (int i = 0; i < allTask; i++) {
+                    if (i == currentTaskId) {
+                        long startHang = i * interval + 1;
+                        long endHang = (i + 1) * interval;
+                        if (endHang > totalSl) {
+                            endHang = totalSl;
+                        }
+                        PreparedStatement startPs = conn.prepareStatement(this.jdbcDialect.getHangValueSql(this.sqlCdcConfig, startHang));
+                        ResultSet rsStart = startPs.executeQuery();
+                        while (rsStart.next()) {
+                            startRowNumber = rsStart.getObject(this.sqlCdcConfig.getPartitionColumn());
+                        }
+                        PreparedStatement endPs = conn.prepareStatement(this.jdbcDialect.getHangValueSql(this.sqlCdcConfig, endHang));
+                        ResultSet rsEnd = endPs.executeQuery();
+                        while (rsEnd.next()) {
+                            endRowNumber = rsEnd.getObject(this.sqlCdcConfig.getPartitionColumn());
+                        }
+                        startPs.close();
+                        endPs.close();
+                    }
+                }
+                String newSql = this.jdbcDialect.getPartitionSql(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getQuery());
+                Date versionDate = new Date();
+                PreparedStatement ps = conn.prepareStatement(newSql);
+                ps.setObject(1, startRowNumber);
+                ps.setObject(2, endRowNumber);
+                ps.setFetchSize(10000);
+                ps.executeQuery();
+                ResultSet resultSet = ps.getResultSet();
+                while (resultSet.next()) {
+                    SeaTunnelRow seaTunnelRowInsert = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
+                    List<String> keys = new ArrayList<>();
+                    for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
+                        Integer i = mapPosition.get(primaryKey);
+                        Object field = seaTunnelRowInsert.getField(i);
+                        keys.add(field.toString());
+                    }
+                    keys.add(String.valueOf(seaTunnelRowInsert.hashCode()));
+                    seaTunnelRowInsert.setRowKind(RowKind.INSERT);
+                    SeaTunnelRow seaTunnelRowDelete=seaTunnelRowInsert.copy();
+                    seaTunnelRowDelete.setRowKind(RowKind.DELETE);
+                    if (!map.containsKey(StringUtils.join(keys, ","))) {
+                        output.collect(seaTunnelRowDelete);
+                        output.collect(seaTunnelRowInsert);
+                        String join = StringUtils.join(keys, ",");
+                        int lastCommaIndex = join.lastIndexOf(",");
+                        String prefix = join.substring(0, lastCommaIndex);
+                        Iterator<Map.Entry<String, Date>> iterator1 = map.entrySet().iterator();
+                        while (iterator1.hasNext()) {
+                            Map.Entry<String, Date> entry = iterator1.next();
+                            if (entry.getKey().startsWith(prefix)) {
+                                iterator1.remove();
+                            }
+                        }
+                    }
+                    map.put(StringUtils.join(keys, ","), versionDate);
+                }
+                Iterator<Map.Entry<String, Date>> iterator = map.entrySet().iterator();
+                while (iterator.hasNext()) {
+                    Map.Entry<String, Date> entry = iterator.next();
+                    if (!versionDate.equals(entry.getValue())) checkDelete(output, entry, mapPosition, iterator);
+                }
+                ps.close();
+                Thread.sleep(1000);
+            }
+        } catch (Exception e) {
+            log.warn("get row type info exception", e);
+        }
     }
 }

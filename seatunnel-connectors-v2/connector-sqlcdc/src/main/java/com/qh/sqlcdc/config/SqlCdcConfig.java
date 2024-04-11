@@ -17,6 +17,8 @@
 
 package com.qh.sqlcdc.config;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import lombok.Data;
 import org.apache.seatunnel.api.common.CommonOptions;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
@@ -36,6 +38,8 @@ public class SqlCdcConfig implements Serializable {
     private int partitionNum;
     private String partitionColumn;
     private List<String> primaryKeys;
+    private Boolean directCompare;
+    private JSONObject directSinkConfig;
 
     public SqlCdcConfig(Config config) {
         this.driver = config.getString(SqlCdcConfigOptions.DRIVER.key());
@@ -47,5 +51,10 @@ public class SqlCdcConfig implements Serializable {
         this.partitionNum = config.getInt(CommonOptions.PARALLELISM.key());
         this.partitionColumn = config.getString(SqlCdcConfigOptions.PARTITION_COLUMN.key());
         this.primaryKeys = config.getStringList(SqlCdcConfigOptions.PRIMARY_KEYS.key());
+        if (config.hasPath("directCompare")) {
+            this.directCompare = config.getBoolean(SqlCdcConfigOptions.directCompare.key());
+            Object anyRef = config.getAnyRef(SqlCdcConfigOptions.directSinkConfig.key());
+            this.directSinkConfig= JSON.parseObject(JSON.toJSONString(anyRef));
+        }
     }
 }
