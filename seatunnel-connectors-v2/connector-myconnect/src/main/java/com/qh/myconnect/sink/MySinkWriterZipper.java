@@ -259,9 +259,9 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             } catch (SQLException e) {
                 this.errorCount++;
                 if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(e.getMessage())) {
-                    JSONObject jsonObject = new JSONObject();
-                    for (int i = 0; i < sinkTableRowType.getTotalFields(); i++) {
-                        jsonObject.put(sinkTableRowType.getFieldName(i), row.getField(i));
+                    LinkedHashMap<String, Object> jsonObject = new LinkedHashMap<>();
+                    for (int i = 0; i < columnMappers.size(); i++) {
+                        jsonObject.put(columnMappers.get(i).getSourceColumnName(), row.getField(i));
                     }
                     log.info(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
                     SeaTunnelJobsHistoryErrorRecord errorRecord = new SeaTunnelJobsHistoryErrorRecord();
@@ -359,9 +359,9 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                 } catch (SQLException e) {
                     this.errorCount++;
                     if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(e.getMessage())) {
-                        JSONObject jsonObject = new JSONObject();
-                        for (int i = 0; i < sinkTableRowType.getTotalFields(); i++) {
-                            jsonObject.put(sinkTableRowType.getFieldName(i), row.getField(i));
+                        LinkedHashMap<String, Object> jsonObject = new LinkedHashMap<>();
+                        for (int i = 0; i < columnMappers.size(); i++) {
+                            jsonObject.put(columnMappers.get(i).getSourceColumnName(), row.getField(i));
                         }
                         log.info(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
                         SeaTunnelJobsHistoryErrorRecord errorRecord = new SeaTunnelJobsHistoryErrorRecord();

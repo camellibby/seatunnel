@@ -133,17 +133,20 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
                 ps.executeQuery();
                 ResultSet resultSet = ps.getResultSet();
                 while (resultSet.next()) {
-                    SeaTunnelRow seaTunnelRow = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
+                    SeaTunnelRow seaTunnelRowInsert = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
                     List<String> keys = new ArrayList<>();
                     for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
                         Integer i = mapPosition.get(primaryKey);
-                        Object field = seaTunnelRow.getField(i);
+                        Object field = seaTunnelRowInsert.getField(i);
                         keys.add(field.toString());
                     }
-                    keys.add(String.valueOf(seaTunnelRow.hashCode()));
-                    seaTunnelRow.setRowKind(RowKind.UPDATE_AFTER);
+                    keys.add(String.valueOf(seaTunnelRowInsert.hashCode()));
+                    seaTunnelRowInsert.setRowKind(RowKind.INSERT);
+                    SeaTunnelRow seaTunnelRowDelete=seaTunnelRowInsert.copy();
+                    seaTunnelRowDelete.setRowKind(RowKind.DELETE);
                     if (!map.containsKey(StringUtils.join(keys, ","))) {
-                        output.collect(seaTunnelRow);
+                        output.collect(seaTunnelRowDelete);
+                        output.collect(seaTunnelRowInsert);
                         String join = StringUtils.join(keys, ",");
                         int lastCommaIndex = join.lastIndexOf(",");
                         String prefix = join.substring(0, lastCommaIndex);
@@ -160,125 +163,126 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
                 Iterator<Map.Entry<String, Date>> iterator = map.entrySet().iterator();
                 while (iterator.hasNext()) {
                     Map.Entry<String, Date> entry = iterator.next();
-                    if (!versionDate.equals(entry.getValue())) {
-                        SeaTunnelRow seaTunnelRow = new SeaTunnelRow(typeInfo.getTotalFields());
-                        seaTunnelRow.setRowKind(RowKind.DELETE);
-                        String checkRealDelete = this.jdbcDialect.checkRealDelete(this.sqlCdcConfig.getPrimaryKeys(), this.sqlCdcConfig.getQuery());
-                        PreparedStatement checkRealDeleteStatement = null;
-                        try {
-                            checkRealDeleteStatement = conn.prepareStatement(checkRealDelete);
-                        } catch (SQLException e) {
-                            throw new RuntimeException(e);
-                        }
-                        String[] keys = entry.getKey().split(",");
-                        for (int i = 0; i < this.sqlCdcConfig.getPrimaryKeys().size(); i++) {
-                            String column = this.sqlCdcConfig.getPrimaryKeys().get(i);
-                            Integer position = mapPosition.get(column);
-                            SeaTunnelDataType<?> fieldType = typeInfo.getFieldType(position);
-                            SqlType sqlType = fieldType.getSqlType();
-                            switch (sqlType) {
-                                case STRING:
-                                    seaTunnelRow.setField(position, keys[i]);
-                                    checkRealDeleteStatement.setString(i + 1, keys[i]);
-                                    break;
-                                case BOOLEAN:
-                                    seaTunnelRow.setField(position, Boolean.parseBoolean(keys[i]));
-                                    checkRealDeleteStatement.setBoolean(i + 1, Boolean.parseBoolean(keys[i]));
-                                    break;
-                                case TINYINT:
-                                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
-                                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
-                                    break;
-                                case SMALLINT:
-                                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
-                                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
-                                    break;
-                                case INT:
-                                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
-                                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
-                                    break;
-                                case BIGINT:
-                                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
-                                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
-                                    break;
-                                case FLOAT:
-                                    seaTunnelRow.setField(position, Float.parseFloat(keys[i]));
-                                    checkRealDeleteStatement.setFloat(i + 1, Float.parseFloat(keys[i]));
-                                    break;
-                                case DOUBLE:
-                                    seaTunnelRow.setField(position, Double.parseDouble(keys[i]));
-                                    checkRealDeleteStatement.setDouble(i + 1, Double.parseDouble(keys[i]));
-                                    break;
-                                case DECIMAL:
-                                    seaTunnelRow.setField(position, new BigDecimal(keys[i]));
-                                    checkRealDeleteStatement.setBigDecimal(i + 1,new BigDecimal(keys[i]));
-                                    break;
-                                case DATE:
-                                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-                                    Date date = null;
-                                    try {
-                                        date = sdf.parse(keys[i]);
-                                    } catch (ParseException e) {
-                                        throw new RuntimeException(e);
-                                    }
-                                    java.sql.Date sqlDate = new java.sql.Date(date.getTime());
-                                    seaTunnelRow.setField(position, sqlDate);
-                                    checkRealDeleteStatement.setDate(i + 1,sqlDate);
-                                    break;
-                                case TIME:
-                                    SimpleDateFormat sdf1 = new SimpleDateFormat("HH:mm:ss");
-                                    Date date1 = null;
-                                    try {
-                                        date1 = sdf1.parse(keys[i]);
-                                    } catch (ParseException e) {
-                                        throw new RuntimeException(e);
-                                    }
-                                    java.sql.Time sqlTime = new java.sql.Time(date1.getTime());
-                                    seaTunnelRow.setField(position, sqlTime);
-                                    checkRealDeleteStatement.setTime(i + 1,sqlTime);
-                                    break;
-                                case TIMESTAMP:
-                                    String dateStr = keys[i];
-                                    SimpleDateFormat sdf3 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                                    Timestamp timestamp = null;
-                                    try {
-                                        timestamp = new Timestamp(sdf3.parse(dateStr).getTime());
-                                    } catch (ParseException e) {
-                                        throw new RuntimeException(e);
-                                    }
-                                    seaTunnelRow.setField(position, timestamp);
-                                    checkRealDeleteStatement.setTimestamp(i + 1,timestamp);
-                                    break;
-                                case MAP:
-                                case ARRAY:
-                                case ROW:
-                                default:
-                                    throw new RuntimeException(
-                                            CommonErrorCode.UNSUPPORTED_DATA_TYPE +
-                                                    "Unexpected value: " + sqlType.toString());
-                            }
-                        }
-                        try {
-                            ResultSet resultSet2 = checkRealDeleteStatement.executeQuery();
-                            while (resultSet2.next()) {
-                                long aLong = resultSet2.getLong("sl");
-                                if (aLong == 0) {
-                                    output.collect(seaTunnelRow);
-                                    iterator.remove();
-                                }
-                            }
-                            checkRealDeleteStatement.close();
-                        } catch (SQLException e) {
-                            throw new RuntimeException(e);
-                        }
-
-                    }
+                    if (!versionDate.equals(entry.getValue())) checkDelete(output, entry, mapPosition, iterator);
                 }
                 ps.close();
                 Thread.sleep(1000);
             }
         } catch (Exception e) {
             log.warn("get row type info exception", e);
+        }
+    }
+
+    private void checkDelete(Collector<SeaTunnelRow> output, Map.Entry<String, Date> entry, Map<String, Integer> mapPosition, Iterator<Map.Entry<String, Date>> iterator) throws SQLException {
+        SeaTunnelRow seaTunnelRow = new SeaTunnelRow(typeInfo.getTotalFields());
+        seaTunnelRow.setRowKind(RowKind.DELETE);
+        String checkRealDelete = this.jdbcDialect.checkRealDelete(this.sqlCdcConfig.getPrimaryKeys(), this.sqlCdcConfig.getQuery());
+        PreparedStatement checkRealDeleteStatement = null;
+        try {
+            checkRealDeleteStatement = conn.prepareStatement(checkRealDelete);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        String[] keys = entry.getKey().split(",");
+        for (int i = 0; i < this.sqlCdcConfig.getPrimaryKeys().size(); i++) {
+            String column = this.sqlCdcConfig.getPrimaryKeys().get(i);
+            Integer position = mapPosition.get(column);
+            SeaTunnelDataType<?> fieldType = typeInfo.getFieldType(position);
+            SqlType sqlType = fieldType.getSqlType();
+            switch (sqlType) {
+                case STRING:
+                    seaTunnelRow.setField(position, keys[i]);
+                    checkRealDeleteStatement.setString(i + 1, keys[i]);
+                    break;
+                case BOOLEAN:
+                    seaTunnelRow.setField(position, Boolean.parseBoolean(keys[i]));
+                    checkRealDeleteStatement.setBoolean(i + 1, Boolean.parseBoolean(keys[i]));
+                    break;
+                case TINYINT:
+                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
+                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
+                    break;
+                case SMALLINT:
+                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
+                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
+                    break;
+                case INT:
+                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
+                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
+                    break;
+                case BIGINT:
+                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
+                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
+                    break;
+                case FLOAT:
+                    seaTunnelRow.setField(position, Float.parseFloat(keys[i]));
+                    checkRealDeleteStatement.setFloat(i + 1, Float.parseFloat(keys[i]));
+                    break;
+                case DOUBLE:
+                    seaTunnelRow.setField(position, Double.parseDouble(keys[i]));
+                    checkRealDeleteStatement.setDouble(i + 1, Double.parseDouble(keys[i]));
+                    break;
+                case DECIMAL:
+                    seaTunnelRow.setField(position, new BigDecimal(keys[i]));
+                    checkRealDeleteStatement.setBigDecimal(i + 1,new BigDecimal(keys[i]));
+                    break;
+                case DATE:
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                    Date date = null;
+                    try {
+                        date = sdf.parse(keys[i]);
+                    } catch (ParseException e) {
+                        throw new RuntimeException(e);
+                    }
+                    java.sql.Date sqlDate = new java.sql.Date(date.getTime());
+                    seaTunnelRow.setField(position, sqlDate);
+                    checkRealDeleteStatement.setDate(i + 1,sqlDate);
+                    break;
+                case TIME:
+                    SimpleDateFormat sdf1 = new SimpleDateFormat("HH:mm:ss");
+                    Date date1 = null;
+                    try {
+                        date1 = sdf1.parse(keys[i]);
+                    } catch (ParseException e) {
+                        throw new RuntimeException(e);
+                    }
+                    Time sqlTime = new Time(date1.getTime());
+                    seaTunnelRow.setField(position, sqlTime);
+                    checkRealDeleteStatement.setTime(i + 1,sqlTime);
+                    break;
+                case TIMESTAMP:
+                    String dateStr = keys[i];
+                    SimpleDateFormat sdf3 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                    Timestamp timestamp = null;
+                    try {
+                        timestamp = new Timestamp(sdf3.parse(dateStr).getTime());
+                    } catch (ParseException e) {
+                        throw new RuntimeException(e);
+                    }
+                    seaTunnelRow.setField(position, timestamp);
+                    checkRealDeleteStatement.setTimestamp(i + 1,timestamp);
+                    break;
+                case MAP:
+                case ARRAY:
+                case ROW:
+                default:
+                    throw new RuntimeException(
+                            CommonErrorCode.UNSUPPORTED_DATA_TYPE +
+                                    "Unexpected value: " + sqlType.toString());
+            }
+        }
+        try {
+            ResultSet resultSet2 = checkRealDeleteStatement.executeQuery();
+            while (resultSet2.next()) {
+                long aLong = resultSet2.getLong("sl");
+                if (aLong == 0) {
+                    output.collect(seaTunnelRow);
+                    iterator.remove();
+                }
+            }
+            checkRealDeleteStatement.close();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
     }
 

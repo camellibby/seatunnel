@@ -224,49 +224,6 @@ public class OracleDialect implements JdbcDialect {
     }
 
 
-    public void updateData(Connection connection,
-                           JdbcSinkConfig jdbcSinkConfig,
-                           List<ColumnMapper> columnMappers,
-                           List<ColumnMapper> listUc,
-                           HashMap<List<String>, SeaTunnelRow> rows,
-                           Map<String, String> metaDataHash
-
-    ) throws SQLException {
-        String templateInsert = "update <dbSchema>.<table> set " +
-                "<columns:{sub | \"<sub.sinkColumnName>\" = ? }; separator=\", \"> " +
-                " where  <pks:{pk | \"<pk.sinkColumnName>\" = ? }; separator=\" and \"> ";
-        ST template = new ST(templateInsert);
-        template.add("dbSchema", jdbcSinkConfig.getDbSchema());
-        template.add("table", jdbcSinkConfig.getTable());
-        template.add("columns", columnMappers);
-        template.add("pks", listUc);
-        String updateSql = template.render();
-        PreparedStatement preparedStatement = connection.prepareStatement(updateSql);
-        for (SeaTunnelRow row : rows.values()) {
-            for (int i = 0; i < columnMappers.size(); i++) {
-                String column = columnMappers.get(i).getSinkColumnName();
-                String dbType = metaDataHash.get(column);
-                this.setPreparedStatementValueByDbType(
-                        i + 1,
-                        preparedStatement,
-                        dbType,
-                        (String) row.getField(columnMappers.get(i).getSinkRowPosition()));
-            }
-            for (int i = 0; i < listUc.size(); i++) {
-                String column = listUc.get(i).getSinkColumnName();
-                String dbType = metaDataHash.get(column);
-                this.setPreparedStatementValueByDbType(
-                        i + 1 + columnMappers.size(),
-                        preparedStatement,
-                        dbType,
-                        (String) row.getField(listUc.get(i).getSinkRowPosition()));
-            }
-            preparedStatement.addBatch();
-        }
-        preparedStatement.executeBatch();
-        preparedStatement.close();
-    }
-
     public String getSinkQueryUpdate(List<ColumnMapper> columnMappers, int rowSize, JdbcSinkConfig jdbcSinkConfig) {
         List<ColumnMapper> ucColumns = columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         String sqlQueryString = " select <columns:{sub | \"<sub.sinkColumnName>\" }; separator=\", \"> " +

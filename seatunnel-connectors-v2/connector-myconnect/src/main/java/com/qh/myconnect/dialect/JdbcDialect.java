@@ -329,47 +329,6 @@ public interface JdbcDialect extends Serializable {
         );
     }
 
-    default void updateData(Connection connection,
-                            JdbcSinkConfig jdbcSinkConfig,
-                            List<ColumnMapper> columnMappers,
-                            List<ColumnMapper> listUc,
-                            HashMap<List<String>, SeaTunnelRow> rows,
-                            Map<String, String> metaDataHash
-
-    ) throws SQLException {
-        String templateInsert = "update <table> set " +
-                "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> " +
-                " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
-        ST template = new ST(templateInsert);
-        template.add("table", jdbcSinkConfig.getTable());
-        template.add("columns", columnMappers);
-        template.add("pks", listUc);
-        String updateSql = template.render();
-        PreparedStatement preparedStatement = connection.prepareStatement(updateSql);
-        for (SeaTunnelRow row : rows.values()) {
-            for (int i = 0; i < columnMappers.size(); i++) {
-                String column = columnMappers.get(i).getSinkColumnName();
-                String dbType = metaDataHash.get(column);
-                this.setPreparedStatementValueByDbType(
-                        i + 1,
-                        preparedStatement,
-                        dbType,
-                        (String) row.getField(columnMappers.get(i).getSinkRowPosition()));
-            }
-            for (int i = 0; i < listUc.size(); i++) {
-                String column = listUc.get(i).getSinkColumnName();
-                String dbType = metaDataHash.get(column);
-                this.setPreparedStatementValueByDbType(
-                        i + 1 + columnMappers.size(),
-                        preparedStatement,
-                        dbType,
-                        (String) row.getField(listUc.get(i).getSinkRowPosition()));
-            }
-            preparedStatement.addBatch();
-        }
-        preparedStatement.executeBatch();
-        preparedStatement.close();
-    }
 
     default int deleteData(Connection connection, String table, String ucTable, List<ColumnMapper> ucColumns) {
         String delSql = "delete from  <table>    " +

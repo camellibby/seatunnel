@@ -2,7 +2,6 @@ package com.qh.myconnect.sink;
 
 
 import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.qh.myconnect.config.*;
 import com.qh.myconnect.converter.ColumnMapper;
@@ -217,9 +216,9 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
                     } catch (SQLException ee) {
                         this.errorCount++;
                         if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(ee.getMessage())) {
-                            JSONObject jsonObject = new JSONObject();
-                            for (int i = 0; i < sourceRowType.getTotalFields(); i++) {
-                                jsonObject.put(sourceRowType.getFieldName(i), seaTunnelRow.getField(i));
+                            LinkedHashMap<String, Object> jsonObject = new LinkedHashMap<>();
+                            for (int i = 0; i < this.columnMappers.size(); i++) {
+                                jsonObject.put(this.columnMappers.get(i).getSourceColumnName(), seaTunnelRow.getField(i));
                             }
                             log.info(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
                             SeaTunnelJobsHistoryErrorRecord errorRecord = new SeaTunnelJobsHistoryErrorRecord();

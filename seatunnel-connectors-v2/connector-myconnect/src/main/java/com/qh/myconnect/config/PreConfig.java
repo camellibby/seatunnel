@@ -19,7 +19,8 @@ public class PreConfig implements Serializable {
     private boolean cleanTableWhenCompleteNoDataIn = false;
     @OptionMark(description = "增量模式 update或者zipper模式 ")
     private String incrementMode;
-
+    @OptionMark(description = "增量模式 忽略时间戳比对 ")
+    private Boolean ignoreTstamp = true;
 
     public PreConfig() {
     }

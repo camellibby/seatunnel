@@ -57,6 +57,8 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     private Set sqlErrorType = new HashSet();
 
+    private int tstampIndex = -1;
+
     public MySinkWriterUpdate(SeaTunnelRowType seaTunnelRowType, Context context, ReadonlyConfig config, JobContext jobContext, LocalDateTime startTime) throws SQLException {
         this.jobContext = jobContext;
         this.sourceRowType = seaTunnelRowType;
@@ -69,6 +71,8 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         this.conn = util.getConnection(this.jdbcSinkConfig);
         conn.setAutoCommit(false);
         this.sinkTableRowType = util.initTableField(conn, this.jdbcDialect, this.jdbcSinkConfig);
+        List<String> collect = Arrays.stream(this.sinkTableRowType.getFieldNames()).map(String::toUpperCase).collect(Collectors.toList());
+        this.tstampIndex = collect.indexOf("TSTAMP");
         this.initColumnMappers(this.jdbcSinkConfig, this.sourceRowType, this.sinkTableRowType, conn);
         String sqlQuery = jdbcDialect.getSinkQueryUpdate(this.columnMappers, 0, this.jdbcSinkConfig);
         PreparedStatement preparedStatementQuery = conn.prepareStatement(sqlQuery);
@@ -130,11 +134,20 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         sourceRows.forEach((k, sourceRow) -> {
             SeaTunnelRow sinkRow = sinkRows.get(k);
             if (null != sinkRow) {
-                if (!sourceRow.equals(sinkRow)) {
-                    needUpdate.put(k, sourceRow);
-//                    this.updateCount++;
+                if (this.jdbcSinkConfig.getPreConfig().getIgnoreTstamp()) {
+                    SeaTunnelRow sourceRowIgnoreTstamp = this.copyIgnoreTstamp(sourceRow);
+                    SeaTunnelRow sinkRowIgnoreTstamp = this.copyIgnoreTstamp(sinkRow);
+                    if (!sourceRowIgnoreTstamp.equals(sinkRowIgnoreTstamp)) {
+                        needUpdate.put(k, sourceRow);
+                    } else {
+                        this.keepCount++;
+                    }
                 } else {
-                    this.keepCount++;
+                    if (!sourceRow.equals(sinkRow)) {
+                        needUpdate.put(k, sourceRow);
+                    } else {
+                        this.keepCount++;
+                    }
                 }
             } else {
                 needInsertRows.add(sourceRow);
@@ -182,7 +195,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
     public void write(SeaTunnelRow element) throws IOException {
         this.writeCount++;
         this.cld.add(element);
-        if (this.writeCount.longValue() % batchSize == 0) {
+        if (this.writeCount % batchSize == 0) {
             this.consumeData();
             cld.clear();
         }
@@ -238,8 +251,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                 if (seaTunnelRow != null) {
                     PreparedStatement psUpsert = conn.prepareStatement(sql);
                     for (int i = 0; i < this.columnMappers.size(); i++) {
-                        Integer valueIndex = this.columnMappers.get(i).getSourceRowPosition();
-                        Object field = seaTunnelRow.getField(valueIndex);
+                        Object field = seaTunnelRow.getField(i);
                         String column = columns.get(i);
                         String dbType = metaDataHash.get(column);
                         jdbcDialect.setPreparedStatementValueByDbType(i + 1, psUpsert, dbType, util.Object2String(field));
@@ -254,9 +266,9 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                     } catch (SQLException ee) {
                         this.errorCount++;
                         if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(ee.getMessage())) {
-                            JSONObject jsonObject = new JSONObject();
-                            for (int i = 0; i < sourceRowType.getTotalFields(); i++) {
-                                jsonObject.put(sourceRowType.getFieldName(i), seaTunnelRow.getField(i));
+                            LinkedHashMap<String, Object> jsonObject = new LinkedHashMap<>();
+                            for (int i = 0; i < this.columnMappers.size(); i++) {
+                                jsonObject.put(this.columnMappers.get(i).getSourceColumnName(), seaTunnelRow.getField(i));
                             }
                             log.info(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
                             SeaTunnelJobsHistoryErrorRecord errorRecord = new SeaTunnelJobsHistoryErrorRecord();
@@ -293,6 +305,9 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
             template.add("columns", columnMappers);
             template.add("pks", listUc);
             String updateSql = template.render();
+            if (this.jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
+                updateSql = updateSql + " SETTINGS mutations_sync=0";
+            }
             PreparedStatement preparedStatement = conn.prepareStatement(updateSql);
             tmpUpdateCount = this.updateCount;
             boolean hasError = false;
@@ -345,6 +360,9 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
             template.add("columns", columnMappers);
             template.add("pks", listUc);
             String updateSql = template.render();
+            if (this.jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
+                updateSql = updateSql + " SETTINGS mutations_sync=0";
+            }
             for (SeaTunnelRow row : rows.values()) {
                 PreparedStatement preparedStatement = conn.prepareStatement(updateSql);
                 for (int i = 0; i < columnMappers.size(); i++) {
@@ -367,9 +385,9 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                 } catch (SQLException ee) {
                     this.errorCount++;
                     if (this.jobContext.getIsRecordErrorData() == 1 && this.errorCount.longValue() <= this.jobContext.getMaxRecordNumber() && !sqlErrorType.contains(ee.getMessage())) {
-                        JSONObject jsonObject = new JSONObject();
-                        for (int i = 0; i < sinkTableRowType.getTotalFields(); i++) {
-                            jsonObject.put(sinkTableRowType.getFieldName(i), row.getField(i));
+                        LinkedHashMap<String, Object> jsonObject = new LinkedHashMap<>();
+                        for (int i = 0; i < this.columnMappers.size(); i++) {
+                            jsonObject.put(this.columnMappers.get(i).getSourceColumnName(), row.getField(i));
                         }
                         log.info(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
                         SeaTunnelJobsHistoryErrorRecord errorRecord = new SeaTunnelJobsHistoryErrorRecord();
@@ -505,6 +523,20 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public SeaTunnelRow copyIgnoreTstamp(SeaTunnelRow oldRow) {
+        Object[] newFields = new Object[oldRow.getArity()];
+        Object[] fields = new Object[oldRow.getArity()];
+        System.arraycopy(oldRow.getFields(), 0, fields, 0, newFields.length);
+        if (tstampIndex != -1) {
+            fields[tstampIndex] = null;
+        }
+        System.arraycopy(fields, 0, newFields, 0, newFields.length);
+        SeaTunnelRow newRow = new SeaTunnelRow(newFields);
+        newRow.setRowKind(oldRow.getRowKind());
+        newRow.setTableId(oldRow.getTableId());
+        return newRow;
     }
 
 

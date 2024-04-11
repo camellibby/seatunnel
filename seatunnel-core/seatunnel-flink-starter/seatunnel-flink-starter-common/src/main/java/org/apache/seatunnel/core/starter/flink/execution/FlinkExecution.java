@@ -216,6 +216,7 @@ public class FlinkExecution implements TaskExecution {
             StreamExecutionEnvironment env = flinkRuntimeEnvironment
                     .getStreamExecutionEnvironment();
             env.registerJobListener(new MyJobListener(this.jobContext.getJobId()));
+            env.getCheckpointConfig().enableUnalignedCheckpoints();
             List<JobListener> jobListeners = env.getJobListeners();
             for (JobListener jobListener : jobListeners) {
                 Class<? extends JobListener> aClass = jobListener.getClass();

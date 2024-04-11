@@ -4,119 +4,359 @@
     "isRecordErrorData": 1,
     "execution.parallelism": 1,
     "maxRecordNumber": 100,
-    "job.name": "aa"
+    "job.name": "测试1"
   },
   "source": [
     {
       "plugin_name": "JDBC",
-      "input_type": "table",
-      "query": "select \"id\",\"name\",\"age\",\"data\",\"bz\" from \"dbo\".\"user\"",
-      "db_type": "SQLSERVER",
-      "url": "jdbc:sqlserver://192.168.10.70:1433;databaseName=test11;",
-      "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
-      "user": "sa",
-      "password": "Xjcz80882488",
-      "db_datasource_id": "1770745900559466497",
-      "database": "test11",
-      "dbSchema": "dbo",
-      "table_name": "user",
-      "columns": [
-        "id",
-        "name",
-        "age",
-        "data",
-        "bz"
-      ],
+      "input_type": "sql",
+      "query": "select  * from (SELECT DISTINCT\nT1.XH\tAS\tXH\t,\t--\t学号\nT1.XM\tAS\tXM\t,\t--\t姓名\nT1.YWXM\tAS\tYWXM\t,\t--\t英文姓名\nT1.XMPY\tAS\tXMPY\t,\t--\t姓名拼音\nT1.CYM\tAS\tCYM\t,\t--\t曾用名\nT1.XBM\tAS\tXBM\t,\t--\t性别码\nT1.CSRQ\tAS\tCSRQ\t,\t--\t出生日期\nT1.CSDXZQHM\tAS\tCSDM\t,\t--\t出生地码\nT1.CSD\tAS\tCSD\t,\t--\t出生地\nT1.JGDXZQHM\tAS\tJGM\t,\t--\t籍贯码\nT1.JG\tAS\tJG\t,\t--\t籍贯\nT1.MZM\tAS\tMZM\t,\t--\t民族码\n--' '\tAS\tGJDQM\t,\t--\t国籍/地区码\nT1.GJ\tAS\tGJDQ\t,\t--\t国籍/地区\nT1.ZJLXM\tAS\tSFZJLXM\t,\t--\t身份证件类型码\nT1.ZJHM\tAS\tSFZJH\t,\t--\t身份证件号\n--' '\tAS\tSFZJYXQ\t,\t--\t身份证件有效期\nT1.HYZKDM\tAS\tHYZKM\t,\t--\t婚姻状况码\nT1.GATQWM\tAS\tGATQWM\t,\t--\t港澳台侨外码\nT1.ZZMMM\tAS\tZZMMM\t,\t--\t政治面貌码\nT1.ZZMMJRSJ\tAS\tCJZZMMSJ\t,\t--\t参加政治面貌时间\nT1.JKZK\tAS\tJKZKM\t,\t--\t健康状况码\n--' '\tAS\tXYZJM\t,\t--\t信仰宗教码\nT1.XYZJ\tAS\tXYZJ\t,\t--\t信仰宗教\nT1.XXM\tAS\tXXM\t,\t--\t血型码\n--' '\tAS\tSFDSZN\t,\t--\t是否独生子女\nT1.SYDXZQHM\tAS\tSYDM\t,\t--\t生源地码\nT1.SYD\tAS\tSYD\t,\t--\t生源地\nT1.LYM\tAS\tXSLYM\t,\t--\t学生来源码\nT1.HJXZ\tAS\tHKXZ\t,\t--\t户口性质\nT1.HKSZD\tAS\tHKSZD\t,\t--\t户口所在地\nT1.YZBM\tAS\tYZBM\t,\t--\t邮政编码\nT1.TXDZ\tAS\tTXDZ\t,\t--\t通讯地址\nT1.SJHM\tAS\tYDDH\t,\t--\t移动电话\nT1.GDDH\tAS\tGDDH\t,\t--\t固定电话\nT1.QQHM\tAS\tQQHM\t,\t--\tQQ号码\nT1.DZYX\tAS\tDZYX\t,\t--\t电子邮箱\nT1.JTDZ\tAS\tJTZZ\t,\t--\t家庭住址\nT1.JTDH\tAS\tJTDH\t,\t--\t家庭电话\nT1.JTLXR\tAS\tJTLXR\t,\t--\t家庭联系人\nT1.XSZH\tAS\tXSZH\t,\t--\t学生证号\nT1.YHMC\tAS\tYHKH\t,\t--\t银行卡号\nT1.YHKH\tAS\tYHMC\t,\t--\t银行名称\nT1.SG\tAS\tSG\t,\t--\t身高\nT1.TZ\tAS\tTZ\t,\t--\t体重\nT1.TC\tAS\tTC\t,\t--\t特长\nT1.RXQWHCD\tAS\tRXQWHCD\t,\t--\t入学前文化程度\nT1.SFZDS\tAS\tSFZDS\t,\t--\t是否走读生\nT1.HCPQJZ\tAS\tHCPQJZ\t,\t--\t火车票区间站\nT1.SFSQZN\tAS\tSFSQZN\t,\t--\t是否随迁子女\nT1.SFSWYXMZ\tAS\tSFSWYXMZ\t,\t--\t是否10万以下民族\nT1.JTRJSR\tAS\tJTRJSR\t,\t--\t家庭人均收入\nT1.JTZSR\tAS\tJTZSR\t,\t--\t家庭总收入\nT1.JTRJSR\tAS\tSFJTKN\t,\t--\t是否家庭困难\nT1.JTRJSR\tAS\tSRLY\t,\t--\t收入来源\nT1.JTRJSR\tAS\tSFDB\t,\t--\t是否低保\nT1.SFJDLKPKH\tAS\tSFJDLKPKH\t,\t--\t是否建档立卡贫困户\nT1.SFLJJS\tAS\tSFLJJS\t,\t--\t是否烈军家属\nT1.BZ\tAS\tBZ\t,\t--\t备注\ntoString(now())\tAS\tTSTAMP\t\t--\t时间戳\nFROM ods.T_JW_JW_XJGL_XSJBXXB T1) a",
+      "db_type": "CLICKHOUSE",
+      "url": "jdbc:clickhouse://192.168.11.228:8123/ods",
+      "driver": "com.clickhouse.jdbc.ClickHouseDriver",
+      "user": "default",
+      "password": "xjgreat",
+      "db_datasource_id": "1742023561690550273",
+      "database": "ods",
+      "dbSchema": "",
+      "table_name": "",
+      "columns": [],
       "result_columns": [
         {
-          "schema": "dbo",
-          "fullAlias": "(ID)id",
-          "nullable": false,
-          "typeName": "int",
-          "remark": "ID",
-          "type": "int",
           "decimalDigit": 0,
-          "database": "test11",
-          "size": 10,
-          "autoincrement": false,
-          "name": "id",
-          "table": "user",
-          "finalAlias": "ID",
-          "order": 1,
-          "primaryKey": true,
-          "sourceColumn": "1770745900559466497.dbo.user.id"
-        },
-        {
-          "schema": "dbo",
-          "fullAlias": "(姓名)name",
-          "nullable": true,
-          "typeName": "varchar",
-          "remark": "姓名",
-          "type": "varchar",
-          "decimalDigit": 0,
-          "database": "test11",
-          "size": 255,
-          "autoincrement": false,
-          "name": "name",
-          "table": "user",
-          "finalAlias": "姓名",
-          "order": 2,
-          "primaryKey": false,
-          "sourceColumn": "1770745900559466497.dbo.user.name"
-        },
-        {
-          "schema": "dbo",
-          "fullAlias": "(年纪)age",
-          "nullable": true,
-          "typeName": "int",
-          "remark": "年纪",
-          "type": "int",
-          "decimalDigit": 0,
-          "database": "test11",
-          "size": 10,
-          "autoincrement": false,
-          "name": "age",
-          "table": "user",
-          "finalAlias": "年纪",
-          "order": 3,
-          "primaryKey": false,
-          "sourceColumn": "1770745900559466497.dbo.user.age"
-        },
-        {
-          "schema": "dbo",
-          "fullAlias": "(日期)data",
-          "nullable": true,
-          "typeName": "date",
-          "remark": "日期",
-          "type": "date",
-          "decimalDigit": 0,
-          "database": "test11",
           "size": 0,
-          "autoincrement": false,
-          "name": "data",
-          "table": "user",
-          "finalAlias": "日期",
-          "order": 4,
-          "primaryKey": false,
-          "sourceColumn": "1770745900559466497.dbo.user.data"
+          "name": "XH",
+          "type": "Nullable(String)"
         },
         {
-          "schema": "dbo",
-          "fullAlias": "(备注)bz",
-          "nullable": true,
-          "typeName": "varchar",
-          "remark": "备注",
-          "type": "varchar",
           "decimalDigit": 0,
-          "database": "test11",
-          "size": 255,
-          "autoincrement": false,
-          "name": "bz",
-          "table": "user",
-          "finalAlias": "备注",
-          "order": 5,
-          "primaryKey": false,
-          "sourceColumn": "1770745900559466497.dbo.user.bz"
+          "size": 0,
+          "name": "XM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "YWXM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "XMPY",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "CYM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "XBM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "CSRQ",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "CSDM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "CSD",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "JGM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "JG",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "MZM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "GJDQ",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "SFZJLXM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "SFZJH",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "HYZKM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "GATQWM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "ZZMMM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "CJZZMMSJ",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "JKZKM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "XYZJ",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "XXM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "SYDM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "SYD",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "XSLYM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "HKXZ",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "HKSZD",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "YZBM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "TXDZ",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "YDDH",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "GDDH",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "QQHM",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "DZYX",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "JTZZ",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "JTDH",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "JTLXR",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "XSZH",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "YHKH",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "YHMC",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "SG",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "TZ",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "TC",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "RXQWHCD",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "SFZDS",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "HCPQJZ",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "SFSQZN",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "SFSWYXMZ",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "JTRJSR",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "JTZSR",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "SFJTKN",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "SRLY",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "SFDB",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "SFJDLKPKH",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "SFLJJS",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "BZ",
+          "type": "Nullable(String)"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "TSTAMP",
+          "type": "String"
         }
       ],
       "result_table_name": "t1"
@@ -126,89 +366,80 @@
   "sink": [
     {
       "plugin_name": "XJJDBC",
-      "query": "select * from TEST16",
-      "url": "jdbc:clickhouse://192.168.11.228:8123/ssb",
+      "query": "select * from T_GXXS_BKSJBXX",
+      "url": "jdbc:clickhouse://192.168.11.228:8123/udw",
       "driver": "com.clickhouse.jdbc.ClickHouseDriver",
       "user": "default",
       "password": "xjgreat",
-      "db_datasource_id": "1704699193694552065",
+      "db_datasource_id": "1777937047902752770",
       "db_type": "CLICKHOUSE",
       "dbSchema": "",
-      "table": "TEST16",
-      "primary_keys": [
-        "id"
-      ],
+      "table": "T_GXXS_BKSJBXX",
       "field_mapper": {
-        "data": "data",
-        "name": "name",
-        "bz": "bz",
-        "id": "id",
-        "age": "age"
-      },
-      "pre_config": {
-        "cleanTableWhenComplete": true,
-        "cleanTableWhenCompleteNoDataIn": false,
-        "insertMode": "complete",
-        "incrementMode": "update"
-      },
-      "source_table_name": [
-        "t1"
-      ]
-    },
-    {
-      "plugin_name": "XJJDBC",
-      "url": "jdbc:clickhouse://192.168.11.228:8123/ssb",
-      "driver": "com.clickhouse.jdbc.ClickHouseDriver",
-      "user": "default",
-      "password": "xjgreat",
-      "db_datasource_id": "1704699193694552065",
-      "db_type": "CLICKHOUSE",
-      "dbSchema": "",
-      "table": "TEST17",
-      "primary_keys": [
-        "id"
-      ],
-      "field_mapper": {
-        "data": "data",
-        "name": "name",
-        "bz": "bz",
-        "id": "id",
-        "age": "age"
-      },
-      "pre_config": {
-        "cleanTableWhenCompleteNoDataIn": false,
-        "insertMode": "increment",
-        "incrementMode": "update"
-      },
-      "source_table_name": [
-        "t1"
-      ]
-    },
-    {
-      "plugin_name": "XJJDBC",
-      "query": "select * from TEST18",
-      "url": "jdbc:clickhouse://192.168.11.228:8123/ssb",
-      "driver": "com.clickhouse.jdbc.ClickHouseDriver",
-      "user": "default",
-      "password": "xjgreat",
-      "db_datasource_id": "1704699193694552065",
-      "db_type": "CLICKHOUSE",
-      "dbSchema": "",
-      "table": "TEST18",
-      "field_mapper": {
-        "id": "id",
-        "name": "name",
-        "age": "age",
-        "data": "data",
-        "bz": "bz"
+        "XH": "XH",
+        "XM": "XM",
+        "YWXM": "YWXM",
+        "XMPY": "XMPY",
+        "CYM": "CYM",
+        "XBM": "XBM",
+        "CSRQ": "CSRQ",
+        "CSDM": "CSDM",
+        "CSD": "CSD",
+        "JGM": "JGM",
+        "JG": "JG",
+        "MZM": "MZM",
+        "GJDQ": "GJDQ",
+        "SFZJLXM": "SFZJLXM",
+        "SFZJH": "SFZJH",
+        "HYZKM": "HYZKM",
+        "GATQWM": "GATQWM",
+        "ZZMMM": "ZZMMM",
+        "CJZZMMSJ": "CJZZMMSJ",
+        "JKZKM": "JKZKM",
+        "XYZJ": "XYZJ",
+        "XXM": "XXM",
+        "SYDM": "SYDM",
+        "SYD": "SYD",
+        "XSLYM": "XSLYM",
+        "HKXZ": "HKXZ",
+        "HKSZD": "HKSZD",
+        "YZBM": "YZBM",
+        "TXDZ": "TXDZ",
+        "YDDH": "YDDH",
+        "GDDH": "GDDH",
+        "QQHM": "QQHM",
+        "DZYX": "DZYX",
+        "JTZZ": "JTZZ",
+        "JTDH": "JTDH",
+        "JTLXR": "JTLXR",
+        "XSZH": "XSZH",
+        "YHKH": "YHKH",
+        "YHMC": "YHMC",
+        "SG": "SG",
+        "TZ": "TZ",
+        "TC": "TC",
+        "RXQWHCD": "RXQWHCD",
+        "SFZDS": "SFZDS",
+        "HCPQJZ": "HCPQJZ",
+        "SFSQZN": "SFSQZN",
+        "SFSWYXMZ": "SFSWYXMZ",
+        "JTRJSR": "JTRJSR",
+        "JTZSR": "JTZSR",
+        "SFJTKN": "SFJTKN",
+        "SRLY": "SRLY",
+        "SFDB": "SFDB",
+        "SFJDLKPKH": "SFJDLKPKH",
+        "SFLJJS": "SFLJJS",
+        "BZ": "BZ",
+        "TSTAMP": "TSTAMP"
       },
       "primary_keys": [
-        "id"
+        "XH"
       ],
       "pre_config": {
         "cleanTableWhenCompleteNoDataIn": false,
         "insertMode": "increment",
-        "incrementMode": "zipper"
+        "incrementMode": "update"
       },
       "source_table_name": [
         "t1"
