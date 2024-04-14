@@ -17,13 +17,17 @@
 
 package com.qh.sqlcdc.source;
 
+import com.alibaba.fastjson2.JSONObject;
 import com.google.auto.service.AutoService;
+import com.qh.sqlcdc.config.ColumnMapper;
+import com.qh.sqlcdc.config.JdbcConfig;
 import com.qh.sqlcdc.config.SqlCdcConfig;
 import com.qh.sqlcdc.config.Util;
 import com.qh.sqlcdc.dialect.JdbcDialect;
 import com.qh.sqlcdc.dialect.JdbcDialectFactory;
 import com.qh.sqlcdc.dialect.JdbcDialectTypeMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.common.PrepareFailException;
 import org.apache.seatunnel.api.source.*;
@@ -37,6 +41,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSetMetaData;
 import java.util.ArrayList;
+import java.util.List;
 
 @AutoService(SeaTunnelSource.class)
 @Slf4j
@@ -47,6 +52,7 @@ public class SqlCdcSource implements SeaTunnelSource<SeaTunnelRow, SqlCdcSourceS
     private JobContext jobContext;
     private JdbcDialect jdbcDialect;
     private SeaTunnelRowType typeInfo;
+    private List<ColumnMapper> columnMappers;
 
 
     @Override
@@ -65,7 +71,8 @@ public class SqlCdcSource implements SeaTunnelSource<SeaTunnelRow, SqlCdcSourceS
     public void prepare(Config pluginConfig) throws PrepareFailException {
         this.sqlCdcConfig = new SqlCdcConfig(pluginConfig);
         this.jdbcDialect = JdbcDialectFactory.getJdbcDialect(sqlCdcConfig.getDbType());
-        this.typeInfo = initTableField();
+        this.columnMappers = initColumnMapper();
+        this.typeInfo = initTableField(this.columnMappers);
     }
 
     @Override
@@ -80,7 +87,7 @@ public class SqlCdcSource implements SeaTunnelSource<SeaTunnelRow, SqlCdcSourceS
 
     @Override
     public SourceReader<SeaTunnelRow, SqlCdcSourceSplit> createReader(SourceReader.Context readerContext) throws Exception {
-        return new SqlCdcReader(this.sqlCdcConfig, readerContext, jdbcDialect, typeInfo);
+        return new SqlCdcReader(this.sqlCdcConfig, readerContext, columnMappers);
     }
 
     @Override
@@ -94,14 +101,22 @@ public class SqlCdcSource implements SeaTunnelSource<SeaTunnelRow, SqlCdcSourceS
         return null;
     }
 
-
-    private SeaTunnelRowType initTableField() {
-        Connection conn = new Util().getConnection(this.sqlCdcConfig);
+    private SeaTunnelRowType initTableField(List<ColumnMapper> columnMappers) {
+        Util util = new Util();
+        JdbcConfig jdbcConfig = new JdbcConfig();
+        jdbcConfig.setUser(this.sqlCdcConfig.getUser());
+        jdbcConfig.setPassWord(this.sqlCdcConfig.getPassWord());
+        jdbcConfig.setUrl(this.sqlCdcConfig.getUrl());
+        jdbcConfig.setDbType(this.sqlCdcConfig.getDbType());
+        jdbcConfig.setQuery(this.sqlCdcConfig.getQuery());
+        jdbcConfig.setDriver(this.sqlCdcConfig.getDriver());
+        Connection conn = util.getConnection(jdbcConfig);
         ArrayList<SeaTunnelDataType<?>> seaTunnelDataTypes = new ArrayList<>();
         ArrayList<String> fieldNames = new ArrayList<>();
         try {
-            String sql = this.sqlCdcConfig.getQuery();
-            sql = String.format("select * from (%s) a where 1=2", sql);
+            List<String> sourceColumns = new ArrayList<>();
+            columnMappers.forEach(x -> sourceColumns.add(x.getSourceColumnName()));
+            String sql = String.format("select  %s from (%s) a ", StringUtils.join(sourceColumns, ","), sqlCdcConfig.getQuery());
             PreparedStatement ps = conn.prepareStatement(sql);
             ps.executeQuery();
             ResultSetMetaData resultSetMetaData = ps.getMetaData();
@@ -118,5 +133,24 @@ public class SqlCdcSource implements SeaTunnelSource<SeaTunnelRow, SqlCdcSourceS
         return new SeaTunnelRowType(
                 fieldNames.toArray(new String[0]),
                 seaTunnelDataTypes.toArray(new SeaTunnelDataType<?>[0]));
+    }
+
+    private List<ColumnMapper> initColumnMapper() {
+        List<ColumnMapper> columnMappers = new ArrayList<>();
+        JSONObject fieldMapper = this.sqlCdcConfig.getDirectSinkConfig().getJSONObject("field_mapper");
+        fieldMapper.forEach((k, v) -> {
+            ColumnMapper columnMapper = new ColumnMapper();
+            columnMapper.setSourceColumnName(k);
+            columnMapper.setSinkColumnName(v.toString());
+            columnMappers.add(columnMapper);
+        });
+        columnMappers.forEach(x -> {
+            this.sqlCdcConfig.getPrimaryKeys().forEach(y -> {
+                if (x.getSourceColumnName().equalsIgnoreCase(y)) {
+                    x.setPrimaryKey(true);
+                }
+            });
+        });
+        return columnMappers;
     }
 }

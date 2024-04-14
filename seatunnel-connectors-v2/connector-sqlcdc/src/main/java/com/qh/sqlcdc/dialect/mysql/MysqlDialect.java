@@ -42,25 +42,5 @@ public class MysqlDialect implements JdbcDialect {
     }
 
 
-    public String getHangValueSql(SqlCdcConfig sqlCdcConfig, long hang) {
-        String template = "SELECT <columnName>   " +
-                "FROM  " +
-                "  (  " +
-                "  SELECT <columnName>  " +
-                "    ,  " +
-                "    @rownum := @rownum + 1 hang   " +
-                "  FROM  " +
-                "    ( SELECT DISTINCT <columnName> FROM ( <query> ) A ORDER BY <columnName> ASC ) a,  " +
-                "    ( SELECT @rownum := 0 ) b   " +
-                "  ) a   " +
-                "WHERE  " +
-                "  hang = <hang>";
-        ST st = new ST(template);
-        st.add("columnName", sqlCdcConfig.getPartitionColumn());
-        st.add("query", sqlCdcConfig.getQuery());
-        st.add("hang", hang);
-        return st.render();
-    }
-
 
 }

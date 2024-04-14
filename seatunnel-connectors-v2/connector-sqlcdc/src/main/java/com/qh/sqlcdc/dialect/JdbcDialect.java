@@ -54,49 +54,8 @@ public interface JdbcDialect extends Serializable {
 
     JdbcDialectTypeMapper getJdbcDialectTypeMapper();
 
-    default String quoteIdentifier(String identifier) {
-        return identifier;
-    }
-
-    default String tableIdentifier(String database, String tableName) {
-        return quoteIdentifier(database) + "." + quoteIdentifier(tableName);
-    }
-
-    default String getColumnDistinctCount(String columnName, SqlCdcConfig config) {
-        String template = "SELECT COUNT(DISTINCT <columnName>) sl " +
-                "          FROM (<tableName>) a where <columnName> is not null";
-        ST st = new ST(template);
-        st.add("columnName", columnName);
-        st.add("tableName", config.getQuery());
-        return st.render();
-    }
-
-    default String getPartitionSql(String partitionColumn, String nativeSql, Optional<List<String>> columns) {
-        if (columns.isPresent()) {
-            return String.format(
-                    "SELECT %s FROM (%s) tt where %s >= ? AND %s <= ?",
-                    StringUtils.join(columns.get(), ","), nativeSql, partitionColumn, partitionColumn);
-        } else {
-            return String.format(
-                    "SELECT * FROM (%s) tt where %s >= ? AND %s <= ?",
-                    nativeSql, partitionColumn, partitionColumn);
-        }
-
-    }
 
 
-    default String getHangValueSql(SqlCdcConfig sqlCdcConfig, long hang) {
-        String template = "SELECT <columnName>" +
-                "  FROM (SELECT <columnName>, ROW_NUMBER() OVER(ORDER BY <columnName> ASC) AS hang" +
-                "          FROM (SELECT DISTINCT <columnName> FROM (<query>) A) A" +
-                "         WHERE <columnName> IS NOT NULL) A" +
-                " WHERE hang = <hang>";
-        ST st = new ST(template);
-        st.add("columnName", sqlCdcConfig.getPartitionColumn());
-        st.add("query", sqlCdcConfig.getQuery());
-        st.add("hang", hang);
-        return st.render();
-    }
 
     default String checkRealDelete(List<String> keys, String nativeSql) {
         String template = "select count(1) sl from (<query>) a where <keys:{key | <key> = ? }; separator=\" and \"> ";

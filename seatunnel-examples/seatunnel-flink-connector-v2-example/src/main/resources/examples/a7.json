@@ -10,7 +10,7 @@
   "source": [
     {
       "plugin_name": "SqlCdc",
-      "query": "select  * from  tydb.T_YKT_TRANSACTIONS",
+        "query": "select  * from  tydb.T_YKT_TRANSACTIONS",
       "primary_keys": [
         "CUSTOMERID"
       ],
@@ -22,7 +22,6 @@
       "db_datasource_id": "1712299719625191425",
       "database": "orcl",
       "dbSchema": "TYDB",
-      "partition_column": "CUSTOMERID",
       "result_columns": [
         {
           "decimalDigit": 0,
@@ -132,7 +131,6 @@
       ],
       "directCompare": true,
       "recordOperation": true,
-      "parallelism": 1,
       "result_table_name": "t1",
       "directSinkConfig": {
         "plugin_name": "JDBC",

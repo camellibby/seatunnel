@@ -18,14 +18,21 @@
 package com.qh.sqlcdc.source;
 
 import com.alibaba.fastjson2.JSONObject;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.qh.sqlcdc.config.ColumnMapper;
+import com.qh.sqlcdc.config.JdbcConfig;
 import com.qh.sqlcdc.config.SqlCdcConfig;
 import com.qh.sqlcdc.config.Util;
 import com.qh.sqlcdc.dialect.JdbcDialect;
+import com.qh.sqlcdc.dialect.JdbcDialectFactory;
+import com.qh.sqlcdc.dialect.JdbcDialectTypeMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.source.Collector;
 import org.apache.seatunnel.api.source.SourceReader;
 import org.apache.seatunnel.api.table.type.*;
+import com.google.common.collect.MapDifference;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
 
 import java.io.IOException;
@@ -35,34 +42,57 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.Date;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.stream.Collectors;
 
 @Slf4j
 public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSplit> {
     private final SqlCdcConfig sqlCdcConfig;
     private final SourceReader.Context context;
 
-    private Connection conn;
+    private final List<ColumnMapper> columnMappers;
 
-    private final JdbcDialect jdbcDialect;
-    private final SeaTunnelRowType typeInfo;
+    private final JdbcConfig sourceJdbcConfig;
+    private final JdbcConfig sinkJdbcConfig;
+    private final List<Integer> keysIndex = new ArrayList<>();
+    ;
 
-    private final Integer currentTaskId;
-    private final Integer allTask;
-
-    private Object startRowNumber;
-    private Object endRowNumber;
-
-
-    SqlCdcReader(SqlCdcConfig sqlCdcConfig, SourceReader.Context context, JdbcDialect jdbcDialect, SeaTunnelRowType typeInfo) {
-        this.conn = new Util().getConnection(sqlCdcConfig);
+    SqlCdcReader(SqlCdcConfig sqlCdcConfig, SourceReader.Context context, List<ColumnMapper> columnMappers) {
         this.sqlCdcConfig = sqlCdcConfig;
         this.context = context;
-        this.jdbcDialect = jdbcDialect;
-        this.typeInfo = typeInfo;
-        this.currentTaskId = context.getIndexOfSubtask();
-        this.allTask = this.sqlCdcConfig.getPartitionNum();
+        this.columnMappers = columnMappers;
+        {
+            JdbcConfig jdbcConfig = new JdbcConfig();
+            jdbcConfig.setUser(sqlCdcConfig.getUser());
+            jdbcConfig.setPassWord(sqlCdcConfig.getPassWord());
+            jdbcConfig.setUrl(sqlCdcConfig.getUrl());
+            jdbcConfig.setDbType(sqlCdcConfig.getDbType());
+            jdbcConfig.setQuery(sqlCdcConfig.getQuery());
+            jdbcConfig.setDriver(sqlCdcConfig.getDriver());
+            this.sourceJdbcConfig = jdbcConfig;
+        }
+        {
+            JdbcConfig jdbcConfig = new JdbcConfig();
+            JSONObject sinkConfig = sqlCdcConfig.getDirectSinkConfig();
+            jdbcConfig.setUser(sinkConfig.getString("user"));
+            jdbcConfig.setPassWord(sinkConfig.getString("password"));
+            jdbcConfig.setUrl(sinkConfig.getString("url"));
+            jdbcConfig.setDbType(sinkConfig.getString("db_type"));
+            jdbcConfig.setQuery(String.format("select  * from %s ", sinkConfig.getString("table")));
+            jdbcConfig.setDriver(sinkConfig.getString("driver"));
+            this.sinkJdbcConfig = jdbcConfig;
+        }
+        {
+            for (int i = 0; i < columnMappers.size(); i++) {
+                if (columnMappers.get(i).isPrimaryKey()) {
+                    keysIndex.add(i);
+                }
+            }
+        }
+
+
     }
 
     @Override
@@ -72,134 +102,14 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
 
     @Override
     public void close() throws IOException {
-        try {
-            conn.close();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
+
     }
 
     @Override
     public void pollNext(Collector<SeaTunnelRow> output) throws Exception {
-        if(this.sqlCdcConfig.getDirectCompare()){
-            directCompare(output);
-        }else{
-            normalCompare(output);
-        }
+        compare(output);
     }
 
-    private void checkDelete(Collector<SeaTunnelRow> output, Map.Entry<String, Date> entry, Map<String, Integer> mapPosition, Iterator<Map.Entry<String, Date>> iterator) throws SQLException {
-        SeaTunnelRow seaTunnelRow = new SeaTunnelRow(typeInfo.getTotalFields());
-        seaTunnelRow.setRowKind(RowKind.DELETE);
-        String checkRealDelete = this.jdbcDialect.checkRealDelete(this.sqlCdcConfig.getPrimaryKeys(), this.sqlCdcConfig.getQuery());
-        PreparedStatement checkRealDeleteStatement = null;
-        try {
-            checkRealDeleteStatement = conn.prepareStatement(checkRealDelete);
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-        String[] keys = entry.getKey().split(",");
-        for (int i = 0; i < this.sqlCdcConfig.getPrimaryKeys().size(); i++) {
-            String column = this.sqlCdcConfig.getPrimaryKeys().get(i);
-            Integer position = mapPosition.get(column);
-            SeaTunnelDataType<?> fieldType = typeInfo.getFieldType(position);
-            SqlType sqlType = fieldType.getSqlType();
-            switch (sqlType) {
-                case STRING:
-                    seaTunnelRow.setField(position, keys[i]);
-                    checkRealDeleteStatement.setString(i + 1, keys[i]);
-                    break;
-                case BOOLEAN:
-                    seaTunnelRow.setField(position, Boolean.parseBoolean(keys[i]));
-                    checkRealDeleteStatement.setBoolean(i + 1, Boolean.parseBoolean(keys[i]));
-                    break;
-                case TINYINT:
-                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
-                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
-                    break;
-                case SMALLINT:
-                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
-                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
-                    break;
-                case INT:
-                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
-                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
-                    break;
-                case BIGINT:
-                    seaTunnelRow.setField(position, Integer.parseInt(keys[i]));
-                    checkRealDeleteStatement.setInt(i + 1, Integer.parseInt(keys[i]));
-                    break;
-                case FLOAT:
-                    seaTunnelRow.setField(position, Float.parseFloat(keys[i]));
-                    checkRealDeleteStatement.setFloat(i + 1, Float.parseFloat(keys[i]));
-                    break;
-                case DOUBLE:
-                    seaTunnelRow.setField(position, Double.parseDouble(keys[i]));
-                    checkRealDeleteStatement.setDouble(i + 1, Double.parseDouble(keys[i]));
-                    break;
-                case DECIMAL:
-                    seaTunnelRow.setField(position, new BigDecimal(keys[i]));
-                    checkRealDeleteStatement.setBigDecimal(i + 1,new BigDecimal(keys[i]));
-                    break;
-                case DATE:
-                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-                    Date date = null;
-                    try {
-                        date = sdf.parse(keys[i]);
-                    } catch (ParseException e) {
-                        throw new RuntimeException(e);
-                    }
-                    java.sql.Date sqlDate = new java.sql.Date(date.getTime());
-                    seaTunnelRow.setField(position, sqlDate);
-                    checkRealDeleteStatement.setDate(i + 1,sqlDate);
-                    break;
-                case TIME:
-                    SimpleDateFormat sdf1 = new SimpleDateFormat("HH:mm:ss");
-                    Date date1 = null;
-                    try {
-                        date1 = sdf1.parse(keys[i]);
-                    } catch (ParseException e) {
-                        throw new RuntimeException(e);
-                    }
-                    Time sqlTime = new Time(date1.getTime());
-                    seaTunnelRow.setField(position, sqlTime);
-                    checkRealDeleteStatement.setTime(i + 1,sqlTime);
-                    break;
-                case TIMESTAMP:
-                    String dateStr = keys[i];
-                    SimpleDateFormat sdf3 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                    Timestamp timestamp = null;
-                    try {
-                        timestamp = new Timestamp(sdf3.parse(dateStr).getTime());
-                    } catch (ParseException e) {
-                        throw new RuntimeException(e);
-                    }
-                    seaTunnelRow.setField(position, timestamp);
-                    checkRealDeleteStatement.setTimestamp(i + 1,timestamp);
-                    break;
-                case MAP:
-                case ARRAY:
-                case ROW:
-                default:
-                    throw new RuntimeException(
-                            CommonErrorCode.UNSUPPORTED_DATA_TYPE +
-                                    "Unexpected value: " + sqlType.toString());
-            }
-        }
-        try {
-            ResultSet resultSet2 = checkRealDeleteStatement.executeQuery();
-            while (resultSet2.next()) {
-                long aLong = resultSet2.getLong("sl");
-                if (aLong == 0) {
-                    output.collect(seaTunnelRow);
-                    iterator.remove();
-                }
-            }
-            checkRealDeleteStatement.close();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     @Override
     public List<SqlCdcSourceSplit> snapshotState(long checkpointId) throws Exception {
@@ -221,165 +131,222 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
 
     }
 
-    private void directCompare(Collector<SeaTunnelRow> output){
+    private void compare(Collector<SeaTunnelRow> output) throws ExecutionException, InterruptedException, SQLException {
+        do {
+            FutureTask<Map<String, Integer>> sourceFuture = new FutureTask<>(new Callable<Map<String, Integer>>() {
+                @Override
+                public Map<String, Integer> call() throws Exception {
+                    List<String> sourceColumns = new ArrayList<>();
+                    columnMappers.forEach(x -> sourceColumns.add(x.getSourceColumnName()));
+                    String sql = String.format("select  %s from (%s) a ", StringUtils.join(sourceColumns, ","), sqlCdcConfig.getQuery());
+                    return getTableColumnsHaseCode(sql, "source", sourceJdbcConfig);
+                }
+            });
+
+            FutureTask<Map<String, Integer>> futureSink = new FutureTask<>(new Callable<Map<String, Integer>>() {
+                @Override
+                public Map<String, Integer> call() throws Exception {
+                    List<String> sinkColumns = new ArrayList<>();
+                    columnMappers.forEach(x -> sinkColumns.add(x.getSinkColumnName()));
+                    String sql = String.format("select  %s from (%s) a ", StringUtils.join(sinkColumns, ","), sinkJdbcConfig.getQuery());
+                    return getTableColumnsHaseCode(sql, "sink", sinkJdbcConfig);
+                }
+            });
+            Thread threadSource = new Thread(sourceFuture);
+            Thread threadSink = new Thread(futureSink);
+            threadSource.start();
+            threadSink.start();
+            Map<String, Integer> resultSource = sourceFuture.get();
+            Map<String, Integer> resultSink = futureSink.get();
+            MapDifference<String, Object> difference = Maps.difference(resultSource, resultSink);
+            Map<String, MapDifference.ValueDifference<Object>> entriesDiffering = difference.entriesDiffering();
+            doModify(entriesDiffering.keySet(), "U", output);
+            Map<String, Object> onlyOnLeft = difference.entriesOnlyOnLeft();
+            doModify(onlyOnLeft.keySet(), "I", output);
+            Map<String, Object> entriesOnlyOnRight = difference.entriesOnlyOnRight();
+            doModify(entriesOnlyOnRight.keySet(), "D", output);
+        } while (true);
+    }
+
+
+    private SeaTunnelRowType getTypeInfo(Connection conn, JdbcDialect jdbcDialect, String sql, List<String> columns) {
+        ArrayList<SeaTunnelDataType<?>> seaTunnelDataTypes = new ArrayList<>();
+        ArrayList<String> fieldNames = new ArrayList<>();
         try {
-            conn.setAutoCommit(false);
-            if (sqlCdcConfig.getDbType().equalsIgnoreCase("mysql")) {
-                conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+            sql = String.format("select %s from (%s) a where 1=2", StringUtils.join(columns, ","), sql);
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.executeQuery();
+            ResultSetMetaData resultSetMetaData = ps.getMetaData();
+            JdbcDialectTypeMapper jdbcDialectTypeMapper = jdbcDialect.getJdbcDialectTypeMapper();
+            for (int i = 1; i <= resultSetMetaData.getColumnCount(); i++) {
+                fieldNames.add(resultSetMetaData.getColumnLabel(i));
+                seaTunnelDataTypes.add(jdbcDialectTypeMapper.mapping(resultSetMetaData, i));
             }
-            Map<String, Integer> mapPosition = new HashMap<>();
-            for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
-                int i = typeInfo.indexOf(primaryKey);
-                mapPosition.put(primaryKey, i);
-            }
-            while (true) {
-                String partitionColumnCountSql = this.jdbcDialect.getColumnDistinctCount(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig);
-                PreparedStatement psTotal = conn.prepareStatement(partitionColumnCountSql);
-                ResultSet resultSet1 = psTotal.executeQuery();
-                long totalSl = 0;
-                int interval = 0;
-                while (resultSet1.next()) {
-                    totalSl = resultSet1.getLong("sl");
-                    interval = (int) Math.ceil((double) totalSl / this.allTask);
-                }
-                psTotal.close();
-                for (int i = 0; i < allTask; i++) {
-                    if (i == currentTaskId) {
-                        long startHang = i * interval + 1;
-                        long endHang = (i + 1) * interval;
-                        if (endHang > totalSl) {
-                            endHang = totalSl;
-                        }
-                        PreparedStatement startPs = conn.prepareStatement(this.jdbcDialect.getHangValueSql(this.sqlCdcConfig, startHang));
-                        ResultSet rsStart = startPs.executeQuery();
-                        while (rsStart.next()) {
-                            startRowNumber = rsStart.getObject(this.sqlCdcConfig.getPartitionColumn());
-                        }
-                        PreparedStatement endPs = conn.prepareStatement(this.jdbcDialect.getHangValueSql(this.sqlCdcConfig, endHang));
-                        ResultSet rsEnd = endPs.executeQuery();
-                        while (rsEnd.next()) {
-                            endRowNumber = rsEnd.getObject(this.sqlCdcConfig.getPartitionColumn());
-                        }
-                        startPs.close();
-                        endPs.close();
-                    }
-                }
-                JSONObject fieldMapper = this.sqlCdcConfig.getDirectSinkConfig().getJSONObject("field_mapper");
-                List<String> sourceColumns= new ArrayList<>();
-                fieldMapper.forEach((key,value)->sourceColumns.add(key));
-                String newSql = this.jdbcDialect.getPartitionSql(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getQuery(),Optional.of(sourceColumns));
-                PreparedStatement ps = conn.prepareStatement(newSql);
-                ps.setObject(1, startRowNumber);
-                ps.setObject(2, endRowNumber);
-                ps.setFetchSize(10000);
-                ps.executeQuery();
-                ResultSet resultSet = ps.getResultSet();
-                while (resultSet.next()) {
-                    SeaTunnelRow seaTunnelRowInsert = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
-                    List<String> keys = new ArrayList<>();
-                    for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
-                        Integer i = mapPosition.get(primaryKey);
-                        Object field = seaTunnelRowInsert.getField(i);
-                        keys.add(field.toString());
-                    }
-                }
-                ps.close();
-                Thread.sleep(1000);
-            }
+            ps.close();
         } catch (Exception e) {
             log.warn("get row type info exception", e);
         }
+        return new SeaTunnelRowType(fieldNames.toArray(new String[0]), seaTunnelDataTypes.toArray(new SeaTunnelDataType<?>[0]));
     }
-    private void normalCompare(Collector<SeaTunnelRow> output){
-        try {
-            conn.setAutoCommit(false);
-            if (sqlCdcConfig.getDbType().equalsIgnoreCase("mysql")) {
-                conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
-            }
-            Map<String, Integer> mapPosition = new HashMap<>();
-            for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
-                int i = typeInfo.indexOf(primaryKey);
-                mapPosition.put(primaryKey, i);
-            }
-            Map<String, java.util.Date> map = new HashMap<>();
-            while (true) {
-                String partitionColumnCountSql = this.jdbcDialect.getColumnDistinctCount(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig);
-                PreparedStatement psTotal = conn.prepareStatement(partitionColumnCountSql);
-                ResultSet resultSet1 = psTotal.executeQuery();
-                long totalSl = 0;
-                int interval = 0;
-                while (resultSet1.next()) {
-                    totalSl = resultSet1.getLong("sl");
-                    interval = (int) Math.ceil((double) totalSl / this.allTask);
+
+    private Map<String, Integer> getTableColumnsHaseCode(String sql, String tableFlag, JdbcConfig jdbcConfig) throws SQLException {
+        Util util = new Util();
+        Connection conn = util.getConnection(jdbcConfig);
+        JdbcDialect jdbcDialect = JdbcDialectFactory.getJdbcDialect(jdbcConfig.getDbType());
+        Map<String, Integer> map = new HashMap<>();
+        SeaTunnelRowType typeInfo = null;
+        if (tableFlag.equalsIgnoreCase("source")) {
+            typeInfo = getTypeInfo(conn, jdbcDialect, sql, columnMappers.stream().map(ColumnMapper::getSourceColumnName).collect(Collectors.toList()));
+        }
+        if (tableFlag.equalsIgnoreCase("sink")) {
+            typeInfo = getTypeInfo(conn, jdbcDialect, sql, columnMappers.stream().map(ColumnMapper::getSinkColumnName).collect(Collectors.toList()));
+        }
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setFetchSize(10000);
+        ps.executeQuery();
+        ResultSet resultSet = ps.getResultSet();
+        while (resultSet.next()) {
+            SeaTunnelRow seaTunnelRow = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
+            SeaTunnelRow newRow = new SeaTunnelRow(columnMappers.size());
+            List<String> keys = new ArrayList<>();
+            for (int i = 0; i < columnMappers.size(); i++) {
+                Object field = seaTunnelRow.getField(i);
+                newRow.setField(i, util.Object2String(field));
+                if (keysIndex.contains(i)) {
+                    keys.add(util.Object2String(field));
                 }
-                psTotal.close();
-                for (int i = 0; i < allTask; i++) {
-                    if (i == currentTaskId) {
-                        long startHang = i * interval + 1;
-                        long endHang = (i + 1) * interval;
-                        if (endHang > totalSl) {
-                            endHang = totalSl;
-                        }
-                        PreparedStatement startPs = conn.prepareStatement(this.jdbcDialect.getHangValueSql(this.sqlCdcConfig, startHang));
-                        ResultSet rsStart = startPs.executeQuery();
-                        while (rsStart.next()) {
-                            startRowNumber = rsStart.getObject(this.sqlCdcConfig.getPartitionColumn());
-                        }
-                        PreparedStatement endPs = conn.prepareStatement(this.jdbcDialect.getHangValueSql(this.sqlCdcConfig, endHang));
-                        ResultSet rsEnd = endPs.executeQuery();
-                        while (rsEnd.next()) {
-                            endRowNumber = rsEnd.getObject(this.sqlCdcConfig.getPartitionColumn());
-                        }
-                        startPs.close();
-                        endPs.close();
+            }
+            map.put(StringUtils.join(keys, ","), Arrays.deepHashCode(newRow.getFields()));
+        }
+        ps.close();
+        conn.close();
+        return map;
+    }
+
+    private void doModify(Set<String> pksValues, String doFlag, Collector<SeaTunnelRow> output) throws SQLException {
+        List<String> list = new ArrayList<>(pksValues);
+        List<List<String>> partition = Lists.partition(list, 200);
+        Util util = new Util();
+        Connection conn = util.getConnection(sourceJdbcConfig);
+        JdbcDialect jdbcDialect = JdbcDialectFactory.getJdbcDialect(sourceJdbcConfig.getDbType());
+        SeaTunnelRowType typeInfo = getTypeInfo(conn, jdbcDialect, sourceJdbcConfig.getQuery(), columnMappers.stream().map(ColumnMapper::getSourceColumnName).collect(Collectors.toList()));
+        List<String> collect = columnMappers.stream().filter(ColumnMapper::isPrimaryKey).map(ColumnMapper::getSourceColumnName).collect(Collectors.toList());
+        List<String> sourceColumns = new ArrayList<>();
+        columnMappers.forEach(x -> sourceColumns.add(x.getSourceColumnName()));
+        String sql = String.format("select  %s from (%s) a ", StringUtils.join(sourceColumns, ","), sourceJdbcConfig.getQuery());
+        if (doFlag.equalsIgnoreCase("I") || doFlag.equalsIgnoreCase("U")) {
+            for (List<String> pksValue1 : partition) {
+                List<String> replaceAll = new ArrayList<>();
+                for (String pksValue2 : pksValue1) {
+                    String[] split = pksValue2.split(",");
+                    List<String> columns = new ArrayList<>();
+                    for (int i = 0; i < split.length; i++) {
+                        String column = String.format("%s='%s'", collect.get(i), split[i]);
+                        columns.add(column);
                     }
+                    replaceAll.add("(" + StringUtils.join(columns, " and ") + ")");
                 }
-                String newSql = this.jdbcDialect.getPartitionSql(this.sqlCdcConfig.getPartitionColumn(), this.sqlCdcConfig.getQuery(),Optional.empty());
-                Date versionDate = new Date();
-                PreparedStatement ps = conn.prepareStatement(newSql);
-                ps.setObject(1, startRowNumber);
-                ps.setObject(2, endRowNumber);
-                ps.setFetchSize(10000);
+                String where = StringUtils.join(replaceAll, " or ");
+                PreparedStatement ps = conn.prepareStatement(String.format("%s where %s", sql, where));
+                ps.setFetchSize(200);
                 ps.executeQuery();
                 ResultSet resultSet = ps.getResultSet();
                 while (resultSet.next()) {
                     SeaTunnelRow seaTunnelRowInsert = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
-                    List<String> keys = new ArrayList<>();
-                    for (String primaryKey : this.sqlCdcConfig.getPrimaryKeys()) {
-                        Integer i = mapPosition.get(primaryKey);
-                        Object field = seaTunnelRowInsert.getField(i);
-                        keys.add(field.toString());
-                    }
-                    keys.add(String.valueOf(seaTunnelRowInsert.hashCode()));
                     seaTunnelRowInsert.setRowKind(RowKind.INSERT);
-                    SeaTunnelRow seaTunnelRowDelete=seaTunnelRowInsert.copy();
+                    SeaTunnelRow seaTunnelRowDelete = seaTunnelRowInsert.copy();
                     seaTunnelRowDelete.setRowKind(RowKind.DELETE);
-                    if (!map.containsKey(StringUtils.join(keys, ","))) {
-                        output.collect(seaTunnelRowDelete);
-                        output.collect(seaTunnelRowInsert);
-                        String join = StringUtils.join(keys, ",");
-                        int lastCommaIndex = join.lastIndexOf(",");
-                        String prefix = join.substring(0, lastCommaIndex);
-                        Iterator<Map.Entry<String, Date>> iterator1 = map.entrySet().iterator();
-                        while (iterator1.hasNext()) {
-                            Map.Entry<String, Date> entry = iterator1.next();
-                            if (entry.getKey().startsWith(prefix)) {
-                                iterator1.remove();
-                            }
-                        }
-                    }
-                    map.put(StringUtils.join(keys, ","), versionDate);
-                }
-                Iterator<Map.Entry<String, Date>> iterator = map.entrySet().iterator();
-                while (iterator.hasNext()) {
-                    Map.Entry<String, Date> entry = iterator.next();
-                    if (!versionDate.equals(entry.getValue())) checkDelete(output, entry, mapPosition, iterator);
+                    output.collect(seaTunnelRowDelete);
+                    output.collect(seaTunnelRowInsert);
                 }
                 ps.close();
-                Thread.sleep(1000);
             }
-        } catch (Exception e) {
-            log.warn("get row type info exception", e);
+
+        } else if (doFlag.equalsIgnoreCase("D")) {
+            for (List<String> pksValue1 : partition) {
+                SeaTunnelRow seaTunnelRowDelete = new SeaTunnelRow(typeInfo.getTotalFields());
+                seaTunnelRowDelete.setRowKind(RowKind.DELETE);
+                for (String pksValue2 : pksValue1) {
+                    String[] split = pksValue2.split(",");
+                    for (int i = 0; i < this.sqlCdcConfig.getPrimaryKeys().size(); i++) {
+                        Integer position = keysIndex.get(i);
+                        SeaTunnelDataType<?> fieldType = typeInfo.getFieldType(position);
+                        SqlType sqlType = fieldType.getSqlType();
+                        switch (sqlType) {
+                            case STRING:
+                                seaTunnelRowDelete.setField(position, split[i]);
+                                break;
+                            case BOOLEAN:
+                                seaTunnelRowDelete.setField(position, Boolean.parseBoolean(split[i]));
+                                break;
+                            case TINYINT:
+                                seaTunnelRowDelete.setField(position, Integer.parseInt(split[i]));
+                                break;
+                            case SMALLINT:
+                                seaTunnelRowDelete.setField(position, Integer.parseInt(split[i]));
+                                break;
+                            case INT:
+                                seaTunnelRowDelete.setField(position, Integer.parseInt(split[i]));
+                                break;
+                            case BIGINT:
+                                seaTunnelRowDelete.setField(position, Long.parseLong(split[i]));
+                                break;
+                            case FLOAT:
+                                seaTunnelRowDelete.setField(position, Float.parseFloat(split[i]));
+                                break;
+                            case DOUBLE:
+                                seaTunnelRowDelete.setField(position, Double.parseDouble(split[i]));
+                                break;
+                            case DECIMAL:
+                                seaTunnelRowDelete.setField(position, new BigDecimal(split[i]));
+                                break;
+                            case DATE:
+                                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                                Date date = null;
+                                try {
+                                    date = sdf.parse(split[i]);
+                                } catch (ParseException e) {
+                                    throw new RuntimeException(e);
+                                }
+                                java.sql.Date sqlDate = new java.sql.Date(date.getTime());
+                                seaTunnelRowDelete.setField(position, sqlDate);
+                                break;
+                            case TIME:
+                                SimpleDateFormat sdf1 = new SimpleDateFormat("HH:mm:ss");
+                                Date date1 = null;
+                                try {
+                                    date1 = sdf1.parse(split[i]);
+                                } catch (ParseException e) {
+                                    throw new RuntimeException(e);
+                                }
+                                Time sqlTime = new Time(date1.getTime());
+                                seaTunnelRowDelete.setField(position, sqlTime);
+                                break;
+                            case TIMESTAMP:
+                                String dateStr = split[i];
+                                SimpleDateFormat sdf3 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                                Timestamp timestamp = null;
+                                try {
+                                    timestamp = new Timestamp(sdf3.parse(dateStr).getTime());
+                                } catch (ParseException e) {
+                                    throw new RuntimeException(e);
+                                }
+                                seaTunnelRowDelete.setField(position, timestamp);
+                                break;
+                            case MAP:
+                            case ARRAY:
+                            case ROW:
+                            default:
+                                throw new RuntimeException(
+                                        CommonErrorCode.UNSUPPORTED_DATA_TYPE +
+                                                "Unexpected value: " + sqlType.toString());
+                        }
+                    }
+                    output.collect(seaTunnelRowDelete);
+                }
+            }
         }
+        conn.close();
     }
+
 }

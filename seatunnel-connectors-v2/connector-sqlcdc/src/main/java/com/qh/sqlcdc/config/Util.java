@@ -156,20 +156,17 @@ public class Util {
         connection.disconnect();
     }
 
-    public Connection getConnection(SqlCdcConfig sqlCdcConfig) {
+    public Connection getConnection(JdbcConfig jdbcConfig) {
         try {
-            Driver driver = this.loadDriver(sqlCdcConfig.getDriver());
+            Driver dri = this.loadDriver(jdbcConfig.getDriver());
             Properties info = new Properties();
-            if (sqlCdcConfig.getUser() != null) {
-                info.setProperty("user", sqlCdcConfig.getUser());
-            }
-            if (sqlCdcConfig.getPassWord() != null) {
-                info.setProperty("password", sqlCdcConfig.getPassWord());
-            }
-            Connection conn = driver.connect(sqlCdcConfig.getUrl(), info);
+            info.setProperty("user", jdbcConfig.getUser());
+            info.setProperty("password", jdbcConfig.getPassWord());
+
+            Connection conn = dri.connect(jdbcConfig.getUrl(), info);
             if (conn == null) {
                 throw new RuntimeException(
-                        "No suitable driver found for " + sqlCdcConfig.getUrl());
+                        "No suitable driver found for " + jdbcConfig.getUrl());
             }
             return conn;
         } catch (ClassNotFoundException | SQLException e) {

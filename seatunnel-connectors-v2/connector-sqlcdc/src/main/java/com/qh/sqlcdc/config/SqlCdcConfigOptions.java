@@ -48,11 +48,6 @@ public class SqlCdcConfigOptions {
     public static Option<List<String>> PRIMARY_KEYS =
             Options.key("primary_keys").listType().noDefaultValue().withDescription("primary keys");
 
-    public static Option<String> PARTITION_COLUMN =
-            Options.key("partition_column")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("partition column");
     public static Option<Boolean> directCompare =
             Options.key("directCompare")
                     .booleanType()
