@@ -107,7 +107,7 @@ public class JdbcSink
                 seaTunnelDataValueIndex.setOriginColumnValueIndex(i);
                 seaTunnelDataValueIndex.setSeaTunnelDataType(seaTunnelRowType.getFieldType(i));
                 list.add(seaTunnelDataValueIndex);
-            }else{
+            } else {
                 fieldNames[i] = seaTunnelRowType.getFieldName(i);
                 fieldTypes[i] = seaTunnelRowType.getFieldType(i);
             }
@@ -175,6 +175,10 @@ public class JdbcSink
     @Override
     public void setTypeInfo(SeaTunnelRowType seaTunnelRowType) {
         Map<String, String> fieldMapper = this.jdbcSinkConfig.getFieldMapper();
+        if (this.jdbcSinkConfig.getRecordOperation() != null && this.jdbcSinkConfig.getRecordOperation()) {
+            fieldMapper.put("OPERATEFLAG","OPERATEFLAG");
+            fieldMapper.put("OPERATETIME","OPERATETIME");
+        }
         String[] fieldNames = new String[seaTunnelRowType.getFieldNames().length];
         SeaTunnelDataType<?>[] fieldTypes = new SeaTunnelDataType[seaTunnelRowType.getFieldNames().length];
         List<SeaTunnelDataValueIndex> list = new ArrayList<>();
@@ -189,7 +193,7 @@ public class JdbcSink
                 seaTunnelDataValueIndex.setOriginColumnValueIndex(i);
                 seaTunnelDataValueIndex.setSeaTunnelDataType(seaTunnelRowType.getFieldType(i));
                 list.add(seaTunnelDataValueIndex);
-            }else{
+            } else {
                 fieldNames[i] = seaTunnelRowType.getFieldName(i);
                 fieldTypes[i] = seaTunnelRowType.getFieldType(i);
             }

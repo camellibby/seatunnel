@@ -31,6 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.common.PrepareFailException;
 import org.apache.seatunnel.api.source.*;
+import org.apache.seatunnel.api.table.type.BasicType;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
@@ -87,7 +88,7 @@ public class SqlCdcSource implements SeaTunnelSource<SeaTunnelRow, SqlCdcSourceS
 
     @Override
     public SourceReader<SeaTunnelRow, SqlCdcSourceSplit> createReader(SourceReader.Context readerContext) throws Exception {
-        return new SqlCdcReader(this.sqlCdcConfig, readerContext, columnMappers);
+        return new SqlCdcReader(this.sqlCdcConfig, readerContext, columnMappers, this.typeInfo);
     }
 
     @Override
@@ -124,6 +125,12 @@ public class SqlCdcSource implements SeaTunnelSource<SeaTunnelRow, SqlCdcSourceS
             for (int i = 1; i <= resultSetMetaData.getColumnCount(); i++) {
                 fieldNames.add(resultSetMetaData.getColumnLabel(i));
                 seaTunnelDataTypes.add(jdbcDialectTypeMapper.mapping(resultSetMetaData, i));
+            }
+            if (this.sqlCdcConfig.getRecordOperation()) {
+                fieldNames.add("OPERATEFLAG");
+                seaTunnelDataTypes.add(BasicType.STRING_TYPE);
+                fieldNames.add("OPERATETIME");
+                seaTunnelDataTypes.add(BasicType.STRING_TYPE);
             }
             ps.close();
             conn.close();

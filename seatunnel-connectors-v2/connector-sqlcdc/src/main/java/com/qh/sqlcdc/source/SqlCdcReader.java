@@ -57,12 +57,13 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
     private final JdbcConfig sourceJdbcConfig;
     private final JdbcConfig sinkJdbcConfig;
     private final List<Integer> keysIndex = new ArrayList<>();
-    ;
+    private final SeaTunnelRowType typeInfoOperateflagOperatetime;
 
-    SqlCdcReader(SqlCdcConfig sqlCdcConfig, SourceReader.Context context, List<ColumnMapper> columnMappers) {
+    SqlCdcReader(SqlCdcConfig sqlCdcConfig, SourceReader.Context context, List<ColumnMapper> columnMappers, SeaTunnelRowType typeInfo) {
         this.sqlCdcConfig = sqlCdcConfig;
         this.context = context;
         this.columnMappers = columnMappers;
+        this.typeInfoOperateflagOperatetime = typeInfo;
         {
             JdbcConfig jdbcConfig = new JdbcConfig();
             jdbcConfig.setUser(sqlCdcConfig.getUser());
@@ -256,8 +257,31 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
                     seaTunnelRowInsert.setRowKind(RowKind.INSERT);
                     SeaTunnelRow seaTunnelRowDelete = seaTunnelRowInsert.copy();
                     seaTunnelRowDelete.setRowKind(RowKind.DELETE);
-                    output.collect(seaTunnelRowDelete);
-                    output.collect(seaTunnelRowInsert);
+                    if (this.sqlCdcConfig.getRecordOperation()) {
+                        SeaTunnelRow newInsert = new SeaTunnelRow(typeInfoOperateflagOperatetime.getTotalFields());
+                        newInsert.setRowKind(RowKind.INSERT);
+                        SeaTunnelRow newDelete = new SeaTunnelRow(typeInfoOperateflagOperatetime.getTotalFields());
+                        newDelete.setRowKind(RowKind.DELETE);
+                        Object[] fields = seaTunnelRowInsert.getFields();
+                        for (int i = 0; i < fields.length; i++) {
+                            newInsert.setField(i, fields[i]);
+                            newDelete.setField(i, fields[i]);
+                        }
+                        if (doFlag.equalsIgnoreCase("I")) {
+                            newInsert.setField(fields.length, "I");
+                        } else {
+                            newInsert.setField(fields.length, "U");
+                        }
+                        newInsert.setField(fields.length + 1, "aaa");
+                        output.collect(newDelete);
+                        output.collect(newInsert);
+
+                    } else {
+                        output.collect(seaTunnelRowDelete);
+                        output.collect(seaTunnelRowInsert);
+                    }
+
+
                 }
                 ps.close();
             }

@@ -10,7 +10,7 @@
   "source": [
     {
       "plugin_name": "SqlCdc",
-        "query": "select  * from  tydb.T_YKT_TRANSACTIONS",
+      "query": "select  * from  tydb.T_YKT_TRANSACTIONS",
       "primary_keys": [
         "CUSTOMERID"
       ],
@@ -179,6 +179,7 @@
         "CUSTOMERID"
       ],
       "db_type": "ORACLE",
+      "recordOperation": true,
       "url": "jdbc:oracle:thin:@111.172.106.210:41521:orcl",
       "driver": "oracle.jdbc.driver.OracleDriver",
       "user": "tydb",

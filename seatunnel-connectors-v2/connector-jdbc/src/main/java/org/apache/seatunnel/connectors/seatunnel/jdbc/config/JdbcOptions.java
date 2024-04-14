@@ -116,7 +116,9 @@ public interface JdbcOptions {
                     .defaultValue(false)
                     .withDescription("support upsert by query primary_key exist");
 
-    /** source config */
+    /**
+     * source config
+     */
     Option<String> PARTITION_COLUMN =
             Options.key("partition_column")
                     .stringType()
@@ -145,4 +147,9 @@ public interface JdbcOptions {
                     .noDefaultValue()
                     .withDescription(
                             "Specify the field mapping relationship between input and output");
+    Option<Boolean> recordOperation =
+            Options.key("recordOperation")
+                    .booleanType()
+                    .noDefaultValue()
+                    .withDescription("是否记录操作类型与时间戳");
 }

@@ -40,7 +40,8 @@ public class JdbcSinkConfig implements Serializable {
     private String table;
     private List<String> primaryKeys;
     private boolean supportUpsertByQueryPrimaryKeyExist;
-    private Map<String,String> fieldMapper;
+    private Map<String, String> fieldMapper;
+    private Boolean recordOperation ;
 
     public static JdbcSinkConfig of(ReadonlyConfig config) {
         JdbcSinkConfig.Builder builder = JdbcSinkConfig.builder();
@@ -53,6 +54,8 @@ public class JdbcSinkConfig implements Serializable {
                 .ifPresent(builder::supportUpsertByQueryPrimaryKeyExist);
         config.getOptional(JdbcOptions.QUERY).ifPresent(builder::simpleSql);
         config.getOptional(JdbcOptions.FIELD_MAPPER).ifPresent(builder::fieldMapper);
+        config.getOptional(JdbcOptions.recordOperation).ifPresent(builder::recordOperation);
+
         return builder.build();
     }
 }

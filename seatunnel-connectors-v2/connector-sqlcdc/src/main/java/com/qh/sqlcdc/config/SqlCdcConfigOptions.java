@@ -53,6 +53,11 @@ public class SqlCdcConfigOptions {
                     .booleanType()
                     .noDefaultValue()
                     .withDescription("directCompare");
+    public static Option<Boolean> recordOperation =
+            Options.key("recordOperation")
+                    .booleanType()
+                    .noDefaultValue()
+                    .withDescription("是否记录操作类型与时间戳");
     public static Option<JSONObject> directSinkConfig =
             Options.key("directSinkConfig")
                     .objectType(JSONObject.class)
