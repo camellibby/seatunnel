@@ -25,9 +25,13 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class SeaTunnelRowType implements CompositeType<SeaTunnelRow> {
     private static final long serialVersionUID = 2L;
 
-    /** The field name of the {@link SeaTunnelRow}. */
+    /**
+     * The field name of the {@link SeaTunnelRow}.
+     */
     private final String[] fieldNames;
-    /** The type of the field. */
+    /**
+     * The type of the field.
+     */
     private final SeaTunnelDataType<?>[] fieldTypes;
 
     public SeaTunnelRowType(String[] fieldNames, SeaTunnelDataType<?>[] fieldTypes) {
@@ -79,7 +83,7 @@ public class SeaTunnelRowType implements CompositeType<SeaTunnelRow> {
                 return i;
             }
         }
-        throw new IllegalArgumentException(String.format("can't find field [%s] in [%s]", Arrays.toString(this.fieldNames), fieldName));
+        throw new IllegalArgumentException(String.format("can't find field [%s] in [%s]", fieldName, Arrays.toString(this.fieldNames)));
     }
 
     @Override

@@ -100,7 +100,11 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
                 truncateTable.setDbSchema(this.jdbcSinkConfig.getDbSchema());
                 truncateTable.setTableName(this.jdbcSinkConfig.getDbSchema() + "." + this.jdbcSinkConfig.getTable());
             } else {
-                truncateTable.setTableName(this.jdbcSinkConfig.getTable());
+                if(this.jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")){
+                    truncateTable.setTableName(String.format("`%s`", this.jdbcSinkConfig.getTable()));
+                }else{
+                    truncateTable.setTableName(this.jdbcSinkConfig.getTable());
+                }
             }
             util.truncateTable(truncateTable);
             this.deleteCount = this.tableCount;
@@ -151,7 +155,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
 
                 }
             }
-            if(hasError){
+            if (hasError) {
                 throw new RuntimeException();
             }
             psUpsert.executeBatch();

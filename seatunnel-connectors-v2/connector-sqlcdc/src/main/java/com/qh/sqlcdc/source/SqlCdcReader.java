@@ -33,15 +33,12 @@ import org.apache.seatunnel.api.source.Collector;
 import org.apache.seatunnel.api.source.SourceReader;
 import org.apache.seatunnel.api.table.type.*;
 import com.google.common.collect.MapDifference;
-import org.apache.seatunnel.common.exception.CommonErrorCode;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.sql.*;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.Date;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -51,9 +48,7 @@ import java.util.stream.Collectors;
 public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSplit> {
     private final SqlCdcConfig sqlCdcConfig;
     private final SourceReader.Context context;
-
     private final List<ColumnMapper> columnMappers;
-
     private final JdbcConfig sourceJdbcConfig;
     private final JdbcConfig sinkJdbcConfig;
     private final List<Integer> keysIndex = new ArrayList<>();
@@ -149,7 +144,13 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
                 public Map<String, Integer> call() throws Exception {
                     List<String> sinkColumns = new ArrayList<>();
                     columnMappers.forEach(x -> sinkColumns.add(x.getSinkColumnName()));
-                    String sql = String.format("select  %s from (%s) a ", StringUtils.join(sinkColumns, ","), sinkJdbcConfig.getQuery());
+                    String sql;
+                    if (sqlCdcConfig.getRecordOperation()) {
+                        sql = String.format("select  %s from (%s) a where OPERATEFLAG in ('I','U')", StringUtils.join(sinkColumns, ","), sinkJdbcConfig.getQuery());
+                    } else {
+                        sql = String.format("select  %s from (%s) a ", StringUtils.join(sinkColumns, ","), sinkJdbcConfig.getQuery());
+                    }
+
                     return getTableColumnsHaseCode(sql, "sink", sinkJdbcConfig);
                 }
             });
@@ -159,13 +160,16 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
             threadSink.start();
             Map<String, Integer> resultSource = sourceFuture.get();
             Map<String, Integer> resultSink = futureSink.get();
+            LocalDateTime now = LocalDateTime.now();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            String formattedString = now.format(formatter);
             MapDifference<String, Object> difference = Maps.difference(resultSource, resultSink);
             Map<String, MapDifference.ValueDifference<Object>> entriesDiffering = difference.entriesDiffering();
-            doModify(entriesDiffering.keySet(), "U", output);
+            doModify(entriesDiffering.keySet(), "U", output, formattedString);
             Map<String, Object> onlyOnLeft = difference.entriesOnlyOnLeft();
-            doModify(onlyOnLeft.keySet(), "I", output);
+            doModify(onlyOnLeft.keySet(), "I", output, formattedString);
             Map<String, Object> entriesOnlyOnRight = difference.entriesOnlyOnRight();
-            doModify(entriesOnlyOnRight.keySet(), "D", output);
+            doModify(entriesOnlyOnRight.keySet(), "D", output, formattedString);
         } while (true);
     }
 
@@ -224,13 +228,19 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
         return map;
     }
 
-    private void doModify(Set<String> pksValues, String doFlag, Collector<SeaTunnelRow> output) throws SQLException {
+    private void doModify(Set<String> pksValues, String doFlag, Collector<SeaTunnelRow> output, String modifyTime) throws SQLException {
         List<String> list = new ArrayList<>(pksValues);
         List<List<String>> partition = Lists.partition(list, 200);
         Util util = new Util();
         Connection conn = util.getConnection(sourceJdbcConfig);
         JdbcDialect jdbcDialect = JdbcDialectFactory.getJdbcDialect(sourceJdbcConfig.getDbType());
-        SeaTunnelRowType typeInfo = getTypeInfo(conn, jdbcDialect, sourceJdbcConfig.getQuery(), columnMappers.stream().map(ColumnMapper::getSourceColumnName).collect(Collectors.toList()));
+        SeaTunnelRowType dataTypeInfo = getTypeInfo(conn, jdbcDialect, sourceJdbcConfig.getQuery(), columnMappers.stream().map(ColumnMapper::getSourceColumnName).collect(Collectors.toList()));
+        SeaTunnelRowType typeInfo;
+        if (this.sqlCdcConfig.getRecordOperation()) {
+            typeInfo = typeInfoOperateflagOperatetime;
+        } else {
+            typeInfo = dataTypeInfo;
+        }
         List<String> collect = columnMappers.stream().filter(ColumnMapper::isPrimaryKey).map(ColumnMapper::getSourceColumnName).collect(Collectors.toList());
         List<String> sourceColumns = new ArrayList<>();
         columnMappers.forEach(x -> sourceColumns.add(x.getSourceColumnName()));
@@ -253,7 +263,7 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
                 ps.executeQuery();
                 ResultSet resultSet = ps.getResultSet();
                 while (resultSet.next()) {
-                    SeaTunnelRow seaTunnelRowInsert = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
+                    SeaTunnelRow seaTunnelRowInsert = jdbcDialect.getRowConverter().toInternal(resultSet, dataTypeInfo);
                     seaTunnelRowInsert.setRowKind(RowKind.INSERT);
                     SeaTunnelRow seaTunnelRowDelete = seaTunnelRowInsert.copy();
                     seaTunnelRowDelete.setRowKind(RowKind.DELETE);
@@ -272,7 +282,7 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
                         } else {
                             newInsert.setField(fields.length, "U");
                         }
-                        newInsert.setField(fields.length + 1, "aaa");
+                        newInsert.setField(fields.length + 1, modifyTime);
                         output.collect(newDelete);
                         output.collect(newInsert);
 
@@ -287,87 +297,74 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
             }
 
         } else if (doFlag.equalsIgnoreCase("D")) {
-            for (List<String> pksValue1 : partition) {
-                SeaTunnelRow seaTunnelRowDelete = new SeaTunnelRow(typeInfo.getTotalFields());
-                seaTunnelRowDelete.setRowKind(RowKind.DELETE);
-                for (String pksValue2 : pksValue1) {
-                    String[] split = pksValue2.split(",");
-                    for (int i = 0; i < this.sqlCdcConfig.getPrimaryKeys().size(); i++) {
-                        Integer position = keysIndex.get(i);
-                        SeaTunnelDataType<?> fieldType = typeInfo.getFieldType(position);
-                        SqlType sqlType = fieldType.getSqlType();
-                        switch (sqlType) {
-                            case STRING:
-                                seaTunnelRowDelete.setField(position, split[i]);
-                                break;
-                            case BOOLEAN:
-                                seaTunnelRowDelete.setField(position, Boolean.parseBoolean(split[i]));
-                                break;
-                            case TINYINT:
-                                seaTunnelRowDelete.setField(position, Integer.parseInt(split[i]));
-                                break;
-                            case SMALLINT:
-                                seaTunnelRowDelete.setField(position, Integer.parseInt(split[i]));
-                                break;
-                            case INT:
-                                seaTunnelRowDelete.setField(position, Integer.parseInt(split[i]));
-                                break;
-                            case BIGINT:
-                                seaTunnelRowDelete.setField(position, Long.parseLong(split[i]));
-                                break;
-                            case FLOAT:
-                                seaTunnelRowDelete.setField(position, Float.parseFloat(split[i]));
-                                break;
-                            case DOUBLE:
-                                seaTunnelRowDelete.setField(position, Double.parseDouble(split[i]));
-                                break;
-                            case DECIMAL:
-                                seaTunnelRowDelete.setField(position, new BigDecimal(split[i]));
-                                break;
-                            case DATE:
-                                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-                                Date date = null;
-                                try {
-                                    date = sdf.parse(split[i]);
-                                } catch (ParseException e) {
-                                    throw new RuntimeException(e);
-                                }
-                                java.sql.Date sqlDate = new java.sql.Date(date.getTime());
-                                seaTunnelRowDelete.setField(position, sqlDate);
-                                break;
-                            case TIME:
-                                SimpleDateFormat sdf1 = new SimpleDateFormat("HH:mm:ss");
-                                Date date1 = null;
-                                try {
-                                    date1 = sdf1.parse(split[i]);
-                                } catch (ParseException e) {
-                                    throw new RuntimeException(e);
-                                }
-                                Time sqlTime = new Time(date1.getTime());
-                                seaTunnelRowDelete.setField(position, sqlTime);
-                                break;
-                            case TIMESTAMP:
-                                String dateStr = split[i];
-                                SimpleDateFormat sdf3 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                                Timestamp timestamp = null;
-                                try {
-                                    timestamp = new Timestamp(sdf3.parse(dateStr).getTime());
-                                } catch (ParseException e) {
-                                    throw new RuntimeException(e);
-                                }
-                                seaTunnelRowDelete.setField(position, timestamp);
-                                break;
-                            case MAP:
-                            case ARRAY:
-                            case ROW:
-                            default:
-                                throw new RuntimeException(
-                                        CommonErrorCode.UNSUPPORTED_DATA_TYPE +
-                                                "Unexpected value: " + sqlType.toString());
-                        }
-                    }
-                    output.collect(seaTunnelRowDelete);
+            deleteSinkData(output, modifyTime, partition, typeInfo);
+        }
+        conn.close();
+    }
+
+    private void deleteSinkData(Collector<SeaTunnelRow> output, String modifyTime, List<List<String>> partition, SeaTunnelRowType typeInfo) throws SQLException {
+        Util util = new Util();
+        Connection conn = util.getConnection(sinkJdbcConfig);
+        JdbcDialect jdbcDialect = JdbcDialectFactory.getJdbcDialect(sinkJdbcConfig.getDbType());
+        List<String> collect = columnMappers.stream().filter(ColumnMapper::isPrimaryKey).map(ColumnMapper::getSinkColumnName).collect(Collectors.toList());
+        List<String> sinkColumns = new ArrayList<>();
+        columnMappers.forEach(x -> sinkColumns.add(x.getSourceColumnName()));
+        String sql;
+        SeaTunnelRowType dataTypeInfo;
+        if (sqlCdcConfig.getRecordOperation()) {
+            String[] fieldNames = typeInfo.getFieldNames();
+            SeaTunnelDataType<?>[] fieldTypes = typeInfo.getFieldTypes();
+            dataTypeInfo = new SeaTunnelRowType(Arrays.copyOfRange(fieldNames, 0, fieldNames.length - 2), Arrays.copyOfRange(fieldTypes, 0, fieldTypes.length - 2));
+            sql = String.format("select  %s from (%s) a where 1=1 and OPERATEFLAG in ('I','U') ", StringUtils.join(sinkColumns, ","), sinkJdbcConfig.getQuery());
+        } else {
+            dataTypeInfo = typeInfo;
+            sql = String.format("select  %s from (%s) a where 1=1 ", StringUtils.join(sinkColumns, ","), sinkJdbcConfig.getQuery());
+        }
+        for (List<String> pksValue1 : partition) {
+            List<String> replaceAll = new ArrayList<>();
+            for (String pksValue2 : pksValue1) {
+                String[] split = pksValue2.split(",");
+                List<String> columns = new ArrayList<>();
+                for (int i = 0; i < split.length; i++) {
+                    String column = String.format("%s='%s'", collect.get(i), split[i]);
+                    columns.add(column);
                 }
+                replaceAll.add("(" + StringUtils.join(columns, " and ") + ")");
+            }
+            String where = StringUtils.join(replaceAll, " or ");
+            PreparedStatement ps = conn.prepareStatement(String.format("%s and  ( %s )", sql, where));
+            ps.setFetchSize(200);
+            ps.executeQuery();
+            ResultSet resultSet = ps.getResultSet();
+            while (resultSet.next()) {
+                SeaTunnelRow seaTunnelSinkData = jdbcDialect.getRowConverter().toInternal(resultSet, dataTypeInfo);
+                Object[] sinkFields = seaTunnelSinkData.getFields();
+                for (String ignored : pksValue1) {
+                    if (this.sqlCdcConfig.getRecordOperation()) {
+                        SeaTunnelRow newInsert = new SeaTunnelRow(typeInfo.getTotalFields());
+                        newInsert.setRowKind(RowKind.INSERT);
+                        SeaTunnelRow newDelete = new SeaTunnelRow(typeInfo.getTotalFields());
+                        newDelete.setRowKind(RowKind.DELETE);
+                        for (int i = 0; i < sinkFields.length; i++) {
+                            newInsert.setField(i, sinkFields[i]);
+                            newDelete.setField(i, sinkFields[i]);
+                        }
+                        newInsert.setField(sinkFields.length, "D");
+                        newInsert.setField(sinkFields.length + 1, modifyTime);
+                        output.collect(newDelete);
+                        output.collect(newInsert);
+                    } else {
+                        SeaTunnelRow seaTunnelRowDelete = new SeaTunnelRow(typeInfo.getTotalFields());
+                        for (int i = 0; i < sinkFields.length; i++) {
+                            seaTunnelRowDelete.setField(i, sinkFields[i]);
+                            seaTunnelRowDelete.setField(i, sinkFields[i]);
+                        }
+                        seaTunnelRowDelete.setRowKind(RowKind.DELETE);
+                        output.collect(seaTunnelRowDelete);
+                    }
+
+                }
+
             }
         }
         conn.close();

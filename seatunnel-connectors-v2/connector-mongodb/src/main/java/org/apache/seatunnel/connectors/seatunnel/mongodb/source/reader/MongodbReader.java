@@ -17,6 +17,8 @@
 
 package org.apache.seatunnel.connectors.seatunnel.mongodb.source.reader;
 
+import com.alibaba.fastjson2.JSONObject;
+import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.shade.com.google.common.base.Preconditions;
 
 import org.apache.seatunnel.api.source.Collector;
@@ -40,7 +42,9 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 
-/** MongoReader reads MongoDB by splits (queries). */
+/**
+ * MongoReader reads MongoDB by splits (queries).
+ */
 @Slf4j
 public class MongodbReader implements SourceReader<SeaTunnelRow, MongoSplit> {
 
@@ -57,17 +61,21 @@ public class MongodbReader implements SourceReader<SeaTunnelRow, MongoSplit> {
     private final MongodbReadOptions readOptions;
 
     private volatile boolean noMoreSplit;
+    private final SeaTunnelRowType seaTunnelRowType;
 
     public MongodbReader(
             SourceReader.Context context,
             MongodbClientProvider clientProvider,
             DocumentDeserializer<SeaTunnelRow> deserializer,
-            MongodbReadOptions mongodbReadOptions) {
+            MongodbReadOptions mongodbReadOptions,
+            SeaTunnelRowType seaTunnelRowType) {
         this.deserializer = deserializer;
         this.context = context;
         this.clientProvider = clientProvider;
         pendingSplits = new ConcurrentLinkedDeque<>();
         this.readOptions = mongodbReadOptions;
+        this.seaTunnelRowType = seaTunnelRowType;
+
     }
 
     @Override
@@ -104,7 +112,15 @@ public class MongodbReader implements SourceReader<SeaTunnelRow, MongoSplit> {
                                 .maxTime(readOptions.getMaxTimeMS(), TimeUnit.MINUTES);
                 cursor = rs.iterator();
                 while (cursor.hasNext()) {
+//                    String json = cursor.next().toJson();
+//                    SeaTunnelRow seaTunnelRow= new SeaTunnelRow(this.seaTunnelRowType.getTotalFields());
+//                    JSONObject parse = JSONObject.parse(json);
+//                    for (int i = 0; i < this.seaTunnelRowType.getTotalFields(); i++) {
+//                        String fieldName = this.seaTunnelRowType.getFieldName(i);
+//                        seaTunnelRow.setField(i,parse.get(fieldName).toString());
+//                    }
                     SeaTunnelRow deserialize = deserializer.deserialize(cursor.next());
+
                     output.collect(deserialize);
                 }
                 closeCurrentSplit();
@@ -135,7 +151,8 @@ public class MongodbReader implements SourceReader<SeaTunnelRow, MongoSplit> {
     }
 
     @Override
-    public void notifyCheckpointComplete(long checkpointId) throws Exception {}
+    public void notifyCheckpointComplete(long checkpointId) throws Exception {
+    }
 
     private void closeCurrentSplit() {
         Preconditions.checkNotNull(cursor);

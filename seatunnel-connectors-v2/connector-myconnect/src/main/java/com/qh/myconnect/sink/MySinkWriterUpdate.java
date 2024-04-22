@@ -299,7 +299,13 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         try {
             List<ColumnMapper> listUc = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
             List<ColumnMapper> columnMappers = this.columnMappers.stream().filter(x -> !x.isUc()).collect(Collectors.toList());
-            String templateInsert = "update <table> set " + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> " + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
+            String templateInsert = "";
+            if (jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
+                templateInsert = "update `<table>` set " + "<columns:{sub | `<sub.sinkColumnName>` = ? }; separator=\", \"> " + " where  <pks:{pk | `<pk.sinkColumnName>` = ? }; separator=\" and \"> ";
+            } else {
+                templateInsert = "update <table> set " + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> " + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
+            }
+
             ST template = new ST(templateInsert);
             template.add("table", jdbcSinkConfig.getTable());
             template.add("columns", columnMappers);

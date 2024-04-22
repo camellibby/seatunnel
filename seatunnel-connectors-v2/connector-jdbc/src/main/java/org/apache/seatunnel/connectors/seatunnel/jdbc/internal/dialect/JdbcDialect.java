@@ -198,15 +198,16 @@ public interface JdbcDialect extends Serializable {
 
     default ResultSetMetaData getResultSetMetaData(
             Connection conn, JdbcSourceConfig jdbcSourceConfig) throws SQLException {
-        PreparedStatement ps = conn.prepareStatement(jdbcSourceConfig.getQuery());
+        PreparedStatement ps = conn.prepareStatement(String.format("select * from  (%s) a where 1=2 ", jdbcSourceConfig.getQuery()));
         ps.executeQuery();
         return ps.getMetaData();
     }
 
     /**
-     *  默认为oracle写法 每个数据库需要单独实现
-     *  oracle 是默认 nulls last 其他数据库要注意把 null 放在最后面
-     *  为了防止 有人修改了数据库排序规则 强制把空值的放在最后面去
+     * 默认为oracle写法 每个数据库需要单独实现
+     * oracle 是默认 nulls last 其他数据库要注意把 null 放在最后面
+     * 为了防止 有人修改了数据库排序规则 强制把空值的放在最后面去
+     *
      * @param conn
      * @param jdbcSourceConfig
      * @param parameterValues
@@ -214,12 +215,12 @@ public interface JdbcDialect extends Serializable {
      */
     default ResultSet getSplitValue(Connection conn, JdbcSourceConfig jdbcSourceConfig, Object[] parameterValues) {
         String template = "select * " +
-                "  from (select <partitionColumn>, " +
-                "               Row_number() over(order by <partitionColumn>) hang " +
-                "          from (select distinct  <partitionColumn>  <partitionColumn> " +
-                "                  from (<query>)) )" +
-                " where hang in (<parameterValues>) " +
-                " order by <partitionColumn> asc nulls last";
+                          "  from (select <partitionColumn>, " +
+                          "               Row_number() over(order by <partitionColumn>) hang " +
+                          "          from (select distinct  <partitionColumn>  <partitionColumn> " +
+                          "                  from (<query>)) )" +
+                          " where hang in (<parameterValues>) " +
+                          " order by <partitionColumn> asc nulls last";
         ST st = new ST(template);
         st.add("partitionColumn", jdbcSourceConfig.getPartitionColumn().orElseThrow(() -> new NullPointerException("分区列为空")));
         st.add("query", jdbcSourceConfig.getQuery());
@@ -237,19 +238,20 @@ public interface JdbcDialect extends Serializable {
     /**
      * 默认为oracle写法 每个数据库需要单独实现
      * 下面的sql把 空值列 也算成了单独的一项 其他数据库也要照此写法
+     *
      * @param columnName
      * @param config
      * @return
      */
     default String getPartitionColumnCount(String columnName, JdbcSourceConfig config) {
         String template = "select sum(sl) " +
-                "  from (SELECT COUNT(DISTINCT <columnName>) sl " +
-                "          FROM (<tableName>) " +
-                "        union all " +
-                "        select 1 " +
-                "          from (<tableName>) " +
-                "         where <columnName> is null " +
-                "           and rownum = 1) a";
+                          "  from (SELECT COUNT(DISTINCT <columnName>) sl " +
+                          "          FROM (<tableName>) " +
+                          "        union all " +
+                          "        select 1 " +
+                          "          from (<tableName>) " +
+                          "         where <columnName> is null " +
+                          "           and rownum = 1) a";
         ST st = new ST(template);
         st.add("columnName", columnName);
         st.add("tableName", config.getQuery());

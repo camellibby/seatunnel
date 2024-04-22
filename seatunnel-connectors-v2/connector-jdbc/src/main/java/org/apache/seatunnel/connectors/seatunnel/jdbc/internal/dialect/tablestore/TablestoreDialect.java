@@ -61,7 +61,7 @@ public class TablestoreDialect implements JdbcDialect {
     @Override
     public ResultSetMetaData getResultSetMetaData(
             Connection conn, JdbcSourceConfig jdbcSourceConfig) throws SQLException {
-        PreparedStatement ps = conn.prepareStatement(jdbcSourceConfig.getQuery());
+        PreparedStatement ps = conn.prepareStatement(String.format("select * from  (%s) a where 1=2 ", jdbcSourceConfig.getQuery()));
         return ps.executeQuery().getMetaData();
     }
 }

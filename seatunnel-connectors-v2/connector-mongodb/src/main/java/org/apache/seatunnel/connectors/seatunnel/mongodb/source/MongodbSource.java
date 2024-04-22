@@ -154,7 +154,7 @@ public class MongodbSource
     @Override
     public SourceReader<SeaTunnelRow, MongoSplit> createReader(SourceReader.Context readerContext)
             throws Exception {
-        return new MongodbReader(readerContext, clientProvider, deserializer, mongodbReadOptions);
+        return new MongodbReader(readerContext, clientProvider, deserializer, mongodbReadOptions,rowType);
     }
 
     @Override
