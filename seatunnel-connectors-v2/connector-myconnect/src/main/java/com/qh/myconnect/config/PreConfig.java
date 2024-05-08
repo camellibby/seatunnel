@@ -1,5 +1,6 @@
 package com.qh.myconnect.config;
 
+import com.clickhouse.jdbc.internal.ClickHouseConnectionImpl;
 import com.qh.myconnect.dialect.JdbcDialectFactory;
 import lombok.Data;
 import org.apache.seatunnel.api.configuration.util.OptionMark;
@@ -21,6 +22,8 @@ public class PreConfig implements Serializable {
     private String incrementMode;
     @OptionMark(description = "增量模式 忽略时间戳比对 ")
     private Boolean ignoreTstamp = true;
+    @OptionMark(description = "ck 集群模式下 集群的名字")
+    private String clusterName;
 
     public PreConfig() {
     }
@@ -56,18 +59,33 @@ public class PreConfig implements Serializable {
             if (null == jdbcSinkConfig.getPrimaryKeys() || jdbcSinkConfig.getPrimaryKeys().isEmpty()) {
                 throw new RuntimeException(String.format("增量更新模式下,未标示逻辑主键", tableName));
             }
-
-
             String tmpTableName = "UC_" + tableName;
-            try {
-                PreparedStatement drop = connection.prepareStatement(JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).dropTable(jdbcSinkConfig, tmpTableName));
-                drop.execute();
-                drop.close();
-            } catch (SQLException e) {
-                System.out.println("删除报错意味着没有表");
-            }
-
             String copyTableOnlyColumnSql = JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).copyTableOnlyColumn(tableName, tmpTableName, jdbcSinkConfig);
+            if (clusterName != null && !clusterName.equalsIgnoreCase("")) {
+                String dropSqlCluster =
+                        JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).dropTableOnCluster(jdbcSinkConfig, ((ClickHouseConnectionImpl) connection).getCurrentDatabase(),
+                                tmpTableName, clusterName);
+                copyTableOnlyColumnSql = JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).copyTableOnlyColumnOnCluster(tableName
+                        , tmpTableName, jdbcSinkConfig, clusterName, ((ClickHouseConnectionImpl) connection).getCurrentDatabase());
+                try {
+                    PreparedStatement drop = connection.prepareStatement(dropSqlCluster);
+                    drop.execute();
+                    drop.close();
+                } catch (SQLException e) {
+                    System.out.println("删除报错意味着没有表");
+                }
+            }
+            else {
+                String dropSql = JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType()).dropTable(jdbcSinkConfig,
+                        tmpTableName);
+                try {
+                    PreparedStatement drop = connection.prepareStatement(dropSql);
+                    drop.execute();
+                    drop.close();
+                } catch (SQLException e) {
+                    System.out.println("删除报错意味着没有表");
+                }
+            }
             PreparedStatement preparedStatement1 = connection.prepareStatement(copyTableOnlyColumnSql);
             preparedStatement1.execute();
             preparedStatement1.close();

@@ -311,12 +311,31 @@ public interface JdbcDialect extends Serializable {
         );
     }
 
+    default String copyTableOnlyColumnOnCluster(String sourceTable, String targetTable, JdbcSinkConfig jdbcSinkConfig
+            ,String clusterName,String dataBase) {
+        return String.format("create  table %s on CLUSTER %s ENGINE=ReplicatedMergeTree() order by (%s) as select %s "
+                           + "from  %s.%s "
+                      + "where 1=2 ",
+                targetTable,
+                clusterName,
+                StringUtils.join(jdbcSinkConfig.getPrimaryKeys(), ','),
+                StringUtils.join(jdbcSinkConfig.getPrimaryKeys(), ','),
+                dataBase,
+                sourceTable
+        );
+    }
+
     default String truncateTable(JdbcSinkConfig jdbcSinkConfig) {
         return String.format("truncate  table %s", jdbcSinkConfig.getTable());
     }
 
     default String dropTable(JdbcSinkConfig jdbcSinkConfig, String tableName) {
         return String.format("drop table  %s", tableName);
+    }
+
+    default String dropTableOnCluster(JdbcSinkConfig jdbcSinkConfig,String database, String tableName,
+                                      String clusterName) {
+        return String.format("drop table  %s.%s on cluster %s no delay ", database,tableName,clusterName);
     }
 
 
@@ -348,6 +367,11 @@ public interface JdbcDialect extends Serializable {
             throw new RuntimeException(e);
         }
         return del;
+    }
+    default int deleteDataOnCluster(Connection connection, String table, String ucTable, List<ColumnMapper> ucColumns
+            ,String clusterName) {
+
+        return 0;
     }
 
     default int deleteDataZipper(Connection connection,  JdbcSinkConfig jdbcSinkConfig,  List<ColumnMapper> columnMappers, LocalDateTime startTime) {

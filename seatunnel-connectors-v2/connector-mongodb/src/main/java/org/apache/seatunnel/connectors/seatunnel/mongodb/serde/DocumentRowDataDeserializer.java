@@ -67,8 +67,14 @@ public class DocumentRowDataDeserializer implements DocumentDeserializer<SeaTunn
         for (int i = 0; i < fieldNames.length; i++) {
             String fieldName = this.fieldNames[i];
             BsonValue o = bsonDocument.get(fieldName);
-            SeaTunnelDataType<?> fieldType = fieldTypes[i];
-            rowData.setField(i, bsonConverters.createConverter(fieldType).convert(o));
+            if (!o.isNull()) {
+                SeaTunnelDataType<?> fieldType = fieldTypes[i];
+                rowData.setField(i, bsonConverters.createConverter(fieldType).convert(o));
+            }
+            else {
+                rowData.setField(i, null);
+            }
+
         }
         return rowData;
     }

@@ -126,25 +126,6 @@ public class ReplaceTransform extends AbstractCatalogSupportTransform {
             }
 
 
-//            if (null != inputRow.getField(i)) {
-//                outputDataArray[finalI] = inputRow.getField(i).toString().replace("\0", "");
-//                Map<String, List<XjReplaceConfig>> mapFields = this.replaceFields.stream().collect(Collectors.groupingBy(XjReplaceConfig::getColumnName));
-//                Map<String, Integer> filedsValueIndexMap = new HashMap<>();
-//                mapFields.forEach((k, v) -> {
-//                    filedsValueIndexMap.put(k, v.get(0).getValueIndex());
-//                });
-//
-//
-//                replaceFields.stream().filter(x -> x.getValueIndex() == finalI).findFirst().ifPresent(x -> {
-//
-//                    outputDataArray[finalI] = inputRow.getField(finalI).toString()
-//                            .replace(x.getOldString(), x.getNewString())
-//                            .replace("\0", "");
-//
-//                });
-//            }
-
-
         }
         SeaTunnelRow outputRow = new SeaTunnelRow(outputDataArray);
         outputRow.setRowKind(inputRow.getRowKind());

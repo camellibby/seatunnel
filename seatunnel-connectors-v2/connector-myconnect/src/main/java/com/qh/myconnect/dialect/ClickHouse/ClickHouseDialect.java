@@ -168,6 +168,42 @@ public class ClickHouseDialect implements JdbcDialect {
         }
         return del;
     }
+    public int deleteDataOnCluster(Connection connection, String table, String ucTable, List<ColumnMapper> ucColumns
+            ,String clusterName) {
+
+        String querySql = "select count(1) sl from  `<table>`   WHERE (<pks:{pk | `<pk.sinkColumnName>`}; separator=\", \">) NOT IN   (SELECT  <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \"> FROM `<ucTable>`  ) ";
+        ST st = new ST(querySql);
+        st.add("table", table);
+        st.add("ucTable", ucTable);
+        st.add("pks", ucColumns);
+        PreparedStatement query = null;
+        int del = 0;
+
+        String delSql = "ALTER  TABLE `<table>` on CLUSTER  <clusterName> DELETE   WHERE (<pks:{pk | `<pk.sinkColumnName>`}; separator=\", "
+                        + "\">) NOT IN   (SELECT  <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \"> FROM "
+                        + "`<ucTable>`  ) SETTINGS allow_nondeterministic_mutations = 1 ";
+        ST template = new ST(delSql);
+        template.add("table", table);
+        template.add("ucTable", ucTable);
+        template.add("pks", ucColumns);
+        template.add("clusterName", clusterName);
+        PreparedStatement preparedStatement = null;
+        try {
+            query = connection.prepareStatement(st.render());
+            ResultSet resultSet = query.executeQuery();
+            if (resultSet.next()) {
+                del = resultSet.getInt("sl");
+            }
+            query.close();
+
+            preparedStatement = connection.prepareStatement(template.render());
+            preparedStatement.executeUpdate();
+            preparedStatement.close();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        return del;
+    }
 
     public int deleteDataZipper(Connection connection, JdbcSinkConfig jdbcSinkConfig, List<ColumnMapper> columnMappers, LocalDateTime startTime) {
         List<ColumnMapper> ucColumns = columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
