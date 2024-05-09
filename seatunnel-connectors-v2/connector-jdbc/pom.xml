@@ -33,6 +33,7 @@
         <postgresql.version>42.4.3</postgresql.version>
         <dm-jdbc.version>8.1.2.141</dm-jdbc.version>
         <sqlserver.version>9.2.1.jre8</sqlserver.version>
+        <trino.version>427</trino.version>
         <phoenix.version>5.2.5-HBase-2.x</phoenix.version>
         <oracle.version>12.2.0.1</oracle.version>
         <sqlite.version>3.39.3.0</sqlite.version>
@@ -116,6 +117,15 @@
                 <version>${teradata.version}</version>
                 <scope>provided</scope>
             </dependency>
+
+            <!-- https://mvnrepository.com/artifact/io.trino/trino-jdbc -->
+            <dependency>
+                <groupId>io.trino</groupId>
+                <artifactId>trino-jdbc</artifactId>
+                <version>${trino.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
 
             <dependency>
                 <groupId>com.amazon.redshift</groupId>

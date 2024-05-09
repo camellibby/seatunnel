@@ -73,7 +73,6 @@ public class OracleTypeMapper implements JdbcDialectTypeMapper {
     public SeaTunnelDataType<?> mapping(ResultSetMetaData metadata, int colIndex)
             throws SQLException {
         String oracleType = metadata.getColumnTypeName(colIndex).toUpperCase();
-        String columnName = metadata.getColumnName(colIndex);
         int precision = metadata.getPrecision(colIndex);
         int scale = metadata.getScale(colIndex);
         switch (oracleType) {
