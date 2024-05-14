@@ -48,19 +48,19 @@ public class SqlCdcConfigOptions {
     public static Option<List<String>> PRIMARY_KEYS =
             Options.key("primary_keys").listType().noDefaultValue().withDescription("primary keys");
 
-    public static Option<Boolean> directCompare =
-            Options.key("directCompare")
-                    .booleanType()
-                    .noDefaultValue()
-                    .withDescription("directCompare");
-    public static Option<Boolean> recordOperation =
-            Options.key("recordOperation")
-                    .booleanType()
-                    .noDefaultValue()
-                    .withDescription("是否记录操作类型与时间戳");
-    public static Option<JSONObject> directSinkConfig =
-            Options.key("directSinkConfig")
-                    .objectType(JSONObject.class)
-                    .noDefaultValue()
-                    .withDescription("directSinkConfig");
+//    public static Option<Boolean> directCompare =
+//            Options.key("directCompare")
+//                    .booleanType()
+//                    .noDefaultValue()
+//                    .withDescription("directCompare");
+//    public static Option<Boolean> recordOperation =
+//            Options.key("recordOperation")
+//                    .booleanType()
+//                    .noDefaultValue()
+//                    .withDescription("是否记录操作类型与时间戳");
+//    public static Option<JSONObject> directSinkConfig =
+//            Options.key("directSinkConfig")
+//                    .objectType(JSONObject.class)
+//                    .noDefaultValue()
+//                    .withDescription("directSinkConfig");
 }

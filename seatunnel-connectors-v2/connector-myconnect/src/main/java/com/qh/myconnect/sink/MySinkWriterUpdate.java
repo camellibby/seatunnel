@@ -10,8 +10,10 @@ import com.qh.myconnect.dialect.JdbcDialectFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
+import org.apache.seatunnel.api.table.type.RowKind;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
+import org.apache.seatunnel.common.constants.JobMode;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
 import org.stringtemplate.v4.ST;
 
@@ -197,12 +199,57 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     @Override
     public void write(SeaTunnelRow element) throws IOException {
-        this.writeCount++;
-        this.cld.add(element);
-        if (this.writeCount % batchSize == 0) {
+        if (element.getRowKind().equals(RowKind.INSERT)) {
+            this.writeCount++;
+            this.cld.add(element);
+            if (this.writeCount % batchSize == 0) {
+                this.consumeData();
+                cld.clear();
+            }
+        }
+        else if (jobContext.getJobMode().equals(JobMode.STREAMING) && element.getRowKind().equals(RowKind.DELETE)) {
             this.consumeData();
             cld.clear();
+            {
+                try {
+                    List<ColumnMapper> ucColumns = this.columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
+                    long del = 0;
+                    if (this.jdbcSinkConfig.getDbSchema() != null && !this.jdbcSinkConfig.getDbSchema().equals("")) {
+                        del = this.jdbcDialect.deleteData(conn, this.jdbcSinkConfig.getDbSchema() + "." + table, this.jdbcSinkConfig.getDbSchema() + "." + tmpTable, ucColumns);
+                    }
+                    else if (null != this.jdbcSinkConfig.getPreConfig().getClusterName() && !this.jdbcSinkConfig.getPreConfig().getClusterName().equalsIgnoreCase("")) {
+                        del = this.jdbcDialect.deleteDataOnCluster(conn, table, tmpTable, ucColumns, this.jdbcSinkConfig.getPreConfig().getClusterName());
+                    }
+                    else {
+                        del = this.jdbcDialect.deleteData(conn, table, tmpTable, ucColumns);
+                    }
+                    conn.commit();
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            {
+                TruncateTable truncateTable = new TruncateTable();
+                truncateTable.setFlinkJobId(this.jobContext.getJobId());
+                truncateTable.setDataSourceId(this.jdbcSinkConfig.getDbDatasourceId());
+                if (this.jdbcSinkConfig.getDbSchema() != null && !this.jdbcSinkConfig.getDbSchema().equalsIgnoreCase("")) {
+                    truncateTable.setDbSchema(this.jdbcSinkConfig.getDbSchema());
+                    truncateTable.setTableName(this.jdbcSinkConfig.getDbSchema() + "." + tmpTable);
+                }
+                else {
+                    if (this.jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
+                        truncateTable.setTableName(String.format("`%s`", tmpTable));
+                    }
+                    else {
+                        truncateTable.setTableName(tmpTable);
+                    }
+                }
+                util.truncateTable(truncateTable);
+            }
+
         }
+
+
     }
 
     private void doInsert(List<SeaTunnelRow> rows, Map<String, String> metaDataHash, Connection connection) throws SQLException {

@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.util.JSONPObject;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.PipelineOptionsInternal;
 import org.apache.flink.core.execution.JobClient;
@@ -65,6 +66,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -222,7 +224,11 @@ public class FlinkExecution implements TaskExecution {
                 Class<? extends JobListener> aClass = jobListener.getClass();
                 System.out.println(aClass.getName());
             }
-            env.setRestartStrategy(RestartStrategies.noRestart());
+//            env.setRestartStrategy(RestartStrategies.noRestart());
+            env.setRestartStrategy(RestartStrategies.fixedDelayRestart(
+                    3, // 尝试重启的次数
+                    Time.of(5, TimeUnit.SECONDS) // 间隔
+            ));
             env.execute(flinkRuntimeEnvironment.getJobName());
 
         } catch (Exception e) {

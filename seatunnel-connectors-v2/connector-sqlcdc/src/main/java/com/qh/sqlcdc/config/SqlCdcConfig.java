@@ -35,9 +35,6 @@ public class SqlCdcConfig implements Serializable {
     private String passWord;
     private String dbType;
     private List<String> primaryKeys;
-    private Boolean directCompare;
-    private JSONObject directSinkConfig;
-    private Boolean recordOperation;
 
     public SqlCdcConfig(Config config) {
         this.driver = config.getString(SqlCdcConfigOptions.DRIVER.key());
@@ -47,13 +44,5 @@ public class SqlCdcConfig implements Serializable {
         this.passWord = config.getString(SqlCdcConfigOptions.PASSWORD.key());
         this.dbType = config.getString(SqlCdcConfigOptions.DBTYPE.key());
         this.primaryKeys = config.getStringList(SqlCdcConfigOptions.PRIMARY_KEYS.key());
-        if (config.hasPath("directCompare")) {
-            this.directCompare = config.getBoolean(SqlCdcConfigOptions.directCompare.key());
-            Object anyRef = config.getAnyRef(SqlCdcConfigOptions.directSinkConfig.key());
-            this.directSinkConfig = JSON.parseObject(JSON.toJSONString(anyRef));
-        }
-        if (config.hasPath("recordOperation")) {
-            this.recordOperation = config.getBoolean(SqlCdcConfigOptions.recordOperation.key());
-        }
     }
 }

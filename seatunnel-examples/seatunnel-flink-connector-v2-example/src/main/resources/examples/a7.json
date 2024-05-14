@@ -1,62 +1,135 @@
 {
   "env": {
-    "job.mode": "BATCH",
-    "isRecordErrorData": 1,
+    "job.mode": "STREAMING",
+    "isRecordErrorData": 0,
     "execution.parallelism": 1,
-    "maxRecordNumber": 100,
-    "job.name": "trino"
+    "maxRecordNumber": 0,
+    "job.name": "aa",
+    "checkpoint.interval": 60000
   },
   "source": [
     {
-      "plugin_name": "JDBC",
-      "input_type": "table",
-      "query": "select \"id\",\"name\" from \"test\".\"test_table\"",
-      "db_type": "TRINO",
-      "url": "jdbc:trino://192.168.9.71:8281/hive",
-      "driver": "io.trino.jdbc.TrinoDriver",
-      "user": "hive",
-      "db_datasource_id": "1684842299545178114",
-      "database": "hive",
-      "dbSchema": "test",
-      "table_name": "test_table",
-      "columns": [
-        "id",
-        "name"
+      "plugin_name": "SqlCdc",
+      "query": "select * from tydb.t_ykt_transactions where CUSTOMERID<=200",
+      "primary_keys": [
+        "CUSTOMERID"
       ],
+      "db_type": "ORACLE",
+      "url": "jdbc:oracle:thin:@192.168.10.46:1521:orcl",
+      "driver": "oracle.jdbc.driver.OracleDriver",
+      "user": "tydb",
+      "password": "oracle",
+      "db_datasource_id": "1712299719625191425",
+      "database": "orcl",
+      "partition_column": "CUSTOMERID",
       "result_columns": [
         {
-          "schema": "test",
-          "fullAlias": "id",
-          "nullable": false,
-          "typeName": "integer",
-          "type": "integer",
           "decimalDigit": 0,
-          "database": "hive",
           "size": 10,
-          "autoincrement": false,
-          "name": "id",
-          "table": "test_table",
-          "order": 1,
-          "primaryKey": false,
-          "sourceColumn": "1684842299545178114.test.test_table.id"
+          "name": "CUSTOMERID",
+          "type": "NUMBER",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.customerid"
         },
         {
-          "schema": "test",
-          "fullAlias": "name",
-          "nullable": false,
-          "typeName": "varchar(300)",
-          "type": "varchar(300)",
           "decimalDigit": 0,
-          "database": "hive",
-          "size": 300,
-          "autoincrement": false,
-          "name": "name",
-          "table": "test_table",
-          "order": 2,
-          "primaryKey": false,
-          "sourceColumn": "1684842299545178114.test.test_table.name"
+          "size": 100,
+          "name": "SCARDSNR",
+          "type": "VARCHAR2",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.scardsnr"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 100,
+          "name": "OUTID",
+          "type": "VARCHAR2",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.outid"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 100,
+          "name": "TREMID",
+          "type": "VARCHAR2",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.tremid"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 100,
+          "name": "TERMED",
+          "type": "VARCHAR2",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.termed"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "OPDT",
+          "type": "DATE",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.opdt"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 0,
+          "name": "OPTM",
+          "type": "DATE",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.optm"
+        },
+        {
+          "decimalDigit": 2,
+          "size": 18,
+          "name": "ZHYE",
+          "type": "NUMBER",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.zhye"
+        },
+        {
+          "decimalDigit": 2,
+          "size": 18,
+          "name": "KNYE",
+          "type": "NUMBER",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.knye"
+        },
+        {
+          "decimalDigit": 2,
+          "size": 18,
+          "name": "OPFARE",
+          "type": "NUMBER",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.opfare"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 10,
+          "name": "OPCOUNT",
+          "type": "NUMBER",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.opcount"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 10,
+          "name": "TRAN_TYPE",
+          "type": "VARCHAR2",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.tran_type"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 10,
+          "name": "TRANSACTION_STATUS",
+          "type": "VARCHAR2",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.transaction_status"
+        },
+        {
+          "decimalDigit": 0,
+          "size": 10,
+          "name": "TRAN_CODE",
+          "type": "VARCHAR2",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.tran_code"
+        },
+        {
+          "decimalDigit": 6,
+          "size": 0,
+          "name": "TSTAMP",
+          "type": "TIMESTAMP",
+          "sourceColumn": "1712299719625191425.tydb.t_ykt_transactions.tstamp"
         }
       ],
+      "dbSchema": "TYDB",
       "result_table_name": "t1"
     }
   ],
@@ -71,17 +144,30 @@
       "db_datasource_id": "1712299719625191425",
       "db_type": "ORACLE",
       "dbSchema": "TYDB",
-      "table": "TEST_TRINO",
+      "table": "T_YKT_TRANSACTIONS_CDC",
+      "primary_keys": [
+        "CUSTOMERID"
+      ],
       "field_mapper": {
-        "id": "id",
-        "name": "name"
+        "CUSTOMERID": "CUSTOMERID",
+        "SCARDSNR": "SCARDSNR",
+        "OUTID": "OUTID",
+        "TREMID": "TREMID",
+        "TERMED": "TERMED",
+        "OPDT": "OPDT",
+        "OPTM": "OPTM",
+        "ZHYE": "ZHYE",
+        "KNYE": "KNYE",
+        "OPFARE": "OPFARE",
+        "OPCOUNT": "OPCOUNT",
+        "TRAN_TYPE": "TRAN_TYPE",
+        "TRANSACTION_STATUS": "TRANSACTION_STATUS",
+        "TRAN_CODE": "TRAN_CODE",
+        "TSTAMP": "TSTAMP"
       },
       "pre_config": {
-        "cleanTableWhenCompleteNoDataIn": true,
-        "ignoreTstamp": true,
-        "cleanTableWhenComplete": true,
         "incrementMode": "update",
-        "insertMode": "complete"
+        "insertMode": "increment"
       },
       "source_table_name": [
         "t1"
