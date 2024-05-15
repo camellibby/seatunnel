@@ -38,7 +38,9 @@ public final class JobContext implements Serializable {
 
     private JobMode jobMode;
 
-    private final String jobId;
+    private  String jobId;
+    private int isRecordErrorData;
+    private int maxRecordNumber;
 
     public JobContext() {
         this.jobId = UUID.randomUUID().toString().replace("-", "");
@@ -79,5 +81,25 @@ public final class JobContext implements Serializable {
 
     public String getJobId() {
         return this.jobId;
+    }
+
+    public int getIsRecordErrorData() {
+        return isRecordErrorData;
+    }
+
+    public void setIsRecordErrorData(int isRecordErrorData) {
+        this.isRecordErrorData = isRecordErrorData;
+    }
+
+    public int getMaxRecordNumber() {
+        return maxRecordNumber;
+    }
+
+    public void setMaxRecordNumber(int maxRecordNumber) {
+        this.maxRecordNumber = maxRecordNumber;
+    }
+
+    public void setJobId(String jobId) {
+        this.jobId = jobId;
     }
 }

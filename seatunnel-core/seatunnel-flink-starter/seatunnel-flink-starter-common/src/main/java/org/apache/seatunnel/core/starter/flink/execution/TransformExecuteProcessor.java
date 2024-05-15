@@ -77,26 +77,26 @@ public class TransformExecuteProcessor
         if (plugins.isEmpty()) {
             return upstreamDataStreams;
         }
-        DataStreamTableInfo input = upstreamDataStreams.get(0);
+        List<DataStreamTableInfo> input = upstreamDataStreams;
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         for (int i = 0; i < plugins.size(); i++) {
             try {
                 Config pluginConfig = pluginConfigs.get(i);
-                DataStreamTableInfo stream =
+                List<DataStreamTableInfo> stream =
                         fromSourceTable(pluginConfig, upstreamDataStreams).orElse(input);
                 TableTransformFactory factory = plugins.get(i);
                 TableTransformFactoryContext context =
                         new TableTransformFactoryContext(
-                                Collections.singletonList(stream.getCatalogTable()),
+                                Collections.singletonList(stream.get(0).getCatalogTable()),
                                 ReadonlyConfig.fromConfig(pluginConfig),
                                 classLoader);
                 ConfigValidator.of(context.getOptions()).validate(factory.optionRule());
                 SeaTunnelTransform transform = factory.createTransform(context).createTransform();
 
-                SeaTunnelRowType sourceType = stream.getCatalogTable().getSeaTunnelRowType();
+                SeaTunnelRowType sourceType = stream.get(0).getCatalogTable().getSeaTunnelRowType();
                 transform.setJobContext(jobContext);
                 DataStream<Row> inputStream =
-                        flinkTransform(sourceType, transform, stream.getDataStream());
+                        flinkTransform(sourceType, transform, stream.get(0).getDataStream());
                 registerResultTable(pluginConfig, inputStream);
                 upstreamDataStreams.add(
                         new DataStreamTableInfo(

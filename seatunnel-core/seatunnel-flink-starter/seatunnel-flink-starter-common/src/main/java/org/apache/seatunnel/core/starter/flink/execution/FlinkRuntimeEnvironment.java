@@ -17,6 +17,8 @@
 
 package org.apache.seatunnel.core.starter.flink.execution;
 
+import org.apache.flink.configuration.PipelineOptionsInternal;
+import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import org.apache.seatunnel.api.env.EnvCommonOptions;
@@ -69,7 +71,12 @@ public class FlinkRuntimeEnvironment implements RuntimeEnvironment {
 
     private String jobName = Constants.LOGO;
 
+    private JobContext jobContext;
     private FlinkRuntimeEnvironment(Config config) {
+        this.initialize(config);
+    }
+    private FlinkRuntimeEnvironment(Config config, JobContext jobContext) {
+        this.jobContext=jobContext;
         this.initialize(config);
     }
 
@@ -188,6 +195,7 @@ public class FlinkRuntimeEnvironment implements RuntimeEnvironment {
 
     private void createStreamEnvironment() {
         Configuration configuration = new Configuration();
+        configuration.setString(PipelineOptionsInternal.PIPELINE_FIXED_JOB_ID, jobContext.getJobId());
         EnvironmentUtil.initConfiguration(config, configuration);
         environment = StreamExecutionEnvironment.getExecutionEnvironment(configuration);
         setTimeCharacteristic();
@@ -356,6 +364,16 @@ public class FlinkRuntimeEnvironment implements RuntimeEnvironment {
             synchronized (FlinkRuntimeEnvironment.class) {
                 if (INSTANCE == null) {
                     INSTANCE = new FlinkRuntimeEnvironment(config);
+                }
+            }
+        }
+        return INSTANCE;
+    }
+    public static FlinkRuntimeEnvironment getInstance(Config config, JobContext jobContext) {
+        if (INSTANCE == null) {
+            synchronized (FlinkRuntimeEnvironment.class) {
+                if (INSTANCE == null) {
+                    INSTANCE = new FlinkRuntimeEnvironment(config, jobContext);
                 }
             }
         }

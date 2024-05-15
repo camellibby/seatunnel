@@ -31,6 +31,7 @@ import com.beust.jcommander.IStringConverter;
 import com.beust.jcommander.Parameter;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.apache.seatunnel.core.starter.flink.command.FlinkTaskFromDbExecuteCommand;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -64,6 +65,9 @@ public class FlinkCommandArgs extends AbstractCommandArgs {
         }
         if (decrypt) {
             return new ConfDecryptCommand(this);
+        }
+        if (db) {
+            return new FlinkTaskFromDbExecuteCommand(this);
         }
         return new FlinkTaskExecuteCommand(this);
     }

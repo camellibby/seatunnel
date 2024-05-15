@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.core.starter.flink.execution;
 
+import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import org.apache.seatunnel.api.env.EnvCommonOptions;
@@ -46,6 +47,7 @@ import org.apache.flink.table.api.TableConfig;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.TernaryBoolean;
+import org.apache.flink.configuration.PipelineOptionsInternal;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -68,6 +70,8 @@ public class FlinkRuntimeEnvironment implements RuntimeEnvironment {
 
     private String jobName = Constants.LOGO;
 
+    private JobContext jobContext;
+
     private FlinkRuntimeEnvironment(Config config) {
         this.initialize(config);
     }
@@ -77,7 +81,10 @@ public class FlinkRuntimeEnvironment implements RuntimeEnvironment {
         this.config = config;
         return this;
     }
-
+    private FlinkRuntimeEnvironment(Config config,JobContext jobContext) {
+        this.jobContext=jobContext;
+        this.initialize(config);
+    }
     @Override
     public Config getConfig() {
         return config;
@@ -187,6 +194,7 @@ public class FlinkRuntimeEnvironment implements RuntimeEnvironment {
 
     private void createStreamEnvironment() {
         Configuration configuration = new Configuration();
+        configuration.setString(PipelineOptionsInternal.PIPELINE_FIXED_JOB_ID, jobContext.getJobId());
         EnvironmentUtil.initConfiguration(config, configuration);
         environment = StreamExecutionEnvironment.getExecutionEnvironment(configuration);
         setTimeCharacteristic();

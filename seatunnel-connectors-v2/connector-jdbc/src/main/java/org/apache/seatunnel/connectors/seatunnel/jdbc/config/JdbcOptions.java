@@ -218,4 +218,16 @@ public interface JdbcOptions {
                     .mapType()
                     .noDefaultValue()
                     .withDescription("additional connection configuration parameters");
+
+    Option<Map<String, String>> FIELD_MAPPER =
+            Options.key("field_mapper")
+                    .mapType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Specify the field mapping relationship between input and output");
+    Option<Boolean> recordOperation =
+            Options.key("recordOperation")
+                    .booleanType()
+                    .noDefaultValue()
+                    .withDescription("是否记录操作类型与时间戳");
 }

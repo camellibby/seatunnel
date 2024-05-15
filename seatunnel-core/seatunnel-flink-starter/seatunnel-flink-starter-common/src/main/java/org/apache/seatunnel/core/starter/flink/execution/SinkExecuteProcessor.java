@@ -89,11 +89,11 @@ public class SinkExecuteProcessor
             throws TaskExecuteException {
         SeaTunnelSinkPluginDiscovery sinkPluginDiscovery =
                 new SeaTunnelSinkPluginDiscovery(ADD_URL_TO_CLASSLOADER);
-        DataStreamTableInfo input = upstreamDataStreams.get(0);
+        List<DataStreamTableInfo> input = upstreamDataStreams;
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         for (int i = 0; i < plugins.size(); i++) {
             Config sinkConfig = pluginConfigs.get(i);
-            DataStreamTableInfo stream =
+            List<DataStreamTableInfo> stream =
                     fromSourceTable(sinkConfig, upstreamDataStreams).orElse(input);
             Optional<? extends Factory> factory = plugins.get(i);
             boolean fallBack = !factory.isPresent() || isFallback(factory.get());
@@ -108,12 +108,12 @@ public class SinkExecuteProcessor
                                         sinkConfig.getString(PLUGIN_NAME.key())),
                                 sinkConfig);
                 sink.setJobContext(jobContext);
-                SeaTunnelRowType sourceType = stream.getCatalogTable().getSeaTunnelRowType();
+                SeaTunnelRowType sourceType = stream.get(0).getCatalogTable().getSeaTunnelRowType();
                 sink.setTypeInfo(sourceType);
             } else {
                 TableSinkFactoryContext context =
                         new TableSinkFactoryContext(
-                                stream.getCatalogTable(),
+                                stream.get(0).getCatalogTable(),
                                 ReadonlyConfig.fromConfig(sinkConfig),
                                 classLoader);
                 ConfigValidator.of(context.getOptions()).validate(factory.get().optionRule());
@@ -132,10 +132,10 @@ public class SinkExecuteProcessor
                 }
             }
             DataStreamSink<Row> dataStreamSink =
-                    stream.getDataStream()
+                    stream.get(0).getDataStream()
                             .sinkTo(
                                     SinkV1Adapter.wrap(
-                                            new FlinkSink<>(sink, stream.getCatalogTable())))
+                                            new FlinkSink<>(sink, stream.get(0).getCatalogTable())))
                             .name(sink.getPluginName());
             if (sinkConfig.hasPath(CommonOptions.PARALLELISM.key())) {
                 int parallelism = sinkConfig.getInt(CommonOptions.PARALLELISM.key());

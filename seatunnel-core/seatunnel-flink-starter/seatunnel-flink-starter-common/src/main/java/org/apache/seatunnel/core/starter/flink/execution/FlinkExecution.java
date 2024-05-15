@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.core.starter.flink.execution;
 
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigUtil;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigValueFactory;
@@ -53,7 +54,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/** Used to execute a SeaTunnelTask. */
+/**
+ * Used to execute a SeaTunnelTask.
+ */
 public class FlinkExecution implements TaskExecution {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FlinkExecution.class);
@@ -67,15 +70,18 @@ public class FlinkExecution implements TaskExecution {
             sinkPluginExecuteProcessor;
     private final List<URL> jarPaths;
 
+    private JobContext jobContext;
+
     public FlinkExecution(Config config) {
+        this.jobContext = new JobContext();
         try {
             jarPaths =
                     new ArrayList<>(
                             Collections.singletonList(
                                     new File(
-                                                    Common.appStarterDir()
-                                                            .resolve(FlinkStarter.APP_JAR_NAME)
-                                                            .toString())
+                                            Common.appStarterDir()
+                                                    .resolve(FlinkStarter.APP_JAR_NAME)
+                                                    .toString())
                                             .toURI()
                                             .toURL()));
         } catch (MalformedURLException e) {
@@ -83,9 +89,11 @@ public class FlinkExecution implements TaskExecution {
         }
         Config envConfig = config.getConfig("env");
         registerPlugin(envConfig);
-        JobContext jobContext = new JobContext();
         jobContext.setJobMode(RuntimeEnvironment.getJobMode(config));
-
+        int isRecordErrorData = config.getConfig("env").getInt("isRecordErrorData");
+        int maxRecordNumber = config.getConfig("env").getInt("maxRecordNumber");
+        jobContext.setIsRecordErrorData(isRecordErrorData);
+        jobContext.setMaxRecordNumber(maxRecordNumber);
         this.sourcePluginExecuteProcessor =
                 new SourceExecuteProcessor(
                         jarPaths, envConfig, config.getConfigList(Constants.SOURCE), jobContext);
@@ -101,13 +109,57 @@ public class FlinkExecution implements TaskExecution {
                         jarPaths, envConfig, config.getConfigList(Constants.SINK), jobContext);
 
         this.flinkRuntimeEnvironment =
-                FlinkRuntimeEnvironment.getInstance(this.registerPlugin(config, jarPaths));
+                FlinkRuntimeEnvironment.getInstance(this.registerPlugin(config, jarPaths),jobContext);
 
         this.sourcePluginExecuteProcessor.setRuntimeEnvironment(flinkRuntimeEnvironment);
         this.transformPluginExecuteProcessor.setRuntimeEnvironment(flinkRuntimeEnvironment);
         this.sinkPluginExecuteProcessor.setRuntimeEnvironment(flinkRuntimeEnvironment);
     }
 
+    public FlinkExecution(Config config, String jobid) {
+        this.jobContext = new JobContext();
+        try {
+            jarPaths =
+                    new ArrayList<>(
+                            Collections.singletonList(
+                                    new File(
+                                            Common.appStarterDir()
+                                                    .resolve(FlinkStarter.APP_JAR_NAME)
+                                                    .toString())
+                                            .toURI()
+                                            .toURL()));
+        } catch (MalformedURLException e) {
+            throw new SeaTunnelException("load flink starter error.", e);
+        }
+        Config envConfig = config.getConfig("env");
+        registerPlugin(envConfig);
+        jobContext.setJobId(jobid);
+        jobContext.setJobMode(RuntimeEnvironment.getJobMode(config));
+        int isRecordErrorData = config.getConfig("env").getInt("isRecordErrorData");
+        int maxRecordNumber = config.getConfig("env").getInt("maxRecordNumber");
+        jobContext.setIsRecordErrorData(isRecordErrorData);
+        jobContext.setMaxRecordNumber(maxRecordNumber);
+        this.sourcePluginExecuteProcessor =
+                new SourceExecuteProcessor(
+                        jarPaths, envConfig, config.getConfigList(Constants.SOURCE), jobContext);
+        this.transformPluginExecuteProcessor =
+                new TransformExecuteProcessor(
+                        jarPaths,
+                        envConfig,
+                        TypesafeConfigUtils.getConfigList(
+                                config, Constants.TRANSFORM, Collections.emptyList()),
+                        jobContext);
+        this.sinkPluginExecuteProcessor =
+                new SinkExecuteProcessor(
+                        jarPaths, envConfig, config.getConfigList(Constants.SINK), jobContext);
+
+        this.flinkRuntimeEnvironment =
+                FlinkRuntimeEnvironment.getInstance(this.registerPlugin(config, jarPaths),jobContext);
+
+        this.sourcePluginExecuteProcessor.setRuntimeEnvironment(flinkRuntimeEnvironment);
+        this.transformPluginExecuteProcessor.setRuntimeEnvironment(flinkRuntimeEnvironment);
+        this.sinkPluginExecuteProcessor.setRuntimeEnvironment(flinkRuntimeEnvironment);
+    }
     @Override
     public void execute() throws TaskExecuteException {
         List<DataStreamTableInfo> dataStreams = new ArrayList<>();
@@ -125,6 +177,9 @@ public class FlinkExecution implements TaskExecution {
             LOGGER.info("Flink job Mode: {}", JobMode.BATCH);
         }
         try {
+            StreamExecutionEnvironment env = flinkRuntimeEnvironment
+                    .getStreamExecutionEnvironment();
+            env.registerJobListener(new MyJobListener(this.jobContext.getJobId()));
             final long jobStartTime = System.currentTimeMillis();
             JobExecutionResult jobResult =
                     flinkRuntimeEnvironment
@@ -188,7 +243,8 @@ public class FlinkExecution implements TaskExecution {
             if (new File(jarUrl.getFile()).exists()) {
                 validJars.add(jarUrl);
                 LOGGER.info("Inject jar to config: {}", jarUrl);
-            } else {
+            }
+            else {
                 LOGGER.warn("Remove invalid jar when inject jars into config: {}", jarUrl);
             }
         }
@@ -217,7 +273,8 @@ public class FlinkExecution implements TaskExecution {
                                             .distinct()
                                             .collect(Collectors.joining(";"))));
 
-        } else {
+        }
+        else {
             config =
                     config.withValue(
                             path,

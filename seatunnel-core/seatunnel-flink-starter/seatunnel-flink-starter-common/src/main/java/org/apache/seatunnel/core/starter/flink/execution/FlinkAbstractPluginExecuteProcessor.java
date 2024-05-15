@@ -29,9 +29,12 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
+import org.apache.seatunnel.shade.com.typesafe.config.ConfigException;
 
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -82,30 +85,40 @@ public abstract class FlinkAbstractPluginExecuteProcessor<T>
         this.flinkRuntimeEnvironment = flinkRuntimeEnvironment;
     }
 
-    protected Optional<DataStreamTableInfo> fromSourceTable(
+    protected Optional<List<DataStreamTableInfo>> fromSourceTable(
             Config pluginConfig, List<DataStreamTableInfo> upstreamDataStreams) {
         if (pluginConfig.hasPath(SOURCE_TABLE_NAME)) {
             StreamTableEnvironment tableEnvironment =
                     flinkRuntimeEnvironment.getStreamTableEnvironment();
-            String tableName = pluginConfig.getString(SOURCE_TABLE_NAME);
-            Table table = tableEnvironment.from(tableName);
-            DataStreamTableInfo dataStreamTableInfo =
-                    upstreamDataStreams.stream()
-                            .filter(info -> tableName.equals(info.getTableName()))
-                            .findFirst()
-                            .orElseThrow(
-                                    () ->
-                                            new SeaTunnelException(
-                                                    String.format(
-                                                            "table %s not found", tableName)));
-            return Optional.of(
-                    new DataStreamTableInfo(
-                            TableUtil.tableToDataStream(
-                                    tableEnvironment,
-                                    table,
-                                    IS_APPEND_STREAM_MAP.getOrDefault(tableName, true)),
-                            dataStreamTableInfo.getCatalogTable(),
-                            tableName));
+            List<String> tableNameList;
+            try {
+                tableNameList = pluginConfig.getStringList(SOURCE_TABLE_NAME);
+            } catch (ConfigException.WrongType ex) {
+                tableNameList = Collections.singletonList(pluginConfig.getString(SOURCE_TABLE_NAME));
+            }
+            List<DataStreamTableInfo> dataStreamTableInfos = new ArrayList<>(tableNameList.size());
+            for (String tableName : tableNameList) {
+                Table table = tableEnvironment.from(tableName);
+                DataStreamTableInfo dataStreamTableInfo =
+                        upstreamDataStreams.stream()
+                                .filter(info -> tableName.equals(info.getTableName()))
+                                .findFirst()
+                                .orElseThrow(
+                                        () ->
+                                                new SeaTunnelException(
+                                                        String.format(
+                                                                "table %s not found", tableName)));
+                DataStreamTableInfo dataStreamTableInfo1 = new DataStreamTableInfo(
+                        TableUtil.tableToDataStream(
+                                tableEnvironment,
+                                table,
+                                IS_APPEND_STREAM_MAP.getOrDefault(tableName, true)),
+                        dataStreamTableInfo.getCatalogTable(),
+                        tableName);
+                dataStreamTableInfos.add(dataStreamTableInfo1);
+            }
+
+            return Optional.of(dataStreamTableInfos);
         }
         return Optional.empty();
     }
