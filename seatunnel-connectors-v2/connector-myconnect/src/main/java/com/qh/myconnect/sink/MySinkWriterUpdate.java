@@ -98,6 +98,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+        conn.commit();
     }
 
     private void consumeData() {

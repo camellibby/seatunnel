@@ -218,6 +218,18 @@
             <artifactId>mockwebserver</artifactId>
             <version>${mock-webserver.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.clickhouse</groupId>
+            <artifactId>clickhouse-jdbc</artifactId>
+            <version>0.3.2-patch11</version>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.5.0</version>
+        </dependency>
+
 <!--        <dependency>-->
 <!--            <groupId>org.apache.hive</groupId>-->
 <!--            <artifactId>hive-jdbc</artifactId>-->

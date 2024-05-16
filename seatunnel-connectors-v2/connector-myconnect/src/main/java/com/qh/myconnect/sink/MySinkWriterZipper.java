@@ -87,6 +87,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         }
         this.metaDataHash = metaDataHash;
         preparedStatementQuery.close();
+        conn.commit();
     }
 
     private void consumeData() {
