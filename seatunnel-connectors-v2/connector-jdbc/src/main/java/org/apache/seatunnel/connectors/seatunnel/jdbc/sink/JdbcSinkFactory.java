@@ -23,9 +23,11 @@ import org.apache.seatunnel.api.sink.DataSaveMode;
 import org.apache.seatunnel.api.sink.SchemaSaveMode;
 import org.apache.seatunnel.api.table.catalog.CatalogOptions;
 import org.apache.seatunnel.api.table.catalog.CatalogTable;
+import org.apache.seatunnel.api.table.catalog.Column;
 import org.apache.seatunnel.api.table.catalog.ConstraintKey;
 import org.apache.seatunnel.api.table.catalog.PrimaryKey;
 import org.apache.seatunnel.api.table.catalog.TableIdentifier;
+import org.apache.seatunnel.api.table.catalog.TableSchema;
 import org.apache.seatunnel.api.table.connector.TableSink;
 import org.apache.seatunnel.api.table.factory.Factory;
 import org.apache.seatunnel.api.table.factory.TableSinkFactory;
@@ -42,7 +44,9 @@ import org.apache.commons.lang3.StringUtils;
 
 import com.google.auto.service.AutoService;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -59,6 +63,7 @@ import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcOptions.
 import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcOptions.DATABASE;
 import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcOptions.DATA_SAVE_MODE;
 import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcOptions.DRIVER;
+import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcOptions.FIELD_MAPPER;
 import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcOptions.GENERATE_SINK_SQL;
 import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcOptions.IS_EXACTLY_ONCE;
 import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcOptions.MAX_COMMIT_ATTEMPTS;
@@ -96,6 +101,30 @@ public class JdbcSinkFactory implements TableSinkFactory {
     public TableSink createSink(TableSinkFactoryContext context) {
         ReadonlyConfig config = context.getOptions();
         CatalogTable catalogTable = context.getCatalogTable();
+        Optional<Map<String, String>> optionalFieldMapper = config.getOptional(FIELD_MAPPER);
+        List<Column> newColumns = new ArrayList<>();
+        List<String> newPrimaryKeyColumnNames = new ArrayList<>();
+        if (optionalFieldMapper.isPresent()) {
+            Map<String, String> fieldMapper = optionalFieldMapper.get();
+            for (Column column : catalogTable.getTableSchema().getColumns()) {
+                String oldName = column.getName();
+                String newName = fieldMapper.get(oldName);
+                Column newColumn = column.rename(newName);
+                newColumns.add(newColumn);
+            }
+            List<String> columnNames = catalogTable.getTableSchema().getPrimaryKey().getColumnNames();
+            for (String columnName : columnNames) {
+                newPrimaryKeyColumnNames.add(fieldMapper.get(columnName));
+            }
+        }
+        PrimaryKey newPrimaryKey = PrimaryKey.of(catalogTable.getTableSchema().getPrimaryKey().getPrimaryKey(), newPrimaryKeyColumnNames);
+        TableSchema newtableSchema =
+                TableSchema.builder()
+                        .columns(newColumns)
+                        .primaryKey(newPrimaryKey)
+                        .constraintKey(catalogTable.getTableSchema().getConstraintKeys())
+                        .build();
+
         ReadonlyConfig catalogOptions = getCatalogOptions(context);
         Optional<String> optionalTable = config.getOptional(TABLE);
         Optional<String> optionalDatabase = config.getOptional(DATABASE);
@@ -115,7 +144,8 @@ public class JdbcSinkFactory implements TableSinkFactory {
         String sinkSchemaName;
         if (sinkTableSplitArray.length > 1) {
             sinkSchemaName = sinkTableSplitArray[sinkTableSplitArray.length - 2];
-        } else {
+        }
+        else {
             sinkSchemaName = null;
         }
         if (StringUtils.isNotBlank(catalogOptions.get(JdbcCatalogOptions.SCHEMA))) {
@@ -129,7 +159,8 @@ public class JdbcSinkFactory implements TableSinkFactory {
             tempTableName = StringUtils.isNotEmpty(prefix) ? prefix + sinkTableName : sinkTableName;
             tempTableName = StringUtils.isNotEmpty(suffix) ? tempTableName + suffix : tempTableName;
 
-        } else {
+        }
+        else {
             tempTableName = sinkTableName;
         }
         // to replace
@@ -143,10 +174,12 @@ public class JdbcSinkFactory implements TableSinkFactory {
         if (sinkSchemaName != null) {
             if (sourceSchemaName == null) {
                 finalSchemaName = sinkSchemaName;
-            } else {
+            }
+            else {
                 finalSchemaName = sinkSchemaName.replace(REPLACE_SCHEMA_NAME_KEY, sourceSchemaName);
             }
-        } else {
+        }
+        else {
             finalSchemaName = null;
         }
         String finalTableName = sinkTableName;
@@ -164,7 +197,7 @@ public class JdbcSinkFactory implements TableSinkFactory {
         catalogTable =
                 CatalogTable.of(
                         newTableId,
-                        catalogTable.getTableSchema(),
+                        newtableSchema,
                         catalogTable.getOptions(),
                         catalogTable.getPartitionKeys(),
                         catalogTable.getComment(),
@@ -174,9 +207,10 @@ public class JdbcSinkFactory implements TableSinkFactory {
             map.put(
                     TABLE.key(),
                     catalogTable.getTableId().getSchemaName()
-                            + "."
-                            + catalogTable.getTableId().getTableName());
-        } else {
+                    + "."
+                    + catalogTable.getTableId().getTableName());
+        }
+        else {
             map.put(TABLE.key(), catalogTable.getTableId().getTableName());
         }
         map.put(DATABASE.key(), catalogTable.getTableId().getDatabaseName());
@@ -184,7 +218,8 @@ public class JdbcSinkFactory implements TableSinkFactory {
         if (!config.getOptional(PRIMARY_KEYS).isPresent()) {
             if (primaryKey != null && !CollectionUtils.isEmpty(primaryKey.getColumnNames())) {
                 map.put(PRIMARY_KEYS.key(), String.join(",", primaryKey.getColumnNames()));
-            } else {
+            }
+            else {
                 Optional<ConstraintKey> keyOptional =
                         catalogTable.getTableSchema().getConstraintKeys().stream()
                                 .filter(
