@@ -123,6 +123,21 @@ public abstract class FlinkAbstractPluginExecuteProcessor<T>
         return Optional.empty();
     }
 
+    protected DataStreamTableInfo union(List<DataStreamTableInfo> streamList) {
+        if (streamList == null || streamList.size() == 0) {
+            return null;
+        }
+        DataStreamTableInfo output = null;
+        for (DataStreamTableInfo stream : streamList) {
+            if (output == null) {
+                output = stream;
+            } else {
+                output.setDataStream(output.getDataStream().union(stream.getDataStream()));
+            }
+        }
+        return output;
+    }
+
     protected void registerResultTable(Config pluginConfig, DataStream<Row> dataStream) {
         if (pluginConfig.hasPath(RESULT_TABLE_NAME.key())) {
             String resultTable = pluginConfig.getString(RESULT_TABLE_NAME.key());

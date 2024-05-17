@@ -93,8 +93,9 @@ public class SinkExecuteProcessor
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         for (int i = 0; i < plugins.size(); i++) {
             Config sinkConfig = pluginConfigs.get(i);
-            List<DataStreamTableInfo> stream =
+            List<DataStreamTableInfo> sourceStreams =
                     fromSourceTable(sinkConfig, upstreamDataStreams).orElse(input);
+            DataStreamTableInfo stream = union(sourceStreams);
             Optional<? extends Factory> factory = plugins.get(i);
             boolean fallBack = !factory.isPresent() || isFallback(factory.get());
             SeaTunnelSink sink;
@@ -108,12 +109,12 @@ public class SinkExecuteProcessor
                                         sinkConfig.getString(PLUGIN_NAME.key())),
                                 sinkConfig);
                 sink.setJobContext(jobContext);
-                SeaTunnelRowType sourceType = stream.get(0).getCatalogTable().getSeaTunnelRowType();
+                SeaTunnelRowType sourceType = stream.getCatalogTable().getSeaTunnelRowType();
                 sink.setTypeInfo(sourceType);
             } else {
                 TableSinkFactoryContext context =
                         new TableSinkFactoryContext(
-                                stream.get(0).getCatalogTable(),
+                                stream.getCatalogTable(),
                                 ReadonlyConfig.fromConfig(sinkConfig),
                                 classLoader);
                 ConfigValidator.of(context.getOptions()).validate(factory.get().optionRule());
@@ -132,10 +133,10 @@ public class SinkExecuteProcessor
                 }
             }
             DataStreamSink<Row> dataStreamSink =
-                    stream.get(0).getDataStream()
+                    stream.getDataStream()
                             .sinkTo(
                                     SinkV1Adapter.wrap(
-                                            new FlinkSink<>(sink, stream.get(0).getCatalogTable())))
+                                            new FlinkSink<>(sink, stream.getCatalogTable())))
                             .name(sink.getPluginName());
             if (sinkConfig.hasPath(CommonOptions.PARALLELISM.key())) {
                 int parallelism = sinkConfig.getInt(CommonOptions.PARALLELISM.key());

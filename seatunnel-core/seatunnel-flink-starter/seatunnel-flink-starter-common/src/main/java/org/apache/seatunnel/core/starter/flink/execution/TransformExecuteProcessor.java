@@ -17,6 +17,8 @@
 
 package org.apache.seatunnel.core.starter.flink.execution;
 
+import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import org.apache.seatunnel.api.common.JobContext;
@@ -95,8 +97,22 @@ public class TransformExecuteProcessor
 
                 SeaTunnelRowType sourceType = stream.get(0).getCatalogTable().getSeaTunnelRowType();
                 transform.setJobContext(jobContext);
-                DataStream<Row> inputStream =
-                        flinkTransform(sourceType, transform, stream.get(0).getDataStream());
+                // TODO: 需要后期优化代码的判断
+                DataStream<Row> inputStream = null;
+                if ("Sql".equals(transform.getPluginName())
+                        && pluginConfig.hasPath("engine")
+                        && "flink".equals(pluginConfig.getString("engine"))) {
+                    StreamTableEnvironment tableEnv = flinkRuntimeEnvironment.getStreamTableEnvironment();
+                    Table joinTable = tableEnv.sqlQuery(pluginConfig.getString("query"));
+                    TypeInformation<Row> typeInfo = joinTable.getSchema().toRowType();
+                    inputStream = tableEnv.toRetractStream(joinTable, typeInfo)
+                            .filter(row -> row.f0)
+                            .map(row -> row.f1)
+                            .returns(typeInfo);
+                } else {
+                    inputStream =
+                            flinkTransform(sourceType, transform, stream.get(0).getDataStream());
+                }
                 registerResultTable(pluginConfig, inputStream);
                 upstreamDataStreams.add(
                         new DataStreamTableInfo(
