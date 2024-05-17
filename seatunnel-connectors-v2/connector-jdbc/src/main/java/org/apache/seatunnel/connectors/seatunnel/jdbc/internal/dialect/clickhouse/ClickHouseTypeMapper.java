@@ -44,13 +44,6 @@ public class ClickHouseTypeMapper implements JdbcDialectTypeMapper {
     private static final String CLICKHOUSE_UINT16 = "UINT16";
     private static final String CLICKHOUSE_UINT32 = "UINT32";
     private static final String CLICKHOUSE_UINT64 = "UINT64";
-
-
-
-
-
-
-
     private static final String CLICKHOUSE_TINYINT_UNSIGNED = "TINYINT UNSIGNED";
     private static final String CLICKHOUSE_SMALLINT = "SMALLINT";
     private static final String CLICKHOUSE_SMALLINT_UNSIGNED = "SMALLINT UNSIGNED";
@@ -68,6 +61,8 @@ public class ClickHouseTypeMapper implements JdbcDialectTypeMapper {
     private static final String CLICKHOUSE_INT16_NULLABLE = "NULLABLE(INT16)";
     private static final String CLICKHOUSE_INT32_NULLABLE = "NULLABLE(INT32)";
     private static final String CLICKHOUSE_INT64_NULLABLE = "NULLABLE(INT64)";
+    private static final String CLICKHOUSE_FLOAT64_NULLABLE = "NULLABLE(FLOAT64)";
+    private static final String CLICKHOUSE_FLOAT64 = "FLOAT64";
 
     private static final String CLICKHOUSE_NULLABLE_NOTHING="NULLABLE(NOTHING)";
     private static final String CLICKHOUSE_INT_UNSIGNED = "INT UNSIGNED";
@@ -161,6 +156,8 @@ public class ClickHouseTypeMapper implements JdbcDialectTypeMapper {
             case CLICKHOUSE_DECIMAL_UNSIGNED:
                 return new DecimalType(precision + 1, scale);
             case CLICKHOUSE_FLOAT:
+            case CLICKHOUSE_FLOAT64_NULLABLE:
+            case CLICKHOUSE_FLOAT64:
                 return BasicType.FLOAT_TYPE;
             case CLICKHOUSE_FLOAT_UNSIGNED:
                 LOG.warn("{} will probably cause value overflow.", CLICKHOUSE_FLOAT_UNSIGNED);
