@@ -28,7 +28,7 @@ public class FlinkSQLEngine implements SQLEngine {
 
     @Override
     public SeaTunnelRowType typeMapping(List<String> inputColumnsMapping) {
-        return null;
+        return inputRowType;
     }
 
     @Override
