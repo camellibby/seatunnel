@@ -10,7 +10,7 @@
     {
       "plugin_name": "JDBC",
       "input_type": "table",
-      "query": "select CUSTOMERID,SCARDSNR,OUTID,TREMID,TERMED,OPDT,OPTM,ZHYE,KNYE,OPFARE,OPCOUNT,TRAN_TYPE,TRANSACTION_STATUS,TRAN_CODE,TSTAMP from `TEST14`",
+      "query": "select CUSTOMERID,SCARDSNR,OUTID,TREMID,TERMED,OPDT,OPTM,ZHYE,KNYE,OPFARE,OPCOUNT,TRAN_TYPE,TRANSACTION_STATUS,TRAN_CODE,TSTAMP from `TEST14` limit 100",
       "db_type": "CLICKHOUSE",
       "url": "jdbc:clickhouse://192.168.9.149:8123,192.168.9.148:8123,192.168.9.147:8123:8123/USR_ODS_DB?socket_timeout=60000",
       "driver": "com.clickhouse.jdbc.ClickHouseDriver",
@@ -313,7 +313,7 @@
         "TSTAMP": "TSTAMP"
       },
       "pre_config": {
-        "cleanTableWhenCompleteNoDataIn": false,
+        "cleanTableWhenCompleteNoDataIn": true,
         "ignoreTstamp": true,
         "cleanTableWhenComplete": true,
         "incrementMode": "update",
