@@ -32,14 +32,14 @@ public class SeaTunnelApiExample {
     public static void main(String[] args)
             throws FileNotFoundException, URISyntaxException, CommandException {
         //本地json文件执行
-        runLocal(args);
+//        runLocal(args);
         //从数据库获取配置文件执行
-//            runFromDb(args);
+            runFromDb(args);
 
     }
 
     public static void runLocal(String[] args)  throws FileNotFoundException, URISyntaxException, CommandException{
-        String configurePath = args.length > 0 ? args[0] : "/examples/a2.json";
+        String configurePath = args.length > 0 ? args[0] : "/examples/a3.json";
         String configFile = getTestConfigFile(configurePath);
         FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
         flinkCommandArgs.setConfigFile(configFile);
@@ -51,7 +51,7 @@ public class SeaTunnelApiExample {
     public static  void runFromDb(String[] args) throws FileNotFoundException, URISyntaxException, CommandException{
         FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
         flinkCommandArgs.setDb(true);
-        flinkCommandArgs.setConfigFile("1779747551697293314");
+        flinkCommandArgs.setConfigFile("1791341393275305986");
         String fid = UUID.randomUUID().toString().replaceAll("-", "");
         System.out.println("---------------------------------------fid---------------------------" + fid);
         flinkCommandArgs.setFlinkJobId(fid);

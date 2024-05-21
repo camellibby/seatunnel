@@ -1,0 +1,102 @@
+{
+  "env": {
+    "job.mode": "STREAMING",
+    "isRecordErrorData": 0,
+    "execution.parallelism": 1,
+    "maxRecordNumber": 0,
+    "job.name": "aa",
+    "checkpoint.interval": 60000
+  },
+  "source": [
+    {
+      "plugin_name": "MySQL-CDC",
+      "base-url": "jdbc:mysql://192.168.9.63:30316/renshi?useUnicode=yes&characterEncoding=UTF-8&useSSL=false&serverTimezone=UTC",
+      "username": "root",
+      "password": "PANGUmysql2023:)",
+      "db_datasource_id": "1740318056713101314",
+      "db_type": "MYSQL",
+      "table-names": [
+        "renshi.student"
+      ],
+      "query": "select * from renshi.student",
+      "result_columns": [
+        {
+          "autoincrement": false,
+          "database": "renshi",
+          "decimalDigit": 0,
+          "fullAlias": "ID",
+          "isPrimaryKey": true,
+          "name": "ID",
+          "nullable": false,
+          "order": 1,
+          "primaryKey": true,
+          "remark": "",
+          "size": 0,
+          "table": "student",
+          "type": "INT",
+          "typeName": "INT"
+        },
+        {
+          "autoincrement": false,
+          "database": "renshi",
+          "decimalDigit": 0,
+          "fullAlias": "name",
+          "isPrimaryKey": false,
+          "name": "name",
+          "nullable": true,
+          "order": 2,
+          "primaryKey": false,
+          "remark": "",
+          "size": 255,
+          "table": "student",
+          "type": "VARCHAR",
+          "typeName": "VARCHAR"
+        },
+        {
+          "autoincrement": false,
+          "database": "renshi",
+          "decimalDigit": 0,
+          "fullAlias": "age",
+          "isPrimaryKey": false,
+          "name": "age",
+          "nullable": true,
+          "order": 3,
+          "primaryKey": false,
+          "remark": "",
+          "size": 0,
+          "table": "student",
+          "type": "INT",
+          "typeName": "INT"
+        }
+      ],
+      "result_table_name": "t1"
+    }
+  ],
+  "transform": [],
+  "sink": [
+    {
+      "plugin_name": "JDBC",
+      "generate_sink_sql": true,
+      "primary_keys": [
+        "id"
+      ],
+      "db_type": "MYSQL",
+      "url": "jdbc:mysql://192.168.9.63:30316/renshi?useUnicode=yes&characterEncoding=UTF-8&useSSL=false&serverTimezone=UTC",
+      "driver": "com.mysql.cj.jdbc.Driver",
+      "user": "root",
+      "database": "renshi",
+      "password": "PANGUmysql2023:)",
+      "db_datasource_id": "1740318056713101314",
+      "dbSchema": "",
+      "table": "student_target",
+      "field_mapper": {
+        "ID": "id",
+        "name": "name",
+        "age": "age"
+      },
+      "source_table_name": [
+        "t1"
+      ]
+    }
+  ]
+}
