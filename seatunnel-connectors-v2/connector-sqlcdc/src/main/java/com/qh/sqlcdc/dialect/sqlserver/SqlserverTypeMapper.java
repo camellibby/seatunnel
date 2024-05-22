@@ -17,6 +17,11 @@
 
 package com.qh.sqlcdc.dialect.sqlserver;
 
+import org.apache.seatunnel.api.table.type.BasicType;
+import org.apache.seatunnel.api.table.type.DecimalType;
+import org.apache.seatunnel.api.table.type.LocalTimeType;
+import org.apache.seatunnel.api.table.type.PrimitiveByteArrayType;
+import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
 
 import com.qh.sqlcdc.dialect.JdbcConnectorException;
@@ -121,7 +126,7 @@ public class SqlserverTypeMapper implements JdbcDialectTypeMapper {
             default:
                 final String jdbcColumnName = metadata.getColumnName(colIndex);
                 throw new JdbcConnectorException(
-                        CommonErrorCode.UNSUPPORTED_OPERATION,
+                        CommonErrorCode.CONVERT_TO_SEATUNNEL_TYPE_ERROR,
                         String.format(
                                 "Doesn't support SQLSERVER type '%s' on column '%s'  yet.",
                                 sqlServerType, jdbcColumnName));

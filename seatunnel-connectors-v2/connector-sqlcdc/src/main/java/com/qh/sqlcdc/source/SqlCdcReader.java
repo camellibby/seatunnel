@@ -27,8 +27,18 @@ import com.qh.sqlcdc.dialect.JdbcDialect;
 import com.qh.sqlcdc.dialect.JdbcDialectFactory;
 import com.qh.sqlcdc.dialect.JdbcDialectTypeMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.seatunnel.api.table.type.RowKind;
+import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
+import org.apache.seatunnel.api.table.type.SeaTunnelRow;
+import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSplit> {

@@ -17,6 +17,11 @@
 
 package com.qh.sqlcdc.dialect.ClickHouse;
 
+import org.apache.seatunnel.api.table.type.BasicType;
+import org.apache.seatunnel.api.table.type.DecimalType;
+import org.apache.seatunnel.api.table.type.LocalTimeType;
+import org.apache.seatunnel.api.table.type.PrimitiveByteArrayType;
+import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
 
 import org.slf4j.Logger;
@@ -154,7 +159,7 @@ public class ClickHouseMapper implements JdbcDialectTypeMapper {
             default:
                 final String jdbcColumnName = metadata.getColumnName(colIndex);
                 throw new JdbcConnectorException(
-                        CommonErrorCode.UNSUPPORTED_OPERATION,
+                        CommonErrorCode.CONVERT_TO_SEATUNNEL_TYPE_ERROR,
                         String.format(
                                 "Doesn't support CLickHouse type '%s' on column '%s'  yet.",
                                 mysqlType, jdbcColumnName));

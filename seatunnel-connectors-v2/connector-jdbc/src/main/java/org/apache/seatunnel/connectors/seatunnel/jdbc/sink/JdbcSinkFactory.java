@@ -109,8 +109,11 @@ public class JdbcSinkFactory implements TableSinkFactory {
             for (Column column : catalogTable.getTableSchema().getColumns()) {
                 String oldName = column.getName();
                 String newName = fieldMapper.get(oldName);
-                Column newColumn = column.rename(newName);
-                newColumns.add(newColumn);
+                if(newName!=null){
+                    Column newColumn = column.rename(newName);
+                    newColumns.add(newColumn);
+                }
+
             }
             List<String> columnNames = catalogTable.getTableSchema().getPrimaryKey().getColumnNames();
             for (String columnName : columnNames) {

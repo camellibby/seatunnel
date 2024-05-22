@@ -24,7 +24,14 @@ import org.apache.seatunnel.api.table.factory.TableSourceFactory;
 
 import com.google.auto.service.AutoService;
 
-static @AutoService(Factory.class) public class SqlCdcFactory implements TableSourceFactory {
+import static com.qh.sqlcdc.config.SqlCdcConfigOptions.DRIVER;
+import static com.qh.sqlcdc.config.SqlCdcConfigOptions.PASSWORD;
+import static com.qh.sqlcdc.config.SqlCdcConfigOptions.QUERY;
+import static com.qh.sqlcdc.config.SqlCdcConfigOptions.URL;
+import static com.qh.sqlcdc.config.SqlCdcConfigOptions.USER;
+
+@AutoService(Factory.class)
+public class SqlCdcFactory implements TableSourceFactory {
     @Override
     public String factoryIdentifier() {
         return "SqlCdc";

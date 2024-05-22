@@ -17,6 +17,12 @@
 
 package com.qh.sqlcdc.source;
 
+import org.apache.seatunnel.api.source.Boundedness;
+import org.apache.seatunnel.api.source.SeaTunnelSource;
+import org.apache.seatunnel.api.source.SourceReader;
+import org.apache.seatunnel.api.source.SourceSplitEnumerator;
+import org.apache.seatunnel.api.source.SupportColumnProjection;
+import org.apache.seatunnel.api.source.SupportParallelism;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import org.apache.seatunnel.api.common.JobContext;
@@ -44,8 +50,8 @@ import java.util.ArrayList;
 @Slf4j
 public class SqlCdcSource
         implements SeaTunnelSource<SeaTunnelRow, SqlCdcSourceSplit, ArrayList<SqlCdcSourceSplit>>,
-                SupportParallelism,
-                SupportColumnProjection {
+        SupportParallelism,
+        SupportColumnProjection {
     private SqlCdcConfig sqlCdcConfig;
     private JobContext jobContext;
     private JdbcDialect jdbcDialect;

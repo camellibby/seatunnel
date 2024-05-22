@@ -17,6 +17,12 @@
 
 package com.qh.sqlcdc.dialect.pgsql;
 
+import org.apache.seatunnel.api.table.type.ArrayType;
+import org.apache.seatunnel.api.table.type.BasicType;
+import org.apache.seatunnel.api.table.type.DecimalType;
+import org.apache.seatunnel.api.table.type.LocalTimeType;
+import org.apache.seatunnel.api.table.type.PrimitiveByteArrayType;
+import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.common.exception.CommonErrorCode;
 
 import org.slf4j.Logger;
@@ -157,7 +163,7 @@ public class PgSqlTypeMapper implements JdbcDialectTypeMapper {
             case PG_DATE_ARRAY:
             default:
                 throw new JdbcConnectorException(
-                        CommonErrorCode.UNSUPPORTED_OPERATION,
+                        CommonErrorCode.CONVERT_TO_SEATUNNEL_TYPE_ERROR,
                         String.format("Doesn't support Postgres type '%s' yet", pgType));
         }
     }
