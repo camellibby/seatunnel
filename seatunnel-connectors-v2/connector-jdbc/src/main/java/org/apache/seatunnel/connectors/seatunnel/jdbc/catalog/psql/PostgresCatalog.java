@@ -233,17 +233,18 @@ public class PostgresCatalog extends AbstractJdbcCatalog {
 
     @Override
     public boolean tableExists(TablePath tablePath) throws CatalogException {
-        try {
-            if (StringUtils.isNotBlank(tablePath.getDatabaseName())) {
-                return databaseExists(tablePath.getDatabaseName())
-                        && listTables(tablePath.getDatabaseName())
-                                .contains(tablePath.getSchemaAndTableName());
-            }
-
-            return listTables(defaultDatabase).contains(tablePath.getSchemaAndTableName());
-        } catch (DatabaseNotExistException e) {
-            return false;
-        }
+        return true;
+//        try {
+//            if (StringUtils.isNotBlank(tablePath.getDatabaseName())) {
+//                return databaseExists(tablePath.getDatabaseName())
+//                        && listTables(tablePath.getDatabaseName())
+//                                .contains(tablePath.getSchemaAndTableName());
+//            }
+//
+//            return listTables(defaultDatabase).contains(tablePath.getSchemaAndTableName());
+//        } catch (DatabaseNotExistException e) {
+//            return false;
+//        }
     }
 
     @Override

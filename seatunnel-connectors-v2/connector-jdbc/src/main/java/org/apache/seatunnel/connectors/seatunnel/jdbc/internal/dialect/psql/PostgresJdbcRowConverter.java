@@ -65,7 +65,7 @@ public class PostgresJdbcRowConverter extends AbstractJdbcRowConverter {
                                         ? null
                                         : rs.getObject(resultSetIndex).toString();
                     } else {
-                        fields[fieldIndex] = JdbcFieldTypeUtils.getString(rs, resultSetIndex);
+                        fields[fieldIndex] = JdbcFieldTypeUtils.getString(rs, resultSetIndex).replace("\0", "");
                     }
                     break;
                 case BOOLEAN:

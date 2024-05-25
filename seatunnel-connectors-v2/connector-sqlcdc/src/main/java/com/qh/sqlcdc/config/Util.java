@@ -158,7 +158,7 @@ public class Util {
         connection.disconnect();
     }
 
-    public Connection getConnection(JdbcConfig jdbcConfig) {
+    public Connection getConnection(SqlCdcConfig jdbcConfig) {
         try {
             Driver dri = this.loadDriver(jdbcConfig.getDriver());
             Properties info = new Properties();

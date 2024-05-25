@@ -231,7 +231,8 @@ public interface JdbcDialect extends Serializable {
 
     default ResultSetMetaData getResultSetMetaData(Connection conn, String query)
             throws SQLException {
-        PreparedStatement ps = conn.prepareStatement(query);
+        PreparedStatement ps = conn.prepareStatement(String.format("select * from  (%s) a where 1=2 ", query));
+        ps.executeQuery();
         return ps.getMetaData();
     }
 

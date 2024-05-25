@@ -18,117 +18,60 @@
 package com.qh.sqlcdc.source;
 
 import org.apache.seatunnel.api.source.Collector;
-import org.apache.seatunnel.api.source.SourceReader;
 
-import com.qh.sqlcdc.config.JdbcConfig;
 import com.qh.sqlcdc.config.SqlCdcConfig;
 import com.qh.sqlcdc.config.Util;
 import com.qh.sqlcdc.dialect.JdbcDialect;
 import com.qh.sqlcdc.dialect.JdbcDialectFactory;
-import com.qh.sqlcdc.dialect.JdbcDialectTypeMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.seatunnel.api.table.type.RowKind;
-import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
-
+import org.apache.seatunnel.connectors.seatunnel.common.source.AbstractSingleSplitReader;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.util.ArrayList;
-import java.util.List;
 
 @Slf4j
-public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSplit> {
+public class SqlCdcReader extends AbstractSingleSplitReader<SeaTunnelRow> {
     private final SqlCdcConfig sqlCdcConfig;
-    private final SourceReader.Context context;
-    private final JdbcConfig sourceJdbcConfig;
-    private final List<Integer> keysIndex = new ArrayList<>();
-    private final SeaTunnelRowType typeInfoOperateflagOperatetime;
+    private final SeaTunnelRowType seaTunnelRowType;
 
     SqlCdcReader(
-            SqlCdcConfig sqlCdcConfig, SourceReader.Context context, SeaTunnelRowType typeInfo) {
+            SqlCdcConfig sqlCdcConfig, SeaTunnelRowType seaTunnelRowType) {
         this.sqlCdcConfig = sqlCdcConfig;
-        this.context = context;
-        this.typeInfoOperateflagOperatetime = typeInfo;
-        {
-            JdbcConfig jdbcConfig = new JdbcConfig();
-            jdbcConfig.setUser(sqlCdcConfig.getUser());
-            jdbcConfig.setPassWord(sqlCdcConfig.getPassWord());
-            jdbcConfig.setUrl(sqlCdcConfig.getUrl());
-            jdbcConfig.setDbType(sqlCdcConfig.getDbType());
-            jdbcConfig.setQuery(sqlCdcConfig.getQuery());
-            jdbcConfig.setDriver(sqlCdcConfig.getDriver());
-            this.sourceJdbcConfig = jdbcConfig;
-        }
+        this.seaTunnelRowType = seaTunnelRowType;
     }
 
     @Override
-    public void open() throws Exception {}
+    public void open() throws Exception {
+
+    }
 
     @Override
-    public void close() throws IOException {}
+    public void close() throws IOException {
+
+    }
 
     @Override
     public void pollNext(Collector<SeaTunnelRow> output) throws Exception {
         Util util = new Util();
-        try (Connection conn = util.getConnection(sourceJdbcConfig)) {
+        try (Connection conn = util.getConnection(this.sqlCdcConfig)) {
             JdbcDialect jdbcDialect =
-                    JdbcDialectFactory.getJdbcDialect(sourceJdbcConfig.getDbType());
-            SeaTunnelRowType typeInfo =
-                    getTypeInfo(conn, jdbcDialect, this.sqlCdcConfig.getQuery());
+                    JdbcDialectFactory.getJdbcDialect(this.sqlCdcConfig.getDbType());
             PreparedStatement ps = conn.prepareStatement(this.sqlCdcConfig.getQuery());
             ps.executeQuery();
             ResultSet resultSet = ps.getResultSet();
             SeaTunnelRow seaTunnelRow = null;
             while (resultSet.next()) {
-                seaTunnelRow = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
+                seaTunnelRow = jdbcDialect.getRowConverter().toInternal(resultSet, this.seaTunnelRowType);
                 output.collect(seaTunnelRow);
             }
-            // 通知下游可以做删除数据的操作了 这里只是发个标记位 不是真正的删除这行数据
-            assert seaTunnelRow != null;
-            seaTunnelRow.setRowKind(RowKind.DELETE);
-            output.collect(seaTunnelRow);
-            Thread.sleep(1000 * 3600);
+            Thread.sleep(1000 * 3);
         } catch (Exception e) {
             log.warn("get row type info exception", e);
         }
     }
 
-    @Override
-    public List<SqlCdcSourceSplit> snapshotState(long checkpointId) throws Exception {
-        return null;
-    }
-
-    @Override
-    public void addSplits(List<SqlCdcSourceSplit> splits) {}
-
-    @Override
-    public void handleNoMoreSplits() {}
-
-    @Override
-    public void notifyCheckpointComplete(long checkpointId) throws Exception {}
-
-    private SeaTunnelRowType getTypeInfo(Connection conn, JdbcDialect jdbcDialect, String sql) {
-        ArrayList<SeaTunnelDataType<?>> seaTunnelDataTypes = new ArrayList<>();
-        ArrayList<String> fieldNames = new ArrayList<>();
-        try {
-            PreparedStatement ps = conn.prepareStatement(sql);
-            ps.executeQuery();
-            ResultSetMetaData resultSetMetaData = ps.getMetaData();
-            JdbcDialectTypeMapper jdbcDialectTypeMapper = jdbcDialect.getJdbcDialectTypeMapper();
-            for (int i = 1; i <= resultSetMetaData.getColumnCount(); i++) {
-                fieldNames.add(resultSetMetaData.getColumnLabel(i));
-                seaTunnelDataTypes.add(jdbcDialectTypeMapper.mapping(resultSetMetaData, i));
-            }
-            ps.close();
-        } catch (Exception e) {
-            log.warn("get row type info exception", e);
-        }
-        return new SeaTunnelRowType(
-                fieldNames.toArray(new String[0]),
-                seaTunnelDataTypes.toArray(new SeaTunnelDataType<?>[0]));
-    }
 }

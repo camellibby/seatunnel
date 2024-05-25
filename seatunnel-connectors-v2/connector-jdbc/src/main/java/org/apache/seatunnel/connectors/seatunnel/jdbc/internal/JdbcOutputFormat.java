@@ -130,7 +130,7 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>> implem
             return;
         }
 
-        final int sleepMs = 1000;
+        final int sleepMs = 500;
         for (int i = 0; i <= jdbcConnectionConfig.getMaxRetries(); i++) {
             try {
                 attemptFlush();

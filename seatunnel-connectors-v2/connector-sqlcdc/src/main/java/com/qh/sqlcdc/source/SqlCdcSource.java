@@ -19,10 +19,9 @@ package com.qh.sqlcdc.source;
 
 import org.apache.seatunnel.api.source.Boundedness;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
-import org.apache.seatunnel.api.source.SourceReader;
-import org.apache.seatunnel.api.source.SourceSplitEnumerator;
-import org.apache.seatunnel.api.source.SupportColumnProjection;
-import org.apache.seatunnel.api.source.SupportParallelism;
+import org.apache.seatunnel.connectors.seatunnel.common.source.AbstractSingleSplitReader;
+import org.apache.seatunnel.connectors.seatunnel.common.source.AbstractSingleSplitSource;
+import org.apache.seatunnel.connectors.seatunnel.common.source.SingleSplitReaderContext;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import org.apache.seatunnel.api.common.JobContext;
@@ -33,7 +32,6 @@ import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.constants.JobMode;
 
 import com.google.auto.service.AutoService;
-import com.qh.sqlcdc.config.JdbcConfig;
 import com.qh.sqlcdc.config.SqlCdcConfig;
 import com.qh.sqlcdc.config.Util;
 import com.qh.sqlcdc.dialect.JdbcDialect;
@@ -49,20 +47,11 @@ import java.util.ArrayList;
 @AutoService(SeaTunnelSource.class)
 @Slf4j
 public class SqlCdcSource
-        implements SeaTunnelSource<SeaTunnelRow, SqlCdcSourceSplit, ArrayList<SqlCdcSourceSplit>>,
-        SupportParallelism,
-        SupportColumnProjection {
+        extends AbstractSingleSplitSource<SeaTunnelRow> {
     private SqlCdcConfig sqlCdcConfig;
     private JobContext jobContext;
     private JdbcDialect jdbcDialect;
-    private SeaTunnelRowType typeInfo;
 
-    @Override
-    public Boundedness getBoundedness() {
-        return JobMode.BATCH.equals(jobContext.getJobMode())
-                ? Boundedness.BOUNDED
-                : Boundedness.UNBOUNDED;
-    }
 
     @Override
     public String getPluginName() {
@@ -73,7 +62,6 @@ public class SqlCdcSource
     public void prepare(Config pluginConfig) throws PrepareFailException {
         this.sqlCdcConfig = new SqlCdcConfig(pluginConfig);
         this.jdbcDialect = JdbcDialectFactory.getJdbcDialect(sqlCdcConfig.getDbType());
-        this.typeInfo = initTableField();
     }
 
     @Override
@@ -83,39 +71,13 @@ public class SqlCdcSource
 
     @Override
     public SeaTunnelDataType<SeaTunnelRow> getProducedType() {
-        return typeInfo;
+        return initTableField();
     }
 
-    @Override
-    public SourceReader<SeaTunnelRow, SqlCdcSourceSplit> createReader(
-            SourceReader.Context readerContext) throws Exception {
-        return new SqlCdcReader(this.sqlCdcConfig, readerContext, this.typeInfo);
-    }
-
-    @Override
-    public SourceSplitEnumerator<SqlCdcSourceSplit, ArrayList<SqlCdcSourceSplit>> createEnumerator(
-            SourceSplitEnumerator.Context<SqlCdcSourceSplit> enumeratorContext) throws Exception {
-        return new SqlCdcSourceSplitEnumerator(enumeratorContext, sqlCdcConfig);
-    }
-
-    @Override
-    public SourceSplitEnumerator<SqlCdcSourceSplit, ArrayList<SqlCdcSourceSplit>> restoreEnumerator(
-            SourceSplitEnumerator.Context<SqlCdcSourceSplit> enumeratorContext,
-            ArrayList<SqlCdcSourceSplit> checkpointState)
-            throws Exception {
-        return null;
-    }
 
     private SeaTunnelRowType initTableField() {
         Util util = new Util();
-        JdbcConfig jdbcConfig = new JdbcConfig();
-        jdbcConfig.setUser(this.sqlCdcConfig.getUser());
-        jdbcConfig.setPassWord(this.sqlCdcConfig.getPassWord());
-        jdbcConfig.setUrl(this.sqlCdcConfig.getUrl());
-        jdbcConfig.setDbType(this.sqlCdcConfig.getDbType());
-        jdbcConfig.setQuery(this.sqlCdcConfig.getQuery());
-        jdbcConfig.setDriver(this.sqlCdcConfig.getDriver());
-        Connection conn = util.getConnection(jdbcConfig);
+        Connection conn = util.getConnection(this.sqlCdcConfig);
         ArrayList<SeaTunnelDataType<?>> seaTunnelDataTypes = new ArrayList<>();
         ArrayList<String> fieldNames = new ArrayList<>();
         try {
@@ -135,5 +97,17 @@ public class SqlCdcSource
         return new SeaTunnelRowType(
                 fieldNames.toArray(new String[0]),
                 seaTunnelDataTypes.toArray(new SeaTunnelDataType<?>[0]));
+    }
+
+    @Override
+    public Boundedness getBoundedness() {
+        return JobMode.BATCH.equals(jobContext.getJobMode())
+                ? Boundedness.BOUNDED
+                : Boundedness.UNBOUNDED;
+    }
+
+    @Override
+    public AbstractSingleSplitReader<SeaTunnelRow> createReader(SingleSplitReaderContext readerContext) throws Exception {
+        return new SqlCdcReader(this.sqlCdcConfig, this.initTableField());
     }
 }

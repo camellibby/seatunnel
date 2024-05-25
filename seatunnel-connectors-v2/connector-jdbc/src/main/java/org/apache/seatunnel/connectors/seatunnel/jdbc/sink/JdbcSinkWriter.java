@@ -21,6 +21,7 @@ import org.apache.seatunnel.api.sink.MultiTableResourceManager;
 import org.apache.seatunnel.api.sink.SinkWriter;
 import org.apache.seatunnel.api.sink.SupportMultiTableSinkWriter;
 import org.apache.seatunnel.api.table.catalog.TableSchema;
+import org.apache.seatunnel.api.table.type.RowKind;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.common.exception.CommonErrorCodeDeprecated;
 import org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcSinkConfig;
@@ -40,14 +41,16 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
 @Slf4j
 public class JdbcSinkWriter
         implements SinkWriter<SeaTunnelRow, XidInfo, JdbcSinkState>,
-                SupportMultiTableSinkWriter<ConnectionPoolManager> {
+        SupportMultiTableSinkWriter<ConnectionPoolManager> {
     private JdbcOutputFormat<SeaTunnelRow, JdbcBatchStatementExecutor<SeaTunnelRow>> outputFormat;
     private final JdbcDialect dialect;
     private final TableSchema tableSchema;
@@ -69,7 +72,7 @@ public class JdbcSinkWriter
                 dialect.getJdbcConnectionProvider(jdbcSinkConfig.getJdbcConnectionConfig());
         this.outputFormat =
                 new JdbcOutputFormatBuilder(
-                                dialect, connectionProvider, jdbcSinkConfig, tableSchema)
+                        dialect, connectionProvider, jdbcSinkConfig, tableSchema)
                         .build();
     }
 
@@ -102,7 +105,7 @@ public class JdbcSinkWriter
                         queueIndex);
         this.outputFormat =
                 new JdbcOutputFormatBuilder(
-                                dialect, connectionProvider, jdbcSinkConfig, tableSchema)
+                        dialect, connectionProvider, jdbcSinkConfig, tableSchema)
                         .build();
     }
 
@@ -125,8 +128,30 @@ public class JdbcSinkWriter
 
     @Override
     public void write(SeaTunnelRow element) throws IOException {
+        Object[] newFields = new Object[element.getArity() + 2];
+        System.arraycopy(element.getFields(), 0, newFields, 0, element.getArity());
+        SeaTunnelRow newRow = new SeaTunnelRow(newFields);
+        newRow.setRowKind(element.getRowKind());
+        newRow.setTableId(element.getTableId());
+        if (jdbcSinkConfig.getRecordOperation() != null && jdbcSinkConfig.getRecordOperation()) {
+            if (element.getRowKind().equals(RowKind.INSERT)) {
+                newRow.setField(element.getArity(), "U");
+            }
+            else if (element.getRowKind().equals(RowKind.DELETE)) {
+                newRow.setRowKind(RowKind.INSERT);
+                newRow.setField(element.getArity(), "D");
+            }
+            else if (element.getRowKind().equals(RowKind.UPDATE_AFTER)) {
+                newRow.setField(element.getArity(), "U");
+            }
+            else {
+                newRow.setField(element.getArity(), "U");
+            }
+
+            newRow.setField(element.getArity() + 1, LocalDateTime.now());
+        }
         tryOpen();
-        outputFormat.writeRecord(element);
+        outputFormat.writeRecord(newRow);
     }
 
     @Override
@@ -148,7 +173,8 @@ public class JdbcSinkWriter
     }
 
     @Override
-    public void abortPrepare() {}
+    public void abortPrepare() {
+    }
 
     @Override
     public void close() throws IOException {

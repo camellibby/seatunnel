@@ -186,10 +186,10 @@ public final class SeaTunnelRowDebeziumDeserializeSchema
             delete.setTableId(tableId);
             collector.collect(delete);
         } else {
-            SeaTunnelRow before = extractBeforeRow(converters, record, messageStruct, valueSchema);
-            before.setRowKind(RowKind.UPDATE_BEFORE);
-            before.setTableId(tableId);
-            collector.collect(before);
+//            SeaTunnelRow before = extractBeforeRow(converters, record, messageStruct, valueSchema);
+//            before.setRowKind(RowKind.UPDATE_BEFORE);
+//            before.setTableId(tableId);
+//            collector.collect(before);
 
             SeaTunnelRow after = extractAfterRow(converters, record, messageStruct, valueSchema);
             after.setRowKind(RowKind.UPDATE_AFTER);

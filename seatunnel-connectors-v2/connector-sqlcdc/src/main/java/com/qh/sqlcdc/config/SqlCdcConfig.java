@@ -32,7 +32,6 @@ public class SqlCdcConfig implements Serializable {
     private String user;
     private String passWord;
     private String dbType;
-    private List<String> primaryKeys;
 
     public SqlCdcConfig(Config config) {
         this.driver = config.getString(SqlCdcConfigOptions.DRIVER.key());
@@ -41,6 +40,5 @@ public class SqlCdcConfig implements Serializable {
         this.user = config.getString(SqlCdcConfigOptions.USER.key());
         this.passWord = config.getString(SqlCdcConfigOptions.PASSWORD.key());
         this.dbType = config.getString(SqlCdcConfigOptions.DBTYPE.key());
-        this.primaryKeys = config.getStringList(SqlCdcConfigOptions.PRIMARY_KEYS.key());
     }
 }

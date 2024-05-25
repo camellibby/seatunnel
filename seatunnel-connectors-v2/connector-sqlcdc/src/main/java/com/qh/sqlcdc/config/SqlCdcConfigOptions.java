@@ -43,8 +43,8 @@ public class SqlCdcConfigOptions {
     public static final Option<String> PASSWORD =
             Options.key("password").stringType().noDefaultValue().withDescription("password");
 
-    public static Option<List<String>> PRIMARY_KEYS =
-            Options.key("primary_keys").listType().noDefaultValue().withDescription("primary keys");
+//    public static Option<List<String>> PRIMARY_KEYS =
+//            Options.key("primary_keys").listType().noDefaultValue().withDescription("primary keys");
 
     //    public static Option<Boolean> directCompare =
     //            Options.key("directCompare")
