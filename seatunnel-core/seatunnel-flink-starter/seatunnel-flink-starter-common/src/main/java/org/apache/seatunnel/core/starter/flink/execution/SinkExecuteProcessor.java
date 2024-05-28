@@ -93,8 +93,7 @@ public class SinkExecuteProcessor
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         for (int i = 0; i < plugins.size(); i++) {
             Config sinkConfig = pluginConfigs.get(i);
-            List<DataStreamTableInfo> sourceStreams =
-                    fromSourceTable(sinkConfig, upstreamDataStreams).orElse(input);
+            List<DataStreamTableInfo> sourceStreams = fromSourceTable(sinkConfig, upstreamDataStreams).orElse(input);
             DataStreamTableInfo stream = union(sourceStreams);
             Optional<? extends Factory> factory = plugins.get(i);
             boolean fallBack = !factory.isPresent() || isFallback(factory.get());

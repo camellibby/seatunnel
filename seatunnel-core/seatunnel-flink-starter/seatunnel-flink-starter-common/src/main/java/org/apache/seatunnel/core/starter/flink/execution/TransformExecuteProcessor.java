@@ -84,43 +84,43 @@ public class TransformExecuteProcessor
         for (int i = 0; i < plugins.size(); i++) {
             try {
                 Config pluginConfig = pluginConfigs.get(i);
-                List<DataStreamTableInfo> stream =
-                        fromSourceTable(pluginConfig, upstreamDataStreams).orElse(input);
+                List<DataStreamTableInfo> streamList = fromSourceTable(pluginConfig, upstreamDataStreams).orElse(input);
                 TableTransformFactory factory = plugins.get(i);
                 TableTransformFactoryContext context =
                         new TableTransformFactoryContext(
-                                Collections.singletonList(stream.get(0).getCatalogTable()),
+                                streamList.stream().map(DataStreamTableInfo::getCatalogTable).collect(Collectors.toList()),
                                 ReadonlyConfig.fromConfig(pluginConfig),
                                 classLoader);
                 ConfigValidator.of(context.getOptions()).validate(factory.optionRule());
                 SeaTunnelTransform transform = factory.createTransform(context).createTransform();
 
-                SeaTunnelRowType sourceType = stream.get(0).getCatalogTable().getSeaTunnelRowType();
+                List<SeaTunnelRowType> sourceType = streamList.stream().map(stream -> stream.getCatalogTable().getSeaTunnelRowType()).collect(Collectors.toList());
                 transform.setJobContext(jobContext);
                 // TODO: 需要后期优化代码的判断
-                DataStream<Row> inputStream = null;
-                if ("Sql".equals(transform.getPluginName())
-                        && pluginConfig.hasPath("engine")
-                        && "flink".equals(pluginConfig.getString("engine"))) {
-                    StreamTableEnvironment tableEnv = flinkRuntimeEnvironment.getStreamTableEnvironment();
-                    Table joinTable = tableEnv.sqlQuery(pluginConfig.getString("query"));
-                    TypeInformation<Row> typeInfo = joinTable.getSchema().toRowType();
-                    inputStream = tableEnv.toRetractStream(joinTable, typeInfo)
-                            .filter(row -> row.f0)
-                            .map(row -> row.f1)
-                            .returns(typeInfo);
+                DataStream<Row> inputStream;
+                if ("SQL".equalsIgnoreCase(transform.getPluginName()) && pluginConfig.hasPath("engine")
+                        && "FLINK".equalsIgnoreCase(pluginConfig.getString("engine"))) {
+                    inputStream = joinStream(pluginConfig);
+                    registerResultTable(pluginConfig, inputStream);
+                    upstreamDataStreams.add(
+                            new DataStreamTableInfo(
+                                    inputStream,
+                                    transform.getProducedCatalogTable(),
+                                    pluginConfig.hasPath(RESULT_TABLE_NAME.key())
+                                            ? pluginConfig.getString(RESULT_TABLE_NAME.key())
+                                            : null));
                 } else {
-                    inputStream =
-                            flinkTransform(sourceType, transform, stream.get(0).getDataStream());
+                    // TODO: 暂时取第一个元素
+                    inputStream = flinkTransform(sourceType.get(0), transform, streamList.get(0).getDataStream());
+                    registerResultTable(pluginConfig, inputStream);
+                    upstreamDataStreams.add(
+                            new DataStreamTableInfo(
+                                    inputStream,
+                                    transform.getProducedCatalogTable(),
+                                    pluginConfig.hasPath(RESULT_TABLE_NAME.key())
+                                            ? pluginConfig.getString(RESULT_TABLE_NAME.key())
+                                            : null));
                 }
-                registerResultTable(pluginConfig, inputStream);
-                upstreamDataStreams.add(
-                        new DataStreamTableInfo(
-                                inputStream,
-                                transform.getProducedCatalogTable(),
-                                pluginConfig.hasPath(RESULT_TABLE_NAME.key())
-                                        ? pluginConfig.getString(RESULT_TABLE_NAME.key())
-                                        : null));
             } catch (Exception e) {
                 throw new TaskExecuteException(
                         String.format(
@@ -155,5 +155,15 @@ public class TransformExecuteProcessor
                                 },
                         rowTypeInfo);
         return output;
+    }
+
+    protected DataStream<Row> joinStream(Config pluginConfig) {
+        StreamTableEnvironment tableEnv = flinkRuntimeEnvironment.getStreamTableEnvironment();
+        Table joinTable = tableEnv.sqlQuery(pluginConfig.getString("query"));
+        TypeInformation<Row> typeInfo = joinTable.getSchema().toRowType();
+        return tableEnv.toRetractStream(joinTable, typeInfo)
+                .filter(row -> row.f0)
+                .map(row -> row.f1)
+                .returns(typeInfo);
     }
 }
