@@ -115,7 +115,8 @@ public class OracleDialect implements JdbcDialect {
                         insertFields,
                         insertValues);
 
-        return Optional.empty();
+//        return Optional.empty();
+        return Optional.of(upsertSQL);
     }
 
     @Override
