@@ -43,6 +43,5 @@ public class SqlCdcConfig implements Serializable {
         this.user = config.getString(SqlCdcConfigOptions.USER.key());
         this.passWord = config.getString(SqlCdcConfigOptions.PASSWORD.key());
         this.dbType = config.getString(SqlCdcConfigOptions.DBTYPE.key());
-        this.primaryKeys = config.getStringList(SqlCdcConfigOptions.PRIMARY_KEYS.key());
     }
 }
