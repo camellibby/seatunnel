@@ -92,13 +92,13 @@ public class SqlCdcReader implements SourceReader<SeaTunnelRow, SqlCdcSourceSpli
             SeaTunnelRow seaTunnelRow = null;
             while (resultSet.next()) {
                 seaTunnelRow = jdbcDialect.getRowConverter().toInternal(resultSet, typeInfo);
+                seaTunnelRow.setRowKind(RowKind.DELETE);
                 output.collect(seaTunnelRow);
+                SeaTunnelRow insertRow = seaTunnelRow.copy();
+                insertRow.setRowKind(RowKind.INSERT);
+                output.collect(insertRow);
             }
-            //通知下游可以做删除数据的操作了 这里只是发个标记位 不是真正的删除这行数据
-            assert seaTunnelRow != null;
-            seaTunnelRow.setRowKind(RowKind.DELETE);
-            output.collect(seaTunnelRow);
-            Thread.sleep(1000 * 3600);
+            Thread.sleep(1000 * 3);
         } catch (Exception e) {
             log.warn("get row type info exception", e);
         }
