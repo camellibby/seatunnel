@@ -51,7 +51,7 @@ public class SeaTunnelApiExample {
     public static  void runFromDb(String[] args) throws FileNotFoundException, URISyntaxException, CommandException{
         FlinkCommandArgs flinkCommandArgs = new FlinkCommandArgs();
         flinkCommandArgs.setDb(true);
-        flinkCommandArgs.setConfigFile("1790302005664907266");
+        flinkCommandArgs.setConfigFile("1792436178523193346");
         String fid = UUID.randomUUID().toString().replaceAll("-", "");
         System.out.println("---------------------------------------fid---------------------------" + fid);
         flinkCommandArgs.setFlinkJobId(fid);

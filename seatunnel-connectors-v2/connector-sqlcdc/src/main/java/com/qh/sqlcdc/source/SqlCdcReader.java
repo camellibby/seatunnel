@@ -17,6 +17,7 @@
 
 package com.qh.sqlcdc.source;
 
+import com.google.common.collect.Sets;
 import org.apache.seatunnel.api.source.Collector;
 
 import com.qh.sqlcdc.config.SqlCdcConfig;
@@ -24,19 +25,25 @@ import com.qh.sqlcdc.config.Util;
 import com.qh.sqlcdc.dialect.JdbcDialect;
 import com.qh.sqlcdc.dialect.JdbcDialectFactory;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.seatunnel.api.table.type.RowKind;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.connectors.seatunnel.common.source.AbstractSingleSplitReader;
+
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
+import com.google.common.collect.MapDifference;
 
 @Slf4j
 public class SqlCdcReader extends AbstractSingleSplitReader<SeaTunnelRow> {
     private final SqlCdcConfig sqlCdcConfig;
     private final SeaTunnelRowType seaTunnelRowType;
+    private List<SeaTunnelRow> localSeaTunnelRowsCache = new ArrayList<>();
 
     SqlCdcReader(
             SqlCdcConfig sqlCdcConfig, SeaTunnelRowType seaTunnelRowType) {
@@ -57,16 +64,24 @@ public class SqlCdcReader extends AbstractSingleSplitReader<SeaTunnelRow> {
     @Override
     public void pollNext(Collector<SeaTunnelRow> output) throws Exception {
         Util util = new Util();
+        List<SeaTunnelRow> nowSeaTunnelRows = new ArrayList<>();
         try (Connection conn = util.getConnection(this.sqlCdcConfig)) {
             JdbcDialect jdbcDialect =
                     JdbcDialectFactory.getJdbcDialect(this.sqlCdcConfig.getDbType());
             PreparedStatement ps = conn.prepareStatement(this.sqlCdcConfig.getQuery());
             ps.executeQuery();
             ResultSet resultSet = ps.getResultSet();
-            SeaTunnelRow seaTunnelRow = null;
             while (resultSet.next()) {
-                seaTunnelRow = jdbcDialect.getRowConverter().toInternal(resultSet, this.seaTunnelRowType);
+                SeaTunnelRow seaTunnelRow = jdbcDialect.getRowConverter().toInternal(resultSet, this.seaTunnelRowType);
+                nowSeaTunnelRows.add(seaTunnelRow);
+            }
+            Sets.SetView<SeaTunnelRow> difference = Sets.difference(Sets.newHashSet(nowSeaTunnelRows), Sets.newHashSet(localSeaTunnelRowsCache));
+            for (SeaTunnelRow seaTunnelRow : difference) {
                 output.collect(seaTunnelRow);
+            }
+            localSeaTunnelRowsCache.clear();
+            for (SeaTunnelRow nowSeaTunnelRow : nowSeaTunnelRows) {
+                localSeaTunnelRowsCache.add(nowSeaTunnelRow.copy());
             }
             Thread.sleep(1000 * 3);
         } catch (Exception e) {
