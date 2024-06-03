@@ -142,12 +142,12 @@ public abstract class FlinkAbstractPluginExecuteProcessor<T>
         if (pluginConfig.hasPath(RESULT_TABLE_NAME.key())) {
             String resultTable = pluginConfig.getString(RESULT_TABLE_NAME.key());
             if (pluginConfig.hasPath(SOURCE_TABLE_NAME)) {
-                String sourceTable = pluginConfig.getString(SOURCE_TABLE_NAME);
+//                String sourceTable = pluginConfig.getString(SOURCE_TABLE_NAME);
                 flinkRuntimeEnvironment.registerResultTable(
                         pluginConfig,
                         dataStream,
                         resultTable,
-                        IS_APPEND_STREAM_MAP.getOrDefault(sourceTable, true));
+                        IS_APPEND_STREAM_MAP.getOrDefault(resultTable, true));
                 registerAppendStream(pluginConfig);
                 return;
             }
