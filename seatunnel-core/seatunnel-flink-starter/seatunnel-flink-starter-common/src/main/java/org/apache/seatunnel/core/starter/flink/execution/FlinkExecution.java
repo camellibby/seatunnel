@@ -17,6 +17,8 @@
 
 package org.apache.seatunnel.core.starter.flink.execution;
 
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.api.common.time.Time;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigUtil;
@@ -51,6 +53,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -180,6 +183,10 @@ public class FlinkExecution implements TaskExecution {
             StreamExecutionEnvironment env = flinkRuntimeEnvironment
                     .getStreamExecutionEnvironment();
             env.registerJobListener(new MyJobListener(this.jobContext.getJobId()));
+            env.setRestartStrategy(RestartStrategies.fixedDelayRestart(
+                    3, // 尝试重启的次数
+                    Time.of(5, TimeUnit.SECONDS) // 间隔
+            ));
             final long jobStartTime = System.currentTimeMillis();
             JobExecutionResult jobResult =
                     flinkRuntimeEnvironment
