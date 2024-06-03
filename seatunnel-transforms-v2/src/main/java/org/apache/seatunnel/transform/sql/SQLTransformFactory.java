@@ -26,6 +26,8 @@ import org.apache.seatunnel.api.table.factory.TableTransformFactoryContext;
 
 import com.google.auto.service.AutoService;
 
+import java.util.List;
+
 import static org.apache.seatunnel.transform.sql.SQLTransform.KEY_QUERY;
 
 @AutoService(Factory.class)
@@ -42,8 +44,7 @@ public class SQLTransformFactory implements TableTransformFactory {
 
     @Override
     public TableTransform createTransform(TableTransformFactoryContext context) {
-        CatalogTable catalogTable = context.getCatalogTables().get(0);
-        catalogTable.getTableSchema().getColumns().addAll(context.getCatalogTables().get(1).getTableSchema().getColumns());
-        return () -> new SQLTransform(context.getOptions(), catalogTable);
+        List<CatalogTable> catalogTables = context.getCatalogTables();
+        return () -> new SQLTransform(context.getOptions(), catalogTables);
     }
 }

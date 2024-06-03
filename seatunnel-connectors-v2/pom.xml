@@ -76,7 +76,7 @@
 <!--        <module>connector-paimon</module>-->
 <!--        <module>connector-easysearch</module>-->
         <module>connector-myconnect</module>
-<!--        <module>connector-sqlcdc</module>-->
+        <module>connector-sqlcdc</module>
     </modules>
 
     <dependencyManagement>

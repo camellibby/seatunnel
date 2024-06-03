@@ -38,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -62,8 +63,15 @@ public class SQLTransform extends AbstractCatalogSupportTransform {
 
     private transient SQLEngine sqlEngine;
 
+    private List<CatalogTable> catalogTables;
+
     public SQLTransform(@NonNull ReadonlyConfig config, @NonNull CatalogTable catalogTable) {
-        super(catalogTable);
+        this(config, Collections.singletonList(catalogTable));
+    }
+
+    public SQLTransform(@NonNull ReadonlyConfig config, List<CatalogTable> catalogTables) {
+        super(catalogTables.get(0));
+        this.catalogTables = catalogTables;
         this.query = config.get(KEY_QUERY);
         if (config.getOptional(KEY_ENGINE).isPresent()) {
             this.engineType = EngineType.valueOf(config.get(KEY_ENGINE).toUpperCase());
@@ -75,9 +83,12 @@ public class SQLTransform extends AbstractCatalogSupportTransform {
         if (sourceTableNames != null && !sourceTableNames.isEmpty()) {
             this.inputTableName = sourceTableNames.get(0);
         } else {
-            this.inputTableName = catalogTable.getTableId().getTableName();
+            this.inputTableName = catalogTables.get(0).getTableId().getTableName();
         }
-        List<Column> columns = catalogTable.getTableSchema().getColumns();
+        List<Column> columns = new ArrayList<>();
+        for (CatalogTable catalogTable : catalogTables) {
+            columns.addAll(catalogTable.getTableSchema().getColumns());
+        }
         String[] fieldNames = new String[columns.size()];
         SeaTunnelDataType<?>[] fieldTypes = new SeaTunnelDataType<?>[columns.size()];
         for (int i = 0; i < columns.size(); i++) {
@@ -125,7 +136,7 @@ public class SQLTransform extends AbstractCatalogSupportTransform {
         TableSchema.Builder builder = TableSchema.builder();
         if (inputCatalogTable.getTableSchema().getPrimaryKey() != null
                 && outputColumns.containsAll(
-                        inputCatalogTable.getTableSchema().getPrimaryKey().getColumnNames())) {
+                inputCatalogTable.getTableSchema().getPrimaryKey().getColumnNames())) {
             builder.primaryKey(inputCatalogTable.getTableSchema().getPrimaryKey().copy());
         }
 
