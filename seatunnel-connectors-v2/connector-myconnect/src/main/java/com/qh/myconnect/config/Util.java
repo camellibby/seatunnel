@@ -1,5 +1,15 @@
 package com.qh.myconnect.config;
 
+import com.alibaba.fastjson.TypeReference;
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.util.EntityUtils;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
@@ -15,6 +25,7 @@ import com.qh.myconnect.dialect.JdbcDialectTypeMapper;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -37,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 
@@ -259,22 +271,22 @@ public class Util {
 
     public String sendPostRequest(String url, String data) throws Exception {
         URL apiUrl = new URL(url);
-        HttpURLConnection connection = (HttpURLConnection) apiUrl.openConnection();
+        HttpURLConnection con = (HttpURLConnection) apiUrl.openConnection();
         String result = null;
-        connection.setRequestMethod("POST");
-        connection.setRequestProperty("Content-Type", "application/json");
-        connection.setRequestProperty("Accept", "application/json");
-        connection.setDoOutput(true);
-        OutputStream outputStream = connection.getOutputStream();
+        con.setRequestMethod("POST");
+        con.setRequestProperty("Content-Type", "application/json");
+        con.setRequestProperty("Accept", "application/json");
+        con.setDoOutput(true);
+        OutputStream outputStream = con.getOutputStream();
         outputStream.write(data.getBytes());
         outputStream.flush();
         outputStream.close();
 
         // 处理响应
-        int responseCode = connection.getResponseCode();
+        int responseCode = con.getResponseCode();
         if (responseCode == HttpURLConnection.HTTP_OK) {
 
-            InputStream is = connection.getInputStream();
+            InputStream is = con.getInputStream();
             // 缓冲流包装字符输入流,放入内存中,读取效率更快
             BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
             StringBuffer stringBuffer1 = new StringBuffer();
@@ -287,7 +299,7 @@ public class Util {
         } else {
             // 处理失败响应
         }
-        connection.disconnect();
+        con.disconnect();
         return result;
     }
 
