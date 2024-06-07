@@ -109,6 +109,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
             metaDataHash.put(metaData.getColumnName(i + 1), metaData.getColumnTypeName(i + 1));
         }
         this.metaDataHash = metaDataHash;
+        conn.commit();
     }
 
     @Override
