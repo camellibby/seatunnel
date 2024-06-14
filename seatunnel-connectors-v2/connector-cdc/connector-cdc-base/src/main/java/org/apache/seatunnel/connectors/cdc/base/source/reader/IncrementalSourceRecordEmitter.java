@@ -97,6 +97,7 @@ public class IncrementalSourceRecordEmitter<T>
         final Iterator<SourceRecord> elementIterator = sourceRecords.iterator();
         while (elementIterator.hasNext()) {
             SourceRecord next = elementIterator.next();
+            System.out.println("实时偏移量: " + next.sourceOffset());
             reportMetrics(next);
             processElement(next, collector, splitState);
             markEnterPureIncrementPhase(next, splitState);
@@ -133,22 +134,27 @@ public class IncrementalSourceRecordEmitter<T>
             Offset watermark = getWatermark(element);
             if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
                 splitState.asSnapshotSplitState().setLowWatermark(watermark);
-            } else if (isHighWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
+            }
+            else if (isHighWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
                 splitState.asSnapshotSplitState().setHighWatermark(watermark);
-            } else if ((isSchemaChangeBeforeWatermarkEvent(element)
-                            || isSchemaChangeAfterWatermarkEvent(element))
-                    && splitState.isIncrementalSplitState()) {
+            }
+            else if ((isSchemaChangeBeforeWatermarkEvent(element)
+                      || isSchemaChangeAfterWatermarkEvent(element))
+                     && splitState.isIncrementalSplitState()) {
                 emitElement(element, output);
             }
-        } else if (isSchemaChangeEvent(element) && splitState.isIncrementalSplitState()) {
+        }
+        else if (isSchemaChangeEvent(element) && splitState.isIncrementalSplitState()) {
             emitElement(element, output);
-        } else if (isDataChangeRecord(element)) {
+        }
+        else if (isDataChangeRecord(element)) {
             if (splitState.isIncrementalSplitState()) {
                 Offset position = getOffsetPosition(element);
                 splitState.asIncrementalSplitState().setStartupOffset(position);
             }
             emitElement(element, output);
-        } else {
+        }
+        else {
             emitElement(element, output);
         }
     }
@@ -164,7 +170,7 @@ public class IncrementalSourceRecordEmitter<T>
             if (incrementalSplitState.markEnterPureIncrementPhaseIfNeed(position)) {
                 log.info(
                         "The current record position {} is after the maxSnapshotSplitsHighWatermark {}, "
-                                + "mark enter pure increment phase.",
+                        + "mark enter pure increment phase.",
                         position,
                         incrementalSplitState.getMaxSnapshotSplitsHighWatermark());
                 log.info("Clean the IncrementalSplit#completedSnapshotSplitInfos to empty.");

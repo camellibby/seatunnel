@@ -53,7 +53,7 @@
 <!--        <module>connector-redis</module>-->
 <!--        <module>connector-datahub</module>-->
 <!--        <module>connector-sentry</module>-->
-<!--        <module>connector-mongodb</module>-->
+        <module>connector-mongodb</module>
 <!--        <module>connector-iceberg</module>-->
 <!--        <module>connector-influxdb</module>-->
 <!--        <module>connector-amazondynamodb</module>-->

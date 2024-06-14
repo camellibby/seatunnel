@@ -30,12 +30,15 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-/** A JDBC outputFormat */
+/**
+ * A JDBC outputFormat
+ */
 public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>> implements Serializable {
 
     protected final JdbcConnectionProvider connectionProvider;
@@ -61,7 +64,9 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>> implem
         this.statementExecutorFactory = checkNotNull(statementExecutorFactory);
     }
 
-    /** Connects to the target database and initializes the prepared statement. */
+    /**
+     * Connects to the target database and initializes the prepared statement.
+     */
     public void open() throws IOException {
         try {
             connectionProvider.getOrEstablishConnection();
@@ -102,7 +107,7 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>> implem
             addToBatch(record);
             batchCount++;
             if (jdbcConnectionConfig.getBatchSize() > 0
-                    && batchCount >= jdbcConnectionConfig.getBatchSize()) {
+                && batchCount >= jdbcConnectionConfig.getBatchSize()) {
                 flush();
             }
         } catch (Exception e) {
@@ -139,6 +144,17 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>> implem
             } catch (SQLException e) {
                 LOG.error("JDBC executeBatch error, retry times = {}", i, e);
                 if (i >= jdbcConnectionConfig.getMaxRetries()) {
+                    try {
+                        Connection connection = connectionProvider.getOrEstablishConnection();
+                        if (!connection.isClosed()) {
+                            connection.close();
+                        }
+                    } catch (Exception ee) {
+                        throw new JdbcConnectorException(
+                                JdbcConnectorErrorCode.CONNECT_DATABASE_FAILED,
+                                "unable to open JDBC writer",
+                                ee);
+                    }
                     throw new JdbcConnectorException(
                             CommonErrorCodeDeprecated.FLUSH_DATA_FAILED, e);
                 }
@@ -172,7 +188,9 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>> implem
         jdbcStatementExecutor.executeBatch();
     }
 
-    /** Executes prepared statement and closes all resources of this instance. */
+    /**
+     * Executes prepared statement and closes all resources of this instance.
+     */
     public synchronized void close() {
         if (!closed) {
             closed = true;
@@ -223,5 +241,6 @@ public class JdbcOutputFormat<I, E extends JdbcBatchStatementExecutor<I>> implem
      * @param <T> The type of instance.
      */
     public interface StatementExecutorFactory<T extends JdbcBatchStatementExecutor<?>>
-            extends Supplier<T>, Serializable {}
+            extends Supplier<T>, Serializable {
+    }
 }
