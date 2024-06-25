@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.connectors.seatunnel.cdc.oracle.source.offset;
 
+import io.debezium.connector.oracle.Scn;
 import org.apache.seatunnel.connectors.cdc.base.source.offset.Offset;
 import org.apache.seatunnel.connectors.cdc.base.source.offset.OffsetFactory;
 import org.apache.seatunnel.connectors.seatunnel.cdc.oracle.config.OracleSourceConfig;
@@ -68,8 +69,9 @@ public class RedoLogOffsetFactory extends OffsetFactory {
 
     @Override
     public Offset specific(String filename, Long position) {
-        throw new UnsupportedOperationException(
-                "not supported create new Offset by filename and position.");
+        return new RedoLogOffset(position);
+//        throw new UnsupportedOperationException(
+//                "not supported create new Offset by filename and position.");
     }
 
     @Override

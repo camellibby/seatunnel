@@ -17,7 +17,9 @@
 
 package org.apache.seatunnel.connectors.cdc.base.source.reader;
 
+import com.alibaba.fastjson.JSONObject;
 import org.apache.seatunnel.api.common.metrics.Counter;
+import org.apache.seatunnel.api.event.DefaultEventProcessor;
 import org.apache.seatunnel.api.event.EventListener;
 import org.apache.seatunnel.api.source.Collector;
 import org.apache.seatunnel.api.source.SourceReader;
@@ -36,17 +38,21 @@ import org.apache.seatunnel.connectors.seatunnel.common.source.reader.RecordEmit
 import org.apache.kafka.connect.source.SourceRecord;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.seatunnel.shade.com.google.common.util.concurrent.RateLimiter;
 
+import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isHighWatermarkEvent;
 import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isLowWatermarkEvent;
 import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isSchemaChangeAfterWatermarkEvent;
 import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isSchemaChangeBeforeWatermarkEvent;
 import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isWatermarkEvent;
+import static org.apache.seatunnel.connectors.cdc.base.utils.ObjectUtils.sendPostRequest;
 import static org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils.getFetchTimestamp;
 import static org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils.getMessageTimestamp;
 import static org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils.isDataChangeRecord;
@@ -76,6 +82,9 @@ public class IncrementalSourceRecordEmitter<T>
     protected final EventListener eventListener;
     protected final MessageDelayedEventLimiter delayedEventLimiter =
             new MessageDelayedEventLimiter(Duration.ofSeconds(1), 0.5d);
+    private final RateLimiter rateLimiter = RateLimiter.create(2.0);
+    private Optional<String> flinkJobId = Optional.empty();
+    private final String st_offset_url = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/recordOffset";
 
     public IncrementalSourceRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
@@ -88,6 +97,19 @@ public class IncrementalSourceRecordEmitter<T>
         this.recordFetchDelay = context.getMetricsContext().counter(CDC_RECORD_FETCH_DELAY);
         this.recordEmitDelay = context.getMetricsContext().counter(CDC_RECORD_EMIT_DELAY);
         this.eventListener = context.getEventListener();
+        if (context.getEventListener() instanceof DefaultEventProcessor) {
+            DefaultEventProcessor defaultEventProcessor = (DefaultEventProcessor) context.getEventListener();
+            Class<? extends DefaultEventProcessor> aClass = defaultEventProcessor.getClass();
+            try {
+                Field field = aClass.getDeclaredField("jobId");
+                field.setAccessible(true);
+                Object jobid = field.get(defaultEventProcessor);
+                this.flinkJobId = Optional.of(String.valueOf(jobid));
+            } catch (NoSuchFieldException | IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
     }
 
     @Override
@@ -125,6 +147,30 @@ public class IncrementalSourceRecordEmitter<T>
                 eventListener.onEvent(new MessageDelayedEvent(emitDelay, element.toString()));
             }
         }
+        //限流2秒发送一次offset记录请求
+        new Thread(() -> {
+            if (rateLimiter.tryAcquire()) {
+                System.out.println(element.sourceOffset());
+                if (element.sourceOffset() != null
+                    && element.sourceOffset().containsKey("file")
+                    && element.sourceOffset().get("file") != null
+                    && element.sourceOffset().get("file") != "") {
+                    System.out.println("实时偏移量: " + element.sourceOffset());
+                    if (flinkJobId.isPresent()) {
+                        JSONObject param = new JSONObject();
+                        param.put("flinkJobId", flinkJobId.get());
+                        param.put("fileName", element.sourceOffset().get("file"));
+                        param.put("position", element.sourceOffset().get("pos"));
+                        try {
+                            sendPostRequest(st_offset_url, param.toString());
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+
+            }
+        }).start();
     }
 
     protected void processElement(

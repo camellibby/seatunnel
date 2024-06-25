@@ -1,0 +1,91 @@
+{
+  "env": {
+    "job.mode": "BATCH",
+    "isRecordErrorData": 1,
+    "execution.parallelism": 1,
+    "maxRecordNumber": 100,
+    "job.name": "测试http2"
+  },
+  "source": [
+    {
+      "plugin_name": "Http",
+      "schema": {
+        "fields": {
+          "dbCategoryAlias": "string",
+          "deptName": "string",
+          "dbCategory": "string",
+          "dbHost": "string"
+        }
+      },
+      "method": "get",
+      "format": "json",
+      "json_field": {
+        "dbCategoryAlias": "$.result.result.records.[*].dbCategoryAlias",
+        "deptName": "$.result.result.records.[*].deptName",
+        "dbCategory": "$.result.result.records.[*].dbCategory",
+        "dbHost": "$.result.result.records.[*].dbHost"
+      },
+      "url": "http://pangu-gateway:30863/db/datasource/api/page/1549657379996635138",
+      "params": {
+        "size": 100
+      },
+      "pageing": {
+        "page_field": "current",
+        "batch_size": 100
+      },
+      "result_columns": [
+        {
+          "name": "deptName",
+          "type": "",
+          "jParse": "$.result.result.records.[*].deptName"
+        },
+        {
+          "name": "dbCategory",
+          "jParse": "$.result.result.records.[*].dbCategory"
+        },
+        {
+          "name": "dbHost",
+          "jParse": "$.result.result.records.[*].dbHost"
+        },
+        {
+          "name": "dbCategoryAlias",
+          "jParse": "$.result.result.records.[*].dbCategoryAlias"
+        }
+      ],
+      "result_table_name": "t1"
+    }
+  ],
+  "transform": [
+
+  ],
+  "sink": [
+    {
+      "plugin_name": "XJJDBC",
+      "query": "select * from \"TYDB\".\"TESTHTTP\"",
+      "url": "jdbc:oracle:thin:@192.168.10.46:1521/orcl",
+      "driver": "oracle.jdbc.driver.OracleDriver",
+      "user": "tydb",
+      "password": "oracle",
+      "db_datasource_id": "1712299719625191425",
+      "db_type": "ORACLE",
+      "dbSchema": "TYDB",
+      "table": "TESTHTTP",
+      "field_mapper": {
+        "deptName": "deptName",
+        "dbCategory": "DBCATEGORY",
+        "dbHost": "dbHost",
+        "dbCategoryAlias": "dbCategoryAlias"
+      },
+      "pre_config": {
+        "cleanTableWhenCompleteNoDataIn": false,
+        "ignoreTstamp": true,
+        "cleanTableWhenComplete": true,
+        "incrementMode": "update",
+        "insertMode": "complete"
+      },
+      "source_table_name": [
+        "t1"
+      ]
+    }
+  ]
+}
