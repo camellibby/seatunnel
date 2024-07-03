@@ -17,14 +17,15 @@
 
 package org.apache.seatunnel.transform.replace;
 
+import com.google.auto.service.AutoService;
+import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.configuration.util.OptionRule;
 import org.apache.seatunnel.api.table.catalog.CatalogTable;
 import org.apache.seatunnel.api.table.connector.TableTransform;
 import org.apache.seatunnel.api.table.factory.Factory;
+import org.apache.seatunnel.api.table.factory.TableFactoryContext;
 import org.apache.seatunnel.api.table.factory.TableTransformFactory;
 import org.apache.seatunnel.api.table.factory.TableTransformFactoryContext;
-
-import com.google.auto.service.AutoService;
 
 @AutoService(Factory.class)
 public class ReplaceTransformFactory implements TableTransformFactory {
@@ -36,21 +37,16 @@ public class ReplaceTransformFactory implements TableTransformFactory {
     @Override
     public OptionRule optionRule() {
         return OptionRule.builder()
-                .required(
-                        ReplaceTransformConfig.KEY_REPLACE_FIELD,
-                        ReplaceTransformConfig.KEY_PATTERN,
-                        ReplaceTransformConfig.KEY_REPLACEMENT)
-                .optional(ReplaceTransformConfig.KEY_IS_REGEX)
-                .conditional(
-                        ReplaceTransformConfig.KEY_IS_REGEX,
-                        true,
-                        ReplaceTransformConfig.KEY_REPLACE_FIRST)
+                .optional(ReplaceTransformConfig.REPLACE_FIELDS)
                 .build();
     }
 
     @Override
     public TableTransform createTransform(TableTransformFactoryContext context) {
         CatalogTable catalogTable = context.getCatalogTables().get(0);
-        return () -> new ReplaceTransform(context.getOptions(), catalogTable);
+        ReadonlyConfig options = context.getOptions();
+        ReplaceTransformConfig replaceTransformConfig =
+                ReplaceTransformConfig.of(options);
+        return () -> new ReplaceTransform(replaceTransformConfig, catalogTable);
     }
 }

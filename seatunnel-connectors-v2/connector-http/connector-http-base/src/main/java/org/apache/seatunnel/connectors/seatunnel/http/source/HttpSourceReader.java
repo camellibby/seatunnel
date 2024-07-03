@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.connectors.seatunnel.http.source;
 
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.seatunnel.api.serialization.DeserializationSchema;
 import org.apache.seatunnel.api.source.Boundedness;
 import org.apache.seatunnel.api.source.Collector;
@@ -58,7 +59,7 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
     protected HttpClientProvider httpClient;
     private final DeserializationCollector deserializationCollector;
     private static final Option[] DEFAULT_OPTIONS = {
-        Option.SUPPRESS_EXCEPTIONS, Option.ALWAYS_RETURN_LIST, Option.DEFAULT_PATH_LEAF_TO_NULL
+            Option.SUPPRESS_EXCEPTIONS, Option.ALWAYS_RETURN_LIST, Option.DEFAULT_PATH_LEAF_TO_NULL
     };
     private JsonPath[] jsonPaths;
     private final JsonField jsonField;
@@ -67,6 +68,7 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
             Configuration.defaultConfiguration().addOptions(DEFAULT_OPTIONS);
     private boolean noMoreElementFlag = true;
     private Optional<PageInfo> pageInfoOptional = Optional.empty();
+    private Long offset = 0L;
 
     public HttpSourceReader(
             HttpParameter httpParameter,
@@ -126,16 +128,19 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
                     while ((lineStr = bufferedReader.readLine()) != null) {
                         collect(output, lineStr);
                     }
-                } else {
+                }
+                else {
                     collect(output, content);
                 }
             }
             log.info(
                     "http client execute success request param:[{}], http response status code:[{}], content:[{}]",
                     httpParameter.getParams(),
-                    response.getCode(),
-                    response.getContent());
-        } else {
+                    response.getCode()
+//                    response.getContent()
+            );
+        }
+        else {
             String msg =
                     String.format(
                             "http client execute exception, http response status code:[%s], content:[%s]",
@@ -160,16 +165,25 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
                 noMoreElementFlag = false;
                 Long pageIndex = 1L;
                 while (!noMoreElementFlag) {
+                    if (pageIndex > this.httpParameter.getMaxSafePage()) {
+                        throw new RuntimeException("翻页次数已超过最大安全翻页次数，程序退出");
+                    }
                     PageInfo info = pageInfoOptional.get();
                     // increment page
-                    info.setPageIndex(pageIndex);
+                    if (info.getPageField().equalsIgnoreCase("current")) {
+                        info.setPageIndex(pageIndex);
+                    }
+                    if (info.getPageField().equalsIgnoreCase("offset")) {
+                        info.setPageIndex(offset);
+                    }
                     // set request param
                     updateRequestParam(info);
                     pollAndCollectData(output);
                     pageIndex += 1;
                     Thread.sleep(10);
                 }
-            } else {
+            }
+            else {
                 pollAndCollectData(output);
             }
         } finally {
@@ -177,7 +191,8 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
                 // signal to the source that we have reached the end of the data.
                 log.info("Closed the bounded http source");
                 context.signalNoMoreElement();
-            } else {
+            }
+            else {
                 if (httpParameter.getPollIntervalMillis() > 0) {
                     Thread.sleep(httpParameter.getPollIntervalMillis());
                 }
@@ -186,6 +201,7 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
     }
 
     private void collect(Collector<SeaTunnelRow> output, String data) throws IOException {
+        String oldData = data;
         if (contentJson != null) {
             data = JsonUtils.stringToJsonNode(getPartOfJson(data)).toString();
         }
@@ -200,7 +216,8 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
             PageInfo pageInfo = pageInfoOptional.get();
             if (pageInfo.getTotalPageSize() > 0) {
                 noMoreElementFlag = pageInfo.getPageIndex() >= pageInfo.getTotalPageSize();
-            } else {
+            }
+            else {
                 // no 'total page' configured
                 int readSize = JsonUtils.stringToJsonNode(data).size();
                 // if read size < BatchSize : read finish
@@ -209,11 +226,17 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
             }
         }
         deserializationCollector.collect(data.getBytes(), output);
+        try {
+            Object value = JsonPath.read(oldData, httpParameter.getOffsetJsonPath());
+            offset = NumberUtils.toLong(value.toString());
+        } catch (Exception e) {
+            throw new RuntimeException("偏移量不是个数字，请联系系统管理员");
+        }
     }
 
     private List<Map<String, String>> parseToMap(List<List<String>> datas, JsonField jsonField) {
         List<Map<String, String>> decodeDatas = new ArrayList<>(datas.size());
-        String[] keys = jsonField.getFields().keySet().toArray(new String[] {});
+        String[] keys = jsonField.getFields().keySet().toArray(new String[]{});
 
         for (List<String> data : datas) {
             Map<String, String> decodeData = new HashMap<>(jsonField.getFields().size());
@@ -271,7 +294,8 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
                     row.add(val);
                     datas.add(row);
                 }
-            } else {
+            }
+            else {
                 for (int j = 0; j < result.size(); j++) {
                     Object o = result.get(j);
                     String val = o == null ? null : o.toString();
@@ -288,7 +312,7 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
         for (int index = 0; index < jsonField.getFields().keySet().size(); index++) {
             jsonPaths[index] =
                     JsonPath.compile(
-                            jsonField.getFields().values().toArray(new String[] {})[index]);
+                            jsonField.getFields().values().toArray(new String[]{})[index]);
         }
     }
 }

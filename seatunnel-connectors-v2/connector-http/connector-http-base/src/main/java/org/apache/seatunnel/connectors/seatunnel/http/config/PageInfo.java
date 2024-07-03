@@ -32,4 +32,9 @@ public class PageInfo implements Serializable {
     private Integer batchSize;
     private String pageField;
     private Long pageIndex;
+
+    public void setPageIndex(Long pageIndex) {
+        System.out.println("pageField---"+pageField+"---"+pageIndex);
+        this.pageIndex = pageIndex;
+    }
 }

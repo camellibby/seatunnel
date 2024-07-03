@@ -33,6 +33,8 @@ public class HttpParameter implements Serializable {
     protected Map<String, String> headers;
     protected Map<String, String> params;
     protected String body;
+    protected String offsetJsonPath;
+    protected int maxSafePage;
     protected int pollIntervalMillis;
     protected int retry;
     protected int retryBackoffMultiplierMillis = HttpConfig.DEFAULT_RETRY_BACKOFF_MULTIPLIER_MS;
@@ -43,6 +45,8 @@ public class HttpParameter implements Serializable {
 
     public void buildWithConfig(Config pluginConfig) {
         // set url
+        this.setOffsetJsonPath(pluginConfig.getString("offset"));
+        this.setMaxSafePage(pluginConfig.getInt("max_safe_page"));
         this.setUrl(pluginConfig.getString(HttpConfig.URL.key()));
         // set method
         if (pluginConfig.hasPath(HttpConfig.METHOD.key())) {
@@ -50,7 +54,8 @@ public class HttpParameter implements Serializable {
                     HttpRequestMethod.valueOf(
                             pluginConfig.getString(HttpConfig.METHOD.key()).toUpperCase());
             this.setMethod(httpRequestMethod);
-        } else {
+        }
+        else {
             this.setMethod(HttpConfig.METHOD.defaultValue());
         }
         // set headers
@@ -84,7 +89,8 @@ public class HttpParameter implements Serializable {
         // set enableMultilines
         if (pluginConfig.hasPath(HttpConfig.ENABLE_MULTI_LINES.key())) {
             this.setEnableMultilines(pluginConfig.getBoolean(HttpConfig.ENABLE_MULTI_LINES.key()));
-        } else {
+        }
+        else {
             this.setEnableMultilines(HttpConfig.ENABLE_MULTI_LINES.defaultValue());
         }
         if (pluginConfig.hasPath(HttpConfig.CONNECT_TIMEOUT_MS.key())) {

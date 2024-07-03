@@ -1,0 +1,448 @@
+{
+  "env": {
+    "job.mode": "BATCH",
+    "isRecordErrorData": 1,
+    "execution.parallelism": 1,
+    "maxRecordNumber": 100,
+    "job.name": "测试接口"
+  },
+  "source": [
+    {
+      "plugin_name": "JDBC",
+      "input_type": "table",
+      "query": "select \"ID\",\"A\",\"MODIFYTIME\",\"SEX_ID\" from \"TYDB\".\"AA1\"",
+      "db_type": "ORACLE",
+      "url": "jdbc:oracle:thin:@192.168.10.46:1521/orcl",
+      "driver": "oracle.jdbc.driver.OracleDriver",
+      "user": "tydb",
+      "password": "oracle",
+      "db_datasource_id": "1712299719625191425",
+      "database": "orcl",
+      "dbSchema": "TYDB",
+      "table_name": "AA1",
+      "columns": [
+        "ID",
+        "A",
+        "MODIFYTIME",
+        "SEX_ID"
+      ],
+      "result_columns": [
+        {
+          "schema": "TYDB",
+          "fullAlias": "ID",
+          "nullable": true,
+          "typeName": "NUMBER",
+          "type": "NUMBER",
+          "decimalDigit": 0,
+          "size": 0,
+          "autoincrement": false,
+          "name": "ID",
+          "table": "AA1",
+          "order": 1,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.ID"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "A",
+          "nullable": true,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 100,
+          "autoincrement": false,
+          "name": "A",
+          "table": "AA1",
+          "order": 2,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.A"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "MODIFYTIME",
+          "nullable": true,
+          "typeName": "DATE",
+          "type": "DATE",
+          "decimalDigit": 0,
+          "size": 7,
+          "autoincrement": false,
+          "name": "MODIFYTIME",
+          "table": "AA1",
+          "order": 3,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.MODIFYTIME"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "SEX_ID",
+          "nullable": true,
+          "typeName": "NUMBER",
+          "type": "NUMBER",
+          "decimalDigit": 0,
+          "size": 0,
+          "autoincrement": false,
+          "name": "SEX_ID",
+          "table": "AA1",
+          "order": 4,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.SEX_ID"
+        }
+      ],
+      "result_table_name": "t1"
+    },
+    {
+      "plugin_name": "JDBC",
+      "input_type": "table",
+      "query": "select \"ID\",\"VAL\" from \"TYDB\".\"DIM_SEX\"",
+      "db_type": "ORACLE",
+      "url": "jdbc:oracle:thin:@192.168.10.46:1521/orcl",
+      "driver": "oracle.jdbc.driver.OracleDriver",
+      "user": "tydb",
+      "password": "oracle",
+      "db_datasource_id": "1712299719625191425",
+      "database": "orcl",
+      "dbSchema": "TYDB",
+      "table_name": "DIM_SEX",
+      "columns": [
+        "ID",
+        "VAL"
+      ],
+      "result_columns": [
+        {
+          "schema": "TYDB",
+          "fullAlias": "ID",
+          "nullable": true,
+          "typeName": "NUMBER",
+          "type": "NUMBER",
+          "decimalDigit": 0,
+          "size": 0,
+          "autoincrement": false,
+          "name": "ID",
+          "table": "DIM_SEX",
+          "order": 1,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.DIM_SEX.ID"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "VAL",
+          "nullable": true,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 30,
+          "autoincrement": false,
+          "name": "VAL",
+          "table": "DIM_SEX",
+          "order": 2,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.DIM_SEX.VAL"
+        }
+      ],
+      "result_table_name": "t5"
+    }
+  ],
+  "transform": [
+    {
+      "plugin_name": "Sql",
+      "engine": "flink",
+      "query": " select t1.ID,t1.A,t1.MODIFYTIME,t1.SEX_ID,t5.VAL from t1 INNER JOIN t5 on t1.SEX_ID = t5.ID",
+      "result_columns": [
+        {
+          "schema": "TYDB",
+          "fullAlias": "ID",
+          "nullable": true,
+          "typeName": "NUMBER",
+          "type": "NUMBER",
+          "decimalDigit": 0,
+          "size": 0,
+          "autoincrement": false,
+          "name": "ID",
+          "table": "AA1",
+          "order": 1,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.ID"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "A",
+          "nullable": true,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 100,
+          "autoincrement": false,
+          "name": "A",
+          "table": "AA1",
+          "order": 2,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.A"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "MODIFYTIME",
+          "nullable": true,
+          "typeName": "DATE",
+          "type": "DATE",
+          "decimalDigit": 0,
+          "size": 7,
+          "autoincrement": false,
+          "name": "MODIFYTIME",
+          "table": "AA1",
+          "order": 3,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.MODIFYTIME"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "SEX_ID",
+          "nullable": true,
+          "typeName": "NUMBER",
+          "type": "NUMBER",
+          "decimalDigit": 0,
+          "size": 0,
+          "autoincrement": false,
+          "name": "SEX_ID",
+          "table": "AA1",
+          "order": 4,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.SEX_ID"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "VAL",
+          "nullable": true,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 30,
+          "autoincrement": false,
+          "name": "VAL",
+          "table": "DIM_SEX",
+          "order": 2,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.DIM_SEX.VAL"
+        }
+      ],
+      "source_table_name": [
+        "t5",
+        "t1"
+      ],
+      "result_table_name": "t2"
+    },
+    {
+      "plugin_name": "Encrypt",
+      "result_columns": [
+        {
+          "schema": "TYDB",
+          "fullAlias": "ID",
+          "nullable": true,
+          "typeName": "NUMBER",
+          "type": "NUMBER",
+          "decimalDigit": 0,
+          "size": 0,
+          "autoincrement": false,
+          "name": "ID",
+          "table": "AA1",
+          "order": 1,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.ID"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "A",
+          "nullable": true,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 100,
+          "autoincrement": false,
+          "name": "A",
+          "table": "AA1",
+          "order": 2,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.A"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "MODIFYTIME",
+          "nullable": true,
+          "typeName": "DATE",
+          "type": "DATE",
+          "decimalDigit": 0,
+          "size": 7,
+          "autoincrement": false,
+          "name": "MODIFYTIME",
+          "table": "AA1",
+          "order": 3,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.MODIFYTIME"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "SEX_ID",
+          "nullable": true,
+          "typeName": "NUMBER",
+          "type": "NUMBER",
+          "decimalDigit": 0,
+          "size": 0,
+          "autoincrement": false,
+          "name": "SEX_ID",
+          "table": "AA1",
+          "order": 4,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.SEX_ID"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "VAL",
+          "nullable": true,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 30,
+          "autoincrement": false,
+          "name": "VAL",
+          "table": "DIM_SEX",
+          "order": 2,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.DIM_SEX.VAL"
+        }
+      ],
+      "encrypt_columns": [
+        "A"
+      ],
+      "source_table_name": [
+        "t2"
+      ],
+      "result_table_name": "t3"
+    },
+    {
+      "plugin_name": "Replace",
+      "result_columns": [
+        {
+          "schema": "TYDB",
+          "fullAlias": "ID",
+          "nullable": true,
+          "typeName": "NUMBER",
+          "type": "NUMBER",
+          "decimalDigit": 0,
+          "size": 0,
+          "autoincrement": false,
+          "name": "ID",
+          "table": "AA1",
+          "order": 1,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.ID"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "A",
+          "nullable": true,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 100,
+          "autoincrement": false,
+          "name": "A",
+          "table": "AA1",
+          "order": 2,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.A"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "MODIFYTIME",
+          "nullable": true,
+          "typeName": "DATE",
+          "type": "DATE",
+          "decimalDigit": 0,
+          "size": 7,
+          "autoincrement": false,
+          "name": "MODIFYTIME",
+          "table": "AA1",
+          "order": 3,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.MODIFYTIME"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "SEX_ID",
+          "nullable": true,
+          "typeName": "NUMBER",
+          "type": "NUMBER",
+          "decimalDigit": 0,
+          "size": 0,
+          "autoincrement": false,
+          "name": "SEX_ID",
+          "table": "AA1",
+          "order": 4,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.AA1.SEX_ID"
+        },
+        {
+          "schema": "TYDB",
+          "fullAlias": "VAL",
+          "nullable": true,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 30,
+          "autoincrement": false,
+          "name": "VAL",
+          "table": "DIM_SEX",
+          "order": 2,
+          "primaryKey": false,
+          "sourceColumn": "1712299719625191425.TYDB.DIM_SEX.VAL"
+        }
+      ],
+      "replace_fields": [
+        {
+          "id": "VAL_0",
+          "name": "VAL",
+          "columnName": "VAL",
+          "oldString": "男",
+          "newString": "男性"
+        }
+      ],
+      "source_table_name": [
+        "t3"
+      ],
+      "result_table_name": "t4"
+    }
+  ],
+  "sink": [
+    {
+      "plugin_name": "XJJDBC",
+      "query": "select * from `TEST1`",
+      "url": "jdbc:clickhouse://192.168.11.228:8123/udw?socket_timeout=60000",
+      "driver": "com.clickhouse.jdbc.ClickHouseDriver",
+      "user": "default",
+      "password": "xjgreat",
+      "db_datasource_id": "1806521485098942466",
+      "db_type": "CLICKHOUSE",
+      "dbSchema": "",
+      "table": "TEST1",
+      "primary_keys": [
+        "ID"
+      ],
+      "field_mapper": {
+        "VAL": "VAL",
+        "A": "A",
+        "SEX_ID": "SEX_ID",
+        "ID": "ID",
+        "MODIFYTIME": "MODIFYTIME"
+      },
+      "pre_config": {
+        "cleanTableWhenCompleteNoDataIn": true,
+        "ignoreTstamp": true,
+        "cleanTableWhenComplete": true,
+        "incrementMode": "update",
+        "insertMode": "complete"
+      },
+      "source_table_name": [
+        "t4"
+      ]
+    }
+  ]
+}
