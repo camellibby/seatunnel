@@ -99,7 +99,7 @@ public class TransformExecuteProcessor
                 // TODO: 需要后期优化代码的判断
                 DataStream<Row> inputStream;
                 if ("SQL".equalsIgnoreCase(transform.getPluginName()) && pluginConfig.hasPath("engine")
-                        && "FLINK".equalsIgnoreCase(pluginConfig.getString("engine"))) {
+                    && "FLINK".equalsIgnoreCase(pluginConfig.getString("engine"))) {
                     inputStream = joinStream(pluginConfig);
                     registerResultTable(pluginConfig, inputStream);
                     upstreamDataStreams.add(
@@ -109,7 +109,8 @@ public class TransformExecuteProcessor
                                     pluginConfig.hasPath(RESULT_TABLE_NAME.key())
                                             ? pluginConfig.getString(RESULT_TABLE_NAME.key())
                                             : null));
-                } else {
+                }
+                else {
                     // TODO: 暂时取第一个元素
                     inputStream = flinkTransform(sourceType.get(0), transform, streamList.get(0).getDataStream());
                     registerResultTable(pluginConfig, inputStream);
@@ -146,12 +147,24 @@ public class TransformExecuteProcessor
                                 (value, out) -> {
                                     SeaTunnelRow seaTunnelRow =
                                             transformInputRowConverter.reconvert(value);
-                                    SeaTunnelRow dataRow =
-                                            (SeaTunnelRow) transform.map(seaTunnelRow);
-                                    if (dataRow != null) {
-                                        Row copy = transformOutputRowConverter.convert(dataRow);
-                                        out.collect(copy);
+                                    if (transform.getPluginName().equalsIgnoreCase("http_transform")) {
+                                        List<SeaTunnelRow> list = transform.mapList(seaTunnelRow);
+                                        if (!list.isEmpty()) {
+                                            for (SeaTunnelRow dataRow : list) {
+                                                Row copy = transformOutputRowConverter.convert(dataRow);
+                                                out.collect(copy);
+                                            }
+                                        }
                                     }
+                                    else {
+                                        SeaTunnelRow dataRow =
+                                                (SeaTunnelRow) transform.map(seaTunnelRow);
+                                        if (dataRow != null) {
+                                            Row copy = transformOutputRowConverter.convert(dataRow);
+                                            out.collect(copy);
+                                        }
+                                    }
+
                                 },
                         rowTypeInfo);
         return output;

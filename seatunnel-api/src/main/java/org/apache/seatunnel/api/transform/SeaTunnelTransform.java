@@ -23,6 +23,7 @@ import org.apache.seatunnel.api.table.catalog.CatalogTable;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 
 import java.io.Serializable;
+import java.util.List;
 
 public interface SeaTunnelTransform<T>
         extends Serializable, PluginIdentifierInterface, SeaTunnelJobAware {
@@ -52,6 +53,10 @@ public interface SeaTunnelTransform<T>
      * @return transformed data.
      */
     T map(T row);
+
+    default List<T> mapList(T row){
+        return null;
+    };
 
     /** call it when Transformer completed */
     default void close() {}

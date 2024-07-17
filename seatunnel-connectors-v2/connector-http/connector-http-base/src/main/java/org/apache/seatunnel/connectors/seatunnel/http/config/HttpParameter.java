@@ -45,7 +45,9 @@ public class HttpParameter implements Serializable {
 
     public void buildWithConfig(Config pluginConfig) {
         // set url
-        this.setOffsetJsonPath(pluginConfig.getString("offset"));
+        if (pluginConfig.hasPath("offset")) {
+            this.setOffsetJsonPath(pluginConfig.getString("offset"));
+        }
         this.setMaxSafePage(pluginConfig.getInt("max_safe_page"));
         this.setUrl(pluginConfig.getString(HttpConfig.URL.key()));
         // set method

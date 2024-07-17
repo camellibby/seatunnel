@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.connectors.seatunnel.http.source;
 
+import com.alibaba.fastjson.JSONObject;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.seatunnel.api.serialization.DeserializationSchema;
 import org.apache.seatunnel.api.source.Boundedness;
@@ -180,11 +181,35 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
                     updateRequestParam(info);
                     pollAndCollectData(output);
                     pageIndex += 1;
-                    Thread.sleep(10);
+                    Thread.sleep(3);
                 }
             }
             else {
-                pollAndCollectData(output);
+                String body = this.httpParameter.getBody();
+                JSONObject jsonBody = JSONObject.parseObject(body);
+                if (jsonBody.containsKey("size")) {
+                    noMoreElementFlag = false;
+                    Long pageIndex = 1L;
+                    while (!noMoreElementFlag) {
+                        if (pageIndex > this.httpParameter.getMaxSafePage()) {
+                            throw new RuntimeException("翻页次数已超过最大安全翻页次数，程序退出");
+                        }
+                        pollAndCollectData(output);
+                        pageIndex += 1;
+                        if(jsonBody.containsKey("current")){
+                            jsonBody.put("current",pageIndex);
+                        }
+                        if(jsonBody.containsKey("offset")){
+                            jsonBody.put("offset",offset);
+                        }
+                        this.httpParameter.setBody(jsonBody.toString());
+                        Thread.sleep(3);
+                    }
+                }
+                else {
+                    pollAndCollectData(output);
+                }
+
             }
         } finally {
             if (Boundedness.BOUNDED.equals(context.getBoundedness()) && noMoreElementFlag) {
@@ -225,10 +250,18 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
                 noMoreElementFlag = readSize < pageInfo.getBatchSize();
             }
         }
+        String body = this.httpParameter.getBody();
+        JSONObject jsonBody = JSONObject.parseObject(body);
+        if (jsonBody.containsKey("size")){
+            int readSize = JsonUtils.stringToJsonNode(data).size();
+            noMoreElementFlag = readSize < jsonBody.getInteger("size");
+        }
         deserializationCollector.collect(data.getBytes(), output);
         try {
-            Object value = JsonPath.read(oldData, httpParameter.getOffsetJsonPath());
-            offset = NumberUtils.toLong(value.toString());
+            if (httpParameter.getOffsetJsonPath() != null) {
+                Object value = JsonPath.read(oldData, httpParameter.getOffsetJsonPath());
+                offset = NumberUtils.toLong(value.toString());
+            }
         } catch (Exception e) {
             throw new RuntimeException("偏移量不是个数字，请联系系统管理员");
         }
