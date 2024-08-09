@@ -4,604 +4,457 @@
     "isRecordErrorData": 1,
     "execution.parallelism": 1,
     "maxRecordNumber": 100,
-    "job.name": "连续http"
+    "job.name": "test88"
   },
   "source": [
     {
-      "plugin_name": "Http",
-      "schema": {
-        "fields": {
-          "deptName": "string",
-          "manufacturerName": "string",
-          "dbName": "string",
-          "businessId": "string",
-          "businessName": "string",
-          "isEnable": "string",
-          "dbCategoryAlias": "string",
-          "appendRecord": "string",
-          "dbUsername": "string",
-          "dbMajorVersion": "string",
-          "id": "string",
-          "state": "string",
-          "dbConfig": "string",
-          "dbSchema": "string",
-          "dbCategory": "string",
-          "deptId": "string",
-          "manufacturerId": "string",
-          "dbType": "string",
-          "dbHost": "string",
-          "updateTime": "string",
-          "businessLabel": "string",
-          "dbPort": "string",
-          "createBy": "string",
-          "dbReadonly": "string",
-          "dbMinorVersion": "string",
-          "createTime": "string",
-          "dbTypeAlias": "string",
-          "name": "string",
-          "userType": "string",
-          "businessType": "string",
-          "dbProductVersion": "string"
-        }
-      },
-      "method": "post",
-      "format": "json",
-      "json_field": {
-        "deptName": "$.result.result.records.[*].deptName",
-        "manufacturerName": "$.result.result.records.[*].manufacturerName",
-        "dbName": "$.result.result.records.[*].dbName",
-        "businessId": "$.result.result.records.[*].businessId",
-        "businessName": "$.result.result.records.[*].businessName",
-        "isEnable": "$.result.result.records.[*].isEnable",
-        "dbCategoryAlias": "$.result.result.records.[*].dbCategoryAlias",
-        "appendRecord": "$.result.result.records.[*].appendRecord",
-        "dbUsername": "$.result.result.records.[*].dbUsername",
-        "dbMajorVersion": "$.result.result.records.[*].dbMajorVersion",
-        "id": "$.result.result.records.[*].id",
-        "state": "$.result.result.records.[*].state",
-        "dbConfig": "$.result.result.records.[*].dbConfig",
-        "dbSchema": "$.result.result.records.[*].dbSchema",
-        "dbCategory": "$.result.result.records.[*].dbCategory",
-        "deptId": "$.result.result.records.[*].deptId",
-        "manufacturerId": "$.result.result.records.[*].manufacturerId",
-        "dbType": "$.result.result.records.[*].dbType",
-        "dbHost": "$.result.result.records.[*].dbHost",
-        "updateTime": "$.result.result.records.[*].updateTime",
-        "businessLabel": "$.result.result.records.[*].businessLabel",
-        "dbPort": "$.result.result.records.[*].dbPort",
-        "createBy": "$.result.result.records.[*].createBy",
-        "dbReadonly": "$.result.result.records.[*].dbReadonly",
-        "dbMinorVersion": "$.result.result.records.[*].dbMinorVersion",
-        "createTime": "$.result.result.records.[*].createTime",
-        "dbTypeAlias": "$.result.result.records.[*].dbTypeAlias",
-        "name": "$.result.result.records.[*].name",
-        "userType": "$.result.result.records.[*].userType",
-        "businessType": "$.result.result.records.[*].businessType",
-        "dbProductVersion": "$.result.result.records.[*].dbProductVersion"
-      },
-      "max_safe_page": 10,
-      "url": "http://pangu-gateway:30863/db/datasource/api/page/1249657379996635138",
-      "body": "{\"current\":\"1\",\"size\":500}",
+      "plugin_name": "JDBC",
+      "input_type": "view",
+      "partition_num": 1,
+      "query": "select \"DM\",\"DMMC\",\"SFQY\" from \"TESTSS\".\"DM_GB_ZGSF_VIEW\"",
+      "db_type": "ORACLE",
+      "url": "jdbc:oracle:thin:@192.168.10.46:1521/ORCL",
+      "driver": "oracle.jdbc.driver.OracleDriver",
+      "user": "scott",
+      "password": "oracle",
+      "db_datasource_id": "1793896205993836545",
+      "database": "ORCL",
+      "dbSchema": "TESTSS",
+      "table_name": "DM_GB_ZGSF_VIEW",
+      "columns": [
+        "DM",
+        "DMMC",
+        "SFQY"
+      ],
+      "partition_column": "DM",
       "result_columns": [
         {
-          "name": "deptName",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].deptName"
+          "schema": "TESTSS",
+          "fullAlias": "DM",
+          "nullable": false,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 255,
+          "autoincrement": false,
+          "name": "DM",
+          "table": "DM_GB_ZGSF_VIEW",
+          "order": 1,
+          "primaryKey": false,
+          "sourceColumn": "1793896205993836545.TESTSS.DM_GB_ZGSF_VIEW.DM"
         },
         {
-          "name": "manufacturerName",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].manufacturerName"
+          "schema": "TESTSS",
+          "fullAlias": "DMMC",
+          "nullable": false,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 255,
+          "autoincrement": false,
+          "name": "DMMC",
+          "table": "DM_GB_ZGSF_VIEW",
+          "order": 2,
+          "primaryKey": false,
+          "sourceColumn": "1793896205993836545.TESTSS.DM_GB_ZGSF_VIEW.DMMC"
         },
         {
-          "name": "dbName",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbName"
-        },
-        {
-          "name": "businessId",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].businessId"
-        },
-        {
-          "name": "businessName",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].businessName"
-        },
-        {
-          "name": "isEnable",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].isEnable"
-        },
-        {
-          "name": "dbCategoryAlias",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbCategoryAlias"
-        },
-        {
-          "name": "appendRecord",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].appendRecord"
-        },
-        {
-          "name": "dbUsername",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbUsername"
-        },
-        {
-          "name": "dbMajorVersion",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbMajorVersion"
-        },
-        {
-          "name": "id",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].id"
-        },
-        {
-          "name": "state",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].state"
-        },
-        {
-          "name": "dbConfig",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbConfig"
-        },
-        {
-          "name": "dbSchema",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbSchema"
-        },
-        {
-          "name": "dbCategory",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbCategory"
-        },
-        {
-          "name": "deptId",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].deptId"
-        },
-        {
-          "name": "manufacturerId",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].manufacturerId"
-        },
-        {
-          "name": "dbType",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbType"
-        },
-        {
-          "name": "dbHost",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbHost"
-        },
-        {
-          "name": "updateTime",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].updateTime"
-        },
-        {
-          "name": "businessLabel",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].businessLabel"
-        },
-        {
-          "name": "dbPort",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbPort"
-        },
-        {
-          "name": "createBy",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].createBy"
-        },
-        {
-          "name": "dbReadonly",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbReadonly"
-        },
-        {
-          "name": "dbMinorVersion",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbMinorVersion"
-        },
-        {
-          "name": "createTime",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].createTime"
-        },
-        {
-          "name": "dbTypeAlias",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbTypeAlias"
-        },
-        {
-          "name": "name",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].name"
-        },
-        {
-          "name": "userType",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].userType"
-        },
-        {
-          "name": "businessType",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].businessType"
-        },
-        {
-          "name": "dbProductVersion",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].dbProductVersion"
+          "schema": "TESTSS",
+          "fullAlias": "SFQY",
+          "nullable": true,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 255,
+          "autoincrement": false,
+          "name": "SFQY",
+          "table": "DM_GB_ZGSF_VIEW",
+          "order": 3,
+          "primaryKey": false,
+          "sourceColumn": "1793896205993836545.TESTSS.DM_GB_ZGSF_VIEW.SFQY"
         }
       ],
       "result_table_name": "t1"
+    },
+    {
+      "plugin_name": "JDBC",
+      "input_type": "table",
+      "partition_num": 1,
+      "query": "select id,data_source_id,data_schema,table_name,table_space,table_comment,table_size,table_rows from `metadata_table`",
+      "db_type": "MYSQL",
+      "url": "jdbc:mysql://192.168.10.97:30303/test?useUnicode=yes&characterEncoding=UTF-8&useSSL=false&serverTimezone=UTC",
+      "driver": "com.mysql.cj.jdbc.Driver",
+      "user": "root",
+      "password": "XIJIAgreat2020!$",
+      "db_datasource_id": "1796383440393199617",
+      "database": "test",
+      "dbSchema": "",
+      "table_name": "metadata_table",
+      "columns": [
+        "id",
+        "data_source_id",
+        "data_schema",
+        "table_name",
+        "table_space",
+        "table_comment",
+        "table_size",
+        "table_rows"
+      ],
+      "partition_column": "id",
+      "result_columns": [
+        {
+          "fullAlias": "(表Id)id",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "表Id",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "id",
+          "table": "metadata_table",
+          "finalAlias": "表Id",
+          "order": 1,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.id"
+        },
+        {
+          "fullAlias": "(数据源Id)data_source_id",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "数据源Id",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "data_source_id",
+          "table": "metadata_table",
+          "finalAlias": "数据源Id",
+          "order": 2,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.data_source_id"
+        },
+        {
+          "fullAlias": "(数据库schema)data_schema",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "数据库schema",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "data_schema",
+          "table": "metadata_table",
+          "finalAlias": "数据库schema",
+          "order": 3,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.data_schema"
+        },
+        {
+          "fullAlias": "(表名称)table_name",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "表名称",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "table_name",
+          "table": "metadata_table",
+          "finalAlias": "表名称",
+          "order": 4,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.table_name"
+        },
+        {
+          "fullAlias": "(表空间)table_space",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "表空间",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "table_space",
+          "table": "metadata_table",
+          "finalAlias": "表空间",
+          "order": 5,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.table_space"
+        },
+        {
+          "fullAlias": "(表注释)table_comment",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "表注释",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "table_comment",
+          "table": "metadata_table",
+          "finalAlias": "表注释",
+          "order": 6,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.table_comment"
+        },
+        {
+          "fullAlias": "(数据大小 (单位: 字节))table_size",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "数据大小 (单位: 字节)",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "table_size",
+          "table": "metadata_table",
+          "finalAlias": "数据大小 (单位: 字节)",
+          "order": 7,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.table_size"
+        },
+        {
+          "fullAlias": "(数据行数 (单位: 条))table_rows",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "数据行数 (单位: 条)",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "table_rows",
+          "table": "metadata_table",
+          "finalAlias": "数据行数 (单位: 条)",
+          "order": 8,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.table_rows"
+        }
+      ],
+      "result_table_name": "t3"
     }
   ],
   "transform": [
     {
-      "plugin_name": "http_transform",
-      "json_field": {
-        "schema": "$.result.result.records.[*].schema",
-        "fullAlias": "$.result.result.records.[*].fullAlias",
-        "create_time": "$.result.result.records.[*].create_time",
-        "ori_schema": "$.result.result.records.[*].ori_schema",
-        "escape_left": "$.result.result.records.[*].escape_left",
-        "ori_name": "$.result.result.records.[*].ori_name",
-        "cspz_schemaName": "$.result.result.records.[*].schemaName",
-        "cspz_id": "$.result.result.records.[*].id",
-        "remark": "$.result.result.records.[*].remark",
-        "escape_right": "$.result.result.records.[*].escape_right",
-        "type": "$.result.result.records.[*].type",
-        "rows": "$.result.result.records.[*].rows",
-        "database": "$.result.result.records.[*].database",
-        "name": "$.result.result.records.[*].name",
-        "alias": "$.result.result.records.[*].alias",
-        "finalAlias": "$.result.result.records.[*].finalAlias"
-      },
-      "max_safe_page": 100,
-      "url": "http://pangu-gateway:30863/db/datasource/api/page/1349657379996635138",
-      "pages": {
-        "current": "1",
-        "size": 500
-      },
+      "plugin_name": "Sql",
+      "engine": "flink",
+      "query": " select t1.DM,t1.DMMC,t1.SFQY,t3.id,t3.data_source_id,t3.data_schema,t3.table_name,t3.table_space,t3.table_comment,t3.table_size,t3.table_rows from t1 INNER JOIN t3 on t1.DM = t3.id",
       "result_columns": [
         {
-          "name": "schema",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].schema"
+          "schema": "TESTSS",
+          "fullAlias": "DM",
+          "nullable": false,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 255,
+          "autoincrement": false,
+          "name": "DM",
+          "table": "DM_GB_ZGSF_VIEW",
+          "order": 1,
+          "primaryKey": false,
+          "sourceColumn": "1793896205993836545.TESTSS.DM_GB_ZGSF_VIEW.DM"
         },
         {
-          "name": "fullAlias",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].fullAlias"
+          "schema": "TESTSS",
+          "fullAlias": "DMMC",
+          "nullable": false,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 255,
+          "autoincrement": false,
+          "name": "DMMC",
+          "table": "DM_GB_ZGSF_VIEW",
+          "order": 2,
+          "primaryKey": false,
+          "sourceColumn": "1793896205993836545.TESTSS.DM_GB_ZGSF_VIEW.DMMC"
         },
         {
-          "name": "create_time",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].create_time"
+          "schema": "TESTSS",
+          "fullAlias": "SFQY",
+          "nullable": true,
+          "typeName": "VARCHAR2",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 255,
+          "autoincrement": false,
+          "name": "SFQY",
+          "table": "DM_GB_ZGSF_VIEW",
+          "order": 3,
+          "primaryKey": false,
+          "sourceColumn": "1793896205993836545.TESTSS.DM_GB_ZGSF_VIEW.SFQY"
         },
         {
-          "name": "ori_schema",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].ori_schema"
-        },
-        {
-          "name": "escape_left",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].escape_left"
-        },
-        {
-          "name": "ori_name",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].ori_name"
-        },
-        {
-          "name": "remark",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].remark"
-        },
-        {
-          "name": "escape_right",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].escape_right"
-        },
-        {
-          "name": "type",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].type"
-        },
-        {
-          "name": "rows",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].rows"
-        },
-        {
-          "name": "database",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].database"
-        },
-        {
-          "name": "name",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].name"
-        },
-        {
-          "name": "alias",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].alias"
-        },
-        {
-          "name": "finalAlias",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].finalAlias"
-        },
-        {
-          "name": "cspz_id",
-          "type": "string"
-        },
-        {
-          "name": "cspz_schemaName",
-          "type": "string"
-        }
-      ],
-      "params_field": [
-        {
+          "fullAlias": "(表Id)id",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "表Id",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
           "name": "id",
-          "type": "dynamic",
-          "value": "id"
+          "table": "metadata_table",
+          "finalAlias": "表Id",
+          "order": 1,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.id"
         },
         {
-          "name": "schemaName",
-          "type": "dynamic",
-          "value": "dbSchema"
+          "fullAlias": "(数据源Id)data_source_id",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "数据源Id",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "data_source_id",
+          "table": "metadata_table",
+          "finalAlias": "数据源Id",
+          "order": 2,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.data_source_id"
+        },
+        {
+          "fullAlias": "(数据库schema)data_schema",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "数据库schema",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "data_schema",
+          "table": "metadata_table",
+          "finalAlias": "数据库schema",
+          "order": 3,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.data_schema"
+        },
+        {
+          "fullAlias": "(表名称)table_name",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "表名称",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "table_name",
+          "table": "metadata_table",
+          "finalAlias": "表名称",
+          "order": 4,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.table_name"
+        },
+        {
+          "fullAlias": "(表空间)table_space",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "表空间",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "table_space",
+          "table": "metadata_table",
+          "finalAlias": "表空间",
+          "order": 5,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.table_space"
+        },
+        {
+          "fullAlias": "(表注释)table_comment",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "表注释",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "table_comment",
+          "table": "metadata_table",
+          "finalAlias": "表注释",
+          "order": 6,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.table_comment"
+        },
+        {
+          "fullAlias": "(数据大小 (单位: 字节))table_size",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "数据大小 (单位: 字节)",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "table_size",
+          "table": "metadata_table",
+          "finalAlias": "数据大小 (单位: 字节)",
+          "order": 7,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.table_size"
+        },
+        {
+          "fullAlias": "(数据行数 (单位: 条))table_rows",
+          "nullable": true,
+          "typeName": "VARCHAR",
+          "remark": "数据行数 (单位: 条)",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "database": "test",
+          "size": 100,
+          "autoincrement": false,
+          "name": "table_rows",
+          "table": "metadata_table",
+          "finalAlias": "数据行数 (单位: 条)",
+          "order": 8,
+          "primaryKey": false,
+          "sourceColumn": "1796383440393199617..metadata_table.table_rows"
         }
       ],
       "source_table_name": [
-        "t1"
+        "t1",
+        "t3"
       ],
-      "result_table_name": "t4"
-    },
-    {
-      "plugin_name": "http_transform",
-      "json_field": {
-        "schema": "$.result.result.records.[*].schema",
-        "fullAlias": "$.result.result.records.[*].fullAlias",
-        "nullable": "$.result.result.records.[*].nullable",
-        "defaultValue": "$.result.result.records.[*].defaultValue",
-        "cspz_schemaName": "$.result.result.records.[*].schemaName",
-        "typeName": "$.result.result.records.[*].typeName",
-        "cspz_id": "$.result.result.records.[*].id",
-        "remark": "$.result.result.records.[*].remark",
-        "type": "$.result.result.records.[*].type",
-        "decimalDigit": "$.result.result.records.[*].decimalDigit",
-        "database": "$.result.result.records.[*].database",
-        "size": "$.result.result.records.[*].size",
-        "autoincrement": "$.result.result.records.[*].autoincrement",
-        "name": "$.result.result.records.[*].name",
-        "alias": "$.result.result.records.[*].alias",
-        "cspz_tableName": "$.result.result.records.[*].tableName",
-        "table": "$.result.result.records.[*].table",
-        "finalAlias": "$.result.result.records.[*].finalAlias",
-        "order": "$.result.result.records.[*].order",
-        "primaryKey": "$.result.result.records.[*].primaryKey"
-      },
-      "max_safe_page": 10,
-      "url": "http://pangu-gateway:30863/db/datasource/api/page/1449657379996635139",
-      "pages": {
-        "current": "1",
-        "size": 2500
-      },
-      "result_columns": [
-        {
-          "name": "schema",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].schema"
-        },
-        {
-          "name": "fullAlias",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].fullAlias"
-        },
-        {
-          "name": "nullable",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].nullable"
-        },
-        {
-          "name": "defaultValue",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].defaultValue"
-        },
-        {
-          "name": "typeName",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].typeName"
-        },
-        {
-          "name": "remark",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].remark"
-        },
-        {
-          "name": "type",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].type"
-        },
-        {
-          "name": "decimalDigit",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].decimalDigit"
-        },
-        {
-          "name": "database",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].database"
-        },
-        {
-          "name": "size",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].size"
-        },
-        {
-          "name": "autoincrement",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].autoincrement"
-        },
-        {
-          "name": "name",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].name"
-        },
-        {
-          "name": "alias",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].alias"
-        },
-        {
-          "name": "table",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].table"
-        },
-        {
-          "name": "finalAlias",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].finalAlias"
-        },
-        {
-          "name": "order",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].order"
-        },
-        {
-          "name": "primaryKey",
-          "type": "string",
-          "jParse": "$.result.result.records.[*].primaryKey"
-        },
-        {
-          "name": "cspz_id",
-          "type": "string"
-        },
-        {
-          "name": "cspz_schemaName",
-          "type": "string"
-        },
-        {
-          "name": "cspz_tableName",
-          "type": "string"
-        }
-      ],
-      "params_field": [
-        {
-          "name": "id",
-          "type": "dynamic",
-          "value": "cspz_id"
-        },
-        {
-          "name": "schemaName",
-          "type": "dynamic",
-          "value": "schema"
-        },
-        {
-          "name": "tableName",
-          "type": "dynamic",
-          "value": "name"
-        }
-      ],
-      "source_table_name": [
-        "t4"
-      ],
-      "result_table_name": "t7"
+      "result_table_name": "t9"
     }
   ],
   "sink": [
     {
       "plugin_name": "XJJDBC",
-      "query": "select * from \"TYDB\".\"DB_DATASOURCE\"",
-      "url": "jdbc:oracle:thin:@192.168.10.46:1521/orcl",
-      "driver": "oracle.jdbc.driver.OracleDriver",
-      "user": "tydb",
-      "password": "oracle",
-      "db_datasource_id": "1712299719625191425",
-      "db_type": "ORACLE",
-      "dbSchema": "TYDB",
-      "table": "DB_DATASOURCE",
+      "query": "select * from \"public\".\"data1\"",
+      "url": "jdbc:postgresql://111.172.106.210:15432/usr_ods_db",
+      "driver": "org.postgresql.Driver",
+      "user": "usr_ods",
+      "password": "usr_ods#20231024",
+      "db_datasource_id": "1795026879047311362",
+      "db_type": "PGSQL",
+      "dbSchema": "public",
+      "table": "data1",
       "field_mapper": {
-        "deptName": "deptName",
-        "manufacturerName": "manufacturerName",
-        "dbName": "dbName",
-        "businessId": "businessId",
-        "businessName": "businessName",
-        "isEnable": "isEnable",
-        "dbCategoryAlias": "dbCategoryAlias",
-        "appendRecord": "appendRecord",
-        "dbUsername": "dbUsername",
-        "dbMajorVersion": "dbMajorVersion",
-        "id": "id",
-        "state": "state",
-        "dbConfig": "dbConfig",
-        "dbSchema": "dbSchema",
-        "dbCategory": "dbCategory",
-        "deptId": "deptId",
-        "manufacturerId": "manufacturerId",
-        "dbType": "dbType",
-        "dbHost": "dbHost",
-        "updateTime": "updateTime",
-        "businessLabel": "businessLabel",
-        "dbPort": "dbPort",
-        "createBy": "createBy",
-        "dbReadonly": "dbReadonly",
-        "dbMinorVersion": "dbMinorVersion",
-        "createTime": "createTime",
-        "dbTypeAlias": "dbTypeAlias",
-        "name": "name",
-        "userType": "userType",
-        "businessType": "businessType",
-        "dbProductVersion": "dbProductVersion"
-      },
-      "pre_config": {
-        "cleanTableWhenCompleteNoDataIn": true,
-        "ignoreTstamp": true,
-        "cleanTableWhenComplete": true,
-        "incrementMode": "update",
-        "insertMode": "complete"
-      },
-      "source_table_name": [
-        "t1"
-      ]
-    },
-    {
-      "plugin_name": "XJJDBC",
-      "query": "select * from \"TYDB\".\"DB_TABLES\"",
-      "url": "jdbc:oracle:thin:@192.168.10.46:1521/orcl",
-      "driver": "oracle.jdbc.driver.OracleDriver",
-      "user": "tydb",
-      "password": "oracle",
-      "db_datasource_id": "1712299719625191425",
-      "db_type": "ORACLE",
-      "dbSchema": "TYDB",
-      "table": "DB_TABLES",
-      "field_mapper": {
-        "schema": "schema",
-        "fullAlias": "fullAlias",
-        "create_time": "create_time",
-        "ori_schema": "ori_schema",
-        "escape_left": "escape_left",
-        "ori_name": "ori_name",
-        "remark": "remark",
-        "escape_right": "escape_right",
-        "type": "type",
-        "rows": "rows",
-        "database": "database",
-        "name": "name",
-        "alias": "alias",
-        "finalAlias": "finalAlias",
-        "cspz_id": "cspz_id",
-        "cspz_schemaName": "cspz_schemaName"
+        "id": "aa",
+        "data_source_id": "bb",
+        "data_schema": "cc",
+        "DMMC": "dd",
+        "SFQY": "ee"
       },
       "pre_config": {
         "cleanTableWhenCompleteNoDataIn": false,
@@ -611,51 +464,7 @@
         "insertMode": "complete"
       },
       "source_table_name": [
-        "t4"
-      ]
-    },
-    {
-      "plugin_name": "XJJDBC",
-      "query": "select * from \"TYDB\".\"DB_COLUMNS\"",
-      "url": "jdbc:oracle:thin:@192.168.10.46:1521/orcl",
-      "driver": "oracle.jdbc.driver.OracleDriver",
-      "user": "tydb",
-      "password": "oracle",
-      "db_datasource_id": "1712299719625191425",
-      "db_type": "ORACLE",
-      "dbSchema": "TYDB",
-      "table": "DB_COLUMNS",
-      "field_mapper": {
-        "schema": "schema",
-        "fullAlias": "fullAlias",
-        "nullable": "nullable",
-        "defaultValue": "defaultValue",
-        "typeName": "typeName",
-        "remark": "remark",
-        "type": "type",
-        "decimalDigit": "decimalDigit",
-        "database": "database",
-        "size": "size",
-        "autoincrement": "autoincrement",
-        "name": "name",
-        "alias": "alias",
-        "table": "table",
-        "finalAlias": "finalAlias",
-        "order": "order",
-        "primaryKey": "primaryKey",
-        "cspz_id": "cspz_id",
-        "cspz_schemaName": "cspz_schemaName",
-        "cspz_tableName": "cspz_tableName"
-      },
-      "pre_config": {
-        "cleanTableWhenCompleteNoDataIn": true,
-        "ignoreTstamp": true,
-        "cleanTableWhenComplete": true,
-        "incrementMode": "update",
-        "insertMode": "complete"
-      },
-      "source_table_name": [
-        "t7"
+        "t9"
       ]
     }
   ]

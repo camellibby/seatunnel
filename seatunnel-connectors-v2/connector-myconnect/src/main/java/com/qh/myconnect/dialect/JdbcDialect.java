@@ -294,6 +294,11 @@ public interface JdbcDialect extends Serializable {
         return sql;
     }
 
+    default String insertTableOnlyColumn(
+            JdbcSinkConfig jdbcSinkConfig,  List<String> columns) {
+        return null;
+    }
+
     default String getSinkQueryZipper(
             List<ColumnMapper> columnMappers, int rowSize, JdbcSinkConfig jdbcSinkConfig) {
         List<ColumnMapper> ucColumns =

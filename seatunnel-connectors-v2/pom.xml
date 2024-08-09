@@ -37,7 +37,7 @@
         <module>connector-fake</module>
         <module>connector-http</module>
         <module>connector-jdbc</module>
-<!--        <module>connector-kafka</module>-->
+        <module>connector-kafka</module>
 <!--        <module>connector-pulsar</module>-->
 <!--        <module>connector-socket</module>-->
 <!--        <module>connector-hive</module>-->

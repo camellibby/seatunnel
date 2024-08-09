@@ -52,20 +52,6 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
         this.seaTunnelRowType = seaTunnelRowType;
         this.config = config;
         this.jdbcSinkConfig = jdbcSinkConfig;
-    }
-
-    public MySink() {
-    }
-
-    @Override
-    public String getPluginName() {
-        return "XjJdbc";
-    }
-
-    @Override
-    public void prepare(Config pluginConfig) throws PrepareFailException {
-        this.config = ReadonlyConfig.fromConfig(pluginConfig);
-        JdbcSinkConfig jdbcSinkConfig = JdbcSinkConfig.of(config);
         try (Connection conn =
                      DriverManager.getConnection(
                              jdbcSinkConfig.getUrl(),
@@ -86,6 +72,16 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
             throw new RuntimeException(e);
         }
     }
+
+    public MySink() {
+    }
+
+    @Override
+    public String getPluginName() {
+        return "XjJdbc";
+    }
+
+
 
     @Override
     public void setTypeInfo(SeaTunnelRowType seaTunnelRowType) {

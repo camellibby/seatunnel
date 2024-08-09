@@ -56,12 +56,12 @@ public class ClickHouseDialect implements JdbcDialect {
                 columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         String sqlQueryString =
                 " select "
-                        + " <columns:{sub |   <if(sub.uc)> `<sub.sinkColumnName>` <else> argMax( `<sub.sinkColumnName>`, OPERATETIME) as  `<sub.sinkColumnName>`  <endif>   }; separator=\", \"> "
-                        + "  from `<table>` "
-                        + " where OPERATEFLAG in ('I', 'U') "
-                        + " and <filter> "
-                        + " group by <ucs:{uc | `<uc.sinkColumnName>`   }; separator=\", \"> "
-                        + " order by <ucs:{uc | `<uc.sinkColumnName>`   }; separator=\" ,\"> ";
+                + " <columns:{sub |   <if(sub.uc)> `<sub.sinkColumnName>` <else> argMax( `<sub.sinkColumnName>`, OPERATETIME) as  `<sub.sinkColumnName>`  <endif>   }; separator=\", \"> "
+                + "  from `<table>` "
+                + " where OPERATEFLAG in ('I', 'U') "
+                + " and <filter> "
+                + " group by <ucs:{uc | `<uc.sinkColumnName>`   }; separator=\", \"> "
+                + " order by <ucs:{uc | `<uc.sinkColumnName>`   }; separator=\" ,\"> ";
 
         ST sqlQueryTemplate = new ST(sqlQueryString);
         sqlQueryTemplate.add("table", jdbcSinkConfig.getTable());
@@ -69,7 +69,8 @@ public class ClickHouseDialect implements JdbcDialect {
         sqlQueryTemplate.add("ucs", ucColumns);
         if (rowSize == 0) {
             sqlQueryTemplate.add("filter", "1=2");
-        } else {
+        }
+        else {
             String where = "(";
             List<String> collect =
                     ucColumns.stream()
@@ -119,8 +120,8 @@ public class ClickHouseDialect implements JdbcDialect {
             throws SQLException {
         String templateInsert =
                 "update <table> set "
-                        + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> "
-                        + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
+                + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> "
+                + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
         List<ColumnMapper> newColumnMappers = new ArrayList<>();
         for (ColumnMapper columnMapper : columnMappers) {
             newColumnMappers.add(columnMapper);
@@ -211,8 +212,8 @@ public class ClickHouseDialect implements JdbcDialect {
 
         String delSql =
                 "ALTER  TABLE `<table>` on CLUSTER  <clusterName> DELETE   WHERE (<pks:{pk | `<pk.sinkColumnName>`}; separator=\", "
-                        + "\">) NOT IN   (SELECT  <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \"> FROM "
-                        + "`<ucTable>`  ) SETTINGS allow_nondeterministic_mutations = 1 ";
+                + "\">) NOT IN   (SELECT  <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \"> FROM "
+                + "`<ucTable>`  ) SETTINGS allow_nondeterministic_mutations = 1 ";
         ST template = new ST(delSql);
         template.add("table", table);
         template.add("ucTable", ucTable);
@@ -246,12 +247,12 @@ public class ClickHouseDialect implements JdbcDialect {
         int insert = 0;
         String insertSql1 =
                 "select  count(1) sl  "
-                        + "    from (select <columns:{sub |   <if(sub.uc)> `<sub.sinkColumnName>` <else> argMax( `<sub.sinkColumnName>`, OPERATETIME) as  `<sub.sinkColumnName>`  <endif>   }; separator=\", \">  "
-                        + "            from `<table>`"
-                        + "           where OPERATEFLAG in ('I', 'U')"
-                        + "             AND (<pks:{pk | `<pk.sinkColumnName>`}; separator=\", \">) NOT IN (SELECT <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \"> FROM `<ucTable>` ut)"
-                        + "           group by <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \">"
-                        + "           order by <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \"> ) a";
+                + "    from (select <columns:{sub |   <if(sub.uc)> `<sub.sinkColumnName>` <else> argMax( `<sub.sinkColumnName>`, OPERATETIME) as  `<sub.sinkColumnName>`  <endif>   }; separator=\", \">  "
+                + "            from `<table>`"
+                + "           where OPERATEFLAG in ('I', 'U')"
+                + "             AND (<pks:{pk | `<pk.sinkColumnName>`}; separator=\", \">) NOT IN (SELECT <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \"> FROM `<ucTable>` ut)"
+                + "           group by <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \">"
+                + "           order by <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \"> ) a";
         ST template1 = new ST(insertSql1);
         template1.add("table", jdbcSinkConfig.getTable());
         template1.add("columns", columnMappers);
@@ -274,14 +275,14 @@ public class ClickHouseDialect implements JdbcDialect {
         }
         String insertSql =
                 "insert into `<table>`"
-                        + "  (<columns:{sub | `<sub.sinkColumnName>`  }; separator=\", \">, OPERATEFLAG, OPERATETIME)"
-                        + "  select <columns:{sub | `<sub.sinkColumnName>` }; separator=\", \">, 'D' OPERATEFLAG, '<OPERATETIME>' OPERATETIME"
-                        + "    from (select <columns:{sub |   <if(sub.uc)> `<sub.sinkColumnName>` <else> argMax( `<sub.sinkColumnName>`, OPERATETIME) as  `<sub.sinkColumnName>`  <endif>   }; separator=\", \">  "
-                        + "            from `<table>`"
-                        + "           where OPERATEFLAG in ('I', 'U')"
-                        + "             AND (<pks:{pk | `<pk.sinkColumnName>`}; separator=\", \">) NOT IN (SELECT <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \"> FROM `<ucTable>` ut)"
-                        + "           group by <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \">"
-                        + "           order by <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \"> ) a";
+                + "  (<columns:{sub | `<sub.sinkColumnName>`  }; separator=\", \">, OPERATEFLAG, OPERATETIME)"
+                + "  select <columns:{sub | `<sub.sinkColumnName>` }; separator=\", \">, 'D' OPERATEFLAG, '<OPERATETIME>' OPERATETIME"
+                + "    from (select <columns:{sub |   <if(sub.uc)> `<sub.sinkColumnName>` <else> argMax( `<sub.sinkColumnName>`, OPERATETIME) as  `<sub.sinkColumnName>`  <endif>   }; separator=\", \">  "
+                + "            from `<table>`"
+                + "           where OPERATEFLAG in ('I', 'U')"
+                + "             AND (<pks:{pk | `<pk.sinkColumnName>`}; separator=\", \">) NOT IN (SELECT <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \"> FROM `<ucTable>` ut)"
+                + "           group by <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \">"
+                + "           order by <pks:{pk | `<pk.sinkColumnName>`}; separator=\", \"> ) a";
         ST template = new ST(insertSql);
         template.add("table", jdbcSinkConfig.getTable());
         template.add("columns", columnMappers);
@@ -324,8 +325,8 @@ public class ClickHouseDialect implements JdbcDialect {
                 columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         String sqlQueryString =
                 " select <columns:{sub | `<sub.sinkColumnName>`}; separator=\", \"> "
-                        + "  from `<table>` a "
-                        + " where  ";
+                + "  from `<table>` a "
+                + " where  ";
         ST sqlQueryTemplate = new ST(sqlQueryString);
         sqlQueryTemplate.add("table", jdbcSinkConfig.getTable());
         sqlQueryTemplate.add("columns", columnMappers);
@@ -341,7 +342,8 @@ public class ClickHouseDialect implements JdbcDialect {
         String wheres = StringUtils.join(where, "  or ");
         if (rowSize == 0) {
             sqlQuery = sqlQuery + " 1=2";
-        } else {
+        }
+        else {
             sqlQuery = sqlQuery + wheres;
         }
         return sqlQuery;
@@ -351,17 +353,33 @@ public class ClickHouseDialect implements JdbcDialect {
             JdbcSinkConfig jdbcSinkConfig, List<String> columns, List<String> values) {
         String sql =
                 "insert into "
-                        + "`"
-                        + jdbcSinkConfig.getTable()
-                        + "`"
-                        + String.format(
-                                "(%s)",
-                                StringUtils.join(
-                                        columns.stream()
-                                                .map(x -> String.format("`%s`", x))
-                                                .collect(Collectors.toList()),
-                                        ","))
-                        + String.format("values (%s)", StringUtils.join(values, ","));
+                + "`"
+                + jdbcSinkConfig.getTable()
+                + "`"
+                + String.format(
+                        "(%s)",
+                        StringUtils.join(
+                                columns.stream()
+                                        .map(x -> String.format("`%s`", x))
+                                        .collect(Collectors.toList()),
+                                ","))
+                + String.format("values (%s)", StringUtils.join(values, ","));
+        return sql;
+    }
+
+    public String insertTableOnlyColumn(JdbcSinkConfig jdbcSinkConfig, List<String> columns) {
+        String sql =
+                "insert into "
+                + "`"
+                + jdbcSinkConfig.getTable()
+                + "`"
+                + String.format(
+                        "(%s)",
+                        StringUtils.join(
+                                columns.stream()
+                                        .map(x -> String.format("`%s`", x))
+                                        .collect(Collectors.toList()),
+                                ","));
         return sql;
     }
 

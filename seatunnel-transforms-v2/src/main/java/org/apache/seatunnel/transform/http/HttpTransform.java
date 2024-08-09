@@ -86,49 +86,52 @@ public class HttpTransform extends AbstractCatalogSupportTransform {
             if (pagesParams.containsKey("current")) {
                 int loop_count = 1;
                 while (loop_count > 0) {
-                    HttpResponse response = HttpRequest.post(config.getUrl())
+                    try (HttpResponse response = HttpRequest.post(config.getUrl())
                             .header("Content-Type", "application/json")
                             .body(obj.toString())
-                            .execute();
-                    if (response.isOk()) {
-                        Map<String, List<String>> dataSet = new HashMap<>();
-                        ReadContext ctx = JsonPath.using(jsonConfiguration).parse(response.body());
-                        Map<String, String> jsonField = config.getJsonField();
-                        if (jsonField != null) {
-                            for (Map.Entry<String, String> entry : jsonField.entrySet()) {
-                                String key = entry.getKey();
-                                String value = entry.getValue();
-                                List<String> valuesList = ctx.read(value);
-                                if (key.startsWith("cspz_") && areAllNull(valuesList)) {
-                                    List<String> newValuesList = new ArrayList<>();
-                                    valuesList.forEach(item -> {
-                                        newValuesList.add(obj.getStr(key.replace("cspz_", "")));
-                                    });
-                                    dataSet.put(key, newValuesList);
-                                }
-                                else {
-                                    dataSet.put(key, valuesList);
+                            .execute()) {
+                        if (response.isOk()) {
+                            Map<String, List<String>> dataSet = new HashMap<>();
+                            ReadContext ctx = JsonPath.using(jsonConfiguration).parse(response.body());
+                            Map<String, String> jsonField = config.getJsonField();
+                            if (jsonField != null) {
+                                for (Map.Entry<String, String> entry : jsonField.entrySet()) {
+                                    String key = entry.getKey();
+                                    String value = entry.getValue();
+                                    List<String> valuesList = ctx.read(value);
+                                    if (key.startsWith("cspz_") && areAllNull(valuesList)) {
+                                        List<String> newValuesList = new ArrayList<>();
+                                        valuesList.forEach(item -> {
+                                            newValuesList.add(obj.getStr(key.replace("cspz_", "")));
+                                        });
+                                        dataSet.put(key, newValuesList);
+                                    }
+                                    else {
+                                        dataSet.put(key, valuesList);
+                                    }
                                 }
                             }
-                        }
-                        for (int i = 0; i < new ArrayList<>(dataSet.values()).get(0).size(); i++) {
-                            Object[] fields = new Object[outputColumns.size()];
-                            for (int j = 0; j < outputColumns.size(); j++) {
-                                String columName = outputColumns.get(j).getName();
-                                fields[j] = StrUtil.toString(dataSet.get(columName).get(i));
+                            for (int i = 0; i < new ArrayList<>(dataSet.values()).get(0).size(); i++) {
+                                Object[] fields = new Object[outputColumns.size()];
+                                for (int j = 0; j < outputColumns.size(); j++) {
+                                    String columName = outputColumns.get(j).getName();
+                                    fields[j] = StrUtil.toString(dataSet.get(columName).get(i));
+                                }
+                                rows.add(new SeaTunnelRow(fields));
                             }
-                            rows.add(new SeaTunnelRow(fields));
+                            System.out.println("请求参数" + obj);
+                            loop_count++;
+                            if (new ArrayList<>(dataSet.values()).get(0).size() < Long.parseLong(pagesParams.get("size"))) {
+                                loop_count = 0;
+                                System.out.println("没有更多数据,总共" + rows.size() + "条数据");
+                            }
+                            obj.putOpt("current", loop_count + "");
                         }
-                        System.out.println("请求参数" + obj);
-                        loop_count++;
-                        if (new ArrayList<>(dataSet.values()).get(0).size() < Long.parseLong(pagesParams.get("size"))) {
-                            loop_count = 0;
-                            System.out.println("没有更多数据,总共" + rows.size() + "条数据");
+                        else {
+                            System.err.println("Error: " + response.getStatus() + ", " + response.body());
                         }
-                        obj.putOpt("current", loop_count + "");
-                    }
-                    else {
-                        System.err.println("Error: " + response.getStatus() + ", " + response.body());
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
                     }
                 }
             }

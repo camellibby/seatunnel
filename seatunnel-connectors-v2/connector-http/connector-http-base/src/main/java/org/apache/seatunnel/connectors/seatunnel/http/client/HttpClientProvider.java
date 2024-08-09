@@ -119,6 +119,9 @@ public class HttpClientProvider implements AutoCloseable {
         // convert method option to uppercase
         method = method.toUpperCase(Locale.ROOT);
         if (HttpPost.METHOD_NAME.equals(method)) {
+            if(body==null){
+                body="{\"a\":\"a\"}";
+            }
             return doPost(url, headers, params, body);
         }
         if (HttpGet.METHOD_NAME.equals(method)) {

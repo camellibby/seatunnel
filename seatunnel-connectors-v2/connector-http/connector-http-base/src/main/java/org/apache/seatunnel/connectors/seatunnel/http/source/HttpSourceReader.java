@@ -59,24 +59,16 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
     protected final HttpParameter httpParameter;
     protected HttpClientProvider httpClient;
     private final DeserializationCollector deserializationCollector;
-    private static final Option[] DEFAULT_OPTIONS = {
-            Option.SUPPRESS_EXCEPTIONS, Option.ALWAYS_RETURN_LIST, Option.DEFAULT_PATH_LEAF_TO_NULL
-    };
+    private static final Option[] DEFAULT_OPTIONS = {Option.SUPPRESS_EXCEPTIONS, Option.ALWAYS_RETURN_LIST, Option.DEFAULT_PATH_LEAF_TO_NULL};
     private JsonPath[] jsonPaths;
     private final JsonField jsonField;
     private final String contentJson;
-    private final Configuration jsonConfiguration =
-            Configuration.defaultConfiguration().addOptions(DEFAULT_OPTIONS);
+    private final Configuration jsonConfiguration = Configuration.defaultConfiguration().addOptions(DEFAULT_OPTIONS);
     private boolean noMoreElementFlag = true;
     private Optional<PageInfo> pageInfoOptional = Optional.empty();
     private Long offset = 0L;
 
-    public HttpSourceReader(
-            HttpParameter httpParameter,
-            SingleSplitReaderContext context,
-            DeserializationSchema<SeaTunnelRow> deserializationSchema,
-            JsonField jsonField,
-            String contentJson) {
+    public HttpSourceReader(HttpParameter httpParameter, SingleSplitReaderContext context, DeserializationSchema<SeaTunnelRow> deserializationSchema, JsonField jsonField, String contentJson) {
         this.context = context;
         this.httpParameter = httpParameter;
         this.deserializationCollector = new DeserializationCollector(deserializationSchema);
@@ -84,13 +76,7 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
         this.contentJson = contentJson;
     }
 
-    public HttpSourceReader(
-            HttpParameter httpParameter,
-            SingleSplitReaderContext context,
-            DeserializationSchema<SeaTunnelRow> deserializationSchema,
-            JsonField jsonField,
-            String contentJson,
-            PageInfo pageInfo) {
+    public HttpSourceReader(HttpParameter httpParameter, SingleSplitReaderContext context, DeserializationSchema<SeaTunnelRow> deserializationSchema, JsonField jsonField, String contentJson, PageInfo pageInfo) {
         this.context = context;
         this.httpParameter = httpParameter;
         this.deserializationCollector = new DeserializationCollector(deserializationSchema);
@@ -112,13 +98,7 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
     }
 
     public void pollAndCollectData(Collector<SeaTunnelRow> output) throws Exception {
-        HttpResponse response =
-                httpClient.execute(
-                        this.httpParameter.getUrl(),
-                        this.httpParameter.getMethod().getMethod(),
-                        this.httpParameter.getHeaders(),
-                        this.httpParameter.getParams(),
-                        this.httpParameter.getBody());
+        HttpResponse response = httpClient.execute(this.httpParameter.getUrl(), this.httpParameter.getMethod().getMethod(), this.httpParameter.getHeaders(), this.httpParameter.getParams(), this.httpParameter.getBody());
         if (HttpResponse.STATUS_OK == response.getCode()) {
             String content = response.getContent();
             if (!Strings.isNullOrEmpty(content)) {
@@ -134,18 +114,12 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
                     collect(output, content);
                 }
             }
-            log.info(
-                    "http client execute success request param:[{}], http response status code:[{}], content:[{}]",
-                    httpParameter.getParams(),
-                    response.getCode()
+            log.info("http client execute success request param:[{}], http response status code:[{}], content:[{}]", httpParameter.getParams(), response.getCode()
 //                    response.getContent()
             );
         }
         else {
-            String msg =
-                    String.format(
-                            "http client execute exception, http response status code:[%s], content:[%s]",
-                            response.getCode(), response.getContent());
+            String msg = String.format("http client execute exception, http response status code:[%s], content:[%s]", response.getCode(), response.getContent());
             throw new HttpConnectorException(HttpConnectorErrorCode.REQUEST_FAILED, msg);
         }
     }
@@ -154,9 +128,7 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
         if (this.httpParameter.getParams() == null) {
             httpParameter.setParams(new HashMap<>());
         }
-        this.httpParameter
-                .getParams()
-                .put(pageInfo.getPageField(), pageInfo.getPageIndex().toString());
+        this.httpParameter.getParams().put(pageInfo.getPageField(), pageInfo.getPageIndex().toString());
     }
 
     @Override
@@ -187,6 +159,11 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
             else {
                 String body = this.httpParameter.getBody();
                 JSONObject jsonBody = JSONObject.parseObject(body);
+                if (jsonBody == null) {
+                    jsonBody = new JSONObject();
+                    jsonBody.put("a", "a");
+                }
+
                 if (jsonBody.containsKey("size")) {
                     noMoreElementFlag = false;
                     Long pageIndex = 1L;
@@ -196,11 +173,11 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
                         }
                         pollAndCollectData(output);
                         pageIndex += 1;
-                        if(jsonBody.containsKey("current")){
-                            jsonBody.put("current",pageIndex);
+                        if (jsonBody.containsKey("current")) {
+                            jsonBody.put("current", pageIndex);
                         }
-                        if(jsonBody.containsKey("offset")){
-                            jsonBody.put("offset",offset);
+                        if (jsonBody.containsKey("offset")) {
+                            jsonBody.put("offset", offset);
                         }
                         this.httpParameter.setBody(jsonBody.toString());
                         Thread.sleep(3);
@@ -252,7 +229,11 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
         }
         String body = this.httpParameter.getBody();
         JSONObject jsonBody = JSONObject.parseObject(body);
-        if (jsonBody.containsKey("size")){
+        if (jsonBody == null) {
+            jsonBody = new JSONObject();
+            jsonBody.put("a", "a");
+        }
+        if (jsonBody.containsKey("size")) {
             int readSize = JsonUtils.stringToJsonNode(data).size();
             noMoreElementFlag = readSize < jsonBody.getInteger("size");
         }
@@ -274,11 +255,10 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
         for (List<String> data : datas) {
             Map<String, String> decodeData = new HashMap<>(jsonField.getFields().size());
             final int[] index = {0};
-            data.forEach(
-                    field -> {
-                        decodeData.put(keys[index[0]], field);
-                        index[0]++;
-                    });
+            data.forEach(field -> {
+                decodeData.put(keys[index[0]], field);
+                index[0]++;
+            });
             decodeDatas.add(decodeData);
         }
 
@@ -296,14 +276,7 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
             List<?> result0 = results.get(0);
             List<?> result = results.get(i);
             if (result0.size() != result.size()) {
-                throw new HttpConnectorException(
-                        HttpConnectorErrorCode.FIELD_DATA_IS_INCONSISTENT,
-                        String.format(
-                                "[%s](%d) and [%s](%d) the number of parsing records is inconsistent.",
-                                jsonPaths[0].getPath(),
-                                result0.size(),
-                                jsonPaths[i].getPath(),
-                                result.size()));
+                throw new HttpConnectorException(HttpConnectorErrorCode.FIELD_DATA_IS_INCONSISTENT, String.format("[%s](%d) and [%s](%d) the number of parsing records is inconsistent.", jsonPaths[0].getPath(), result0.size(), jsonPaths[i].getPath(), result.size()));
             }
         }
 
@@ -343,9 +316,7 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
     private void initJsonPath(JsonField jsonField) {
         jsonPaths = new JsonPath[jsonField.getFields().size()];
         for (int index = 0; index < jsonField.getFields().keySet().size(); index++) {
-            jsonPaths[index] =
-                    JsonPath.compile(
-                            jsonField.getFields().values().toArray(new String[]{})[index]);
+            jsonPaths[index] = JsonPath.compile(jsonField.getFields().values().toArray(new String[]{})[index]);
         }
     }
 }
