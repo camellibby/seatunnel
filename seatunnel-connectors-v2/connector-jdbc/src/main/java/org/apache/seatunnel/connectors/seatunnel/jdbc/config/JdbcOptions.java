@@ -225,6 +225,20 @@ public interface JdbcOptions {
                     .noDefaultValue()
                     .withDescription(
                             "Specify the field mapping relationship between input and output");
+    Option<Map<String, String>> VALUE_MAPPER =
+            Options.key("value_mapper")
+                    .mapType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Specify the field mapping relationship between input and output");
+
+    Option<List<String>> ALL_Columns =
+            Options.key("allColumns")
+                    .listType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Specify the field mapping relationship between input and output");
+
     Option<Boolean> recordOperation =
             Options.key("recordOperation")
                     .booleanType()

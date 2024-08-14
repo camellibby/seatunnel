@@ -20,6 +20,7 @@ package org.apache.seatunnel.connectors.seatunnel.jdbc.sink;
 import org.apache.seatunnel.api.sink.MultiTableResourceManager;
 import org.apache.seatunnel.api.sink.SinkWriter;
 import org.apache.seatunnel.api.sink.SupportMultiTableSinkWriter;
+import org.apache.seatunnel.api.table.catalog.Column;
 import org.apache.seatunnel.api.table.catalog.TableSchema;
 import org.apache.seatunnel.api.table.type.RowKind;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
@@ -45,7 +46,9 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 public class JdbcSinkWriter
@@ -128,8 +131,17 @@ public class JdbcSinkWriter
 
     @Override
     public void write(SeaTunnelRow element) throws IOException {
+        List<String> columns = tableSchema.getColumns().stream().map(Column::getName).collect(Collectors.toList());
         Object[] newFields = new Object[element.getArity() + 2];
-        System.arraycopy(element.getFields(), 0, newFields, 0, element.getArity());
+        Map<String, String> valueMapper = jdbcSinkConfig.getValueMapper();
+        if (valueMapper != null && !valueMapper.isEmpty()) {
+            newFields = new Object[valueMapper.size() + 2];
+            for (int i = 0; i < columns.size(); i++) {
+                String valueIndex = getKeyByValue(valueMapper, columns.get(i));
+                newFields[i]= element.getField(Integer.parseInt(valueIndex));
+            }
+        }
+//        System.arraycopy(element.getFields(), 0, newFields, 0, element.getArity());
         SeaTunnelRow newRow = new SeaTunnelRow(newFields);
         newRow.setRowKind(element.getRowKind());
         newRow.setTableId(element.getTableId());
@@ -191,5 +203,14 @@ public class JdbcSinkWriter
                     e);
         }
         outputFormat.close();
+    }
+
+    public  <K, V> K getKeyByValue(Map<K, V> map, V value) {
+        for (Map.Entry<K, V> entry : map.entrySet()) {
+            if (entry.getValue().equals(value)) {
+                return entry.getKey();
+            }
+        }
+        return null; // 如果找不到，返回null
     }
 }

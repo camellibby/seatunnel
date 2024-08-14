@@ -39,13 +39,16 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Optional;
 
-/** Base class for all converters that convert between JDBC object and SeaTunnel internal object. */
+/**
+ * Base class for all converters that convert between JDBC object and SeaTunnel internal object.
+ */
 @Slf4j
 public abstract class AbstractJdbcRowConverter implements JdbcRowConverter {
 
     public abstract String converterName();
 
-    public AbstractJdbcRowConverter() {}
+    public AbstractJdbcRowConverter() {
+    }
 
     @Override
     public SeaTunnelRow toInternal(ResultSet rs, TableSchema tableSchema) throws SQLException {
@@ -148,7 +151,15 @@ public abstract class AbstractJdbcRowConverter implements JdbcRowConverter {
                     statement.setShort(statementIndex, (Short) row.getField(fieldIndex));
                     break;
                 case INT:
-                    statement.setInt(statementIndex, (Integer) row.getField(fieldIndex));
+                    if (row.getField(fieldIndex) instanceof Integer) {
+                        statement.setInt(statementIndex, (Integer) row.getField(fieldIndex));
+                    }
+                    else if (row.getField(fieldIndex) instanceof String) {
+                        statement.setInt(statementIndex, Integer.parseInt((String) row.getField(fieldIndex)));
+                    }
+                    else {
+                        statement.setInt(statementIndex, Integer.parseInt((String) row.getField(fieldIndex)));
+                    }
                     break;
                 case BIGINT:
                     statement.setLong(statementIndex, (Long) row.getField(fieldIndex));

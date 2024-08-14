@@ -41,6 +41,9 @@ import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ReadContext;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.seatunnel.shade.com.fasterxml.jackson.core.type.TypeReference;
+import org.apache.seatunnel.shade.com.fasterxml.jackson.databind.JsonNode;
+import org.apache.seatunnel.shade.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -210,6 +213,10 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
         if (jsonField != null && contentJson == null) {
             this.initJsonPath(jsonField);
             data = JsonUtils.toJsonNode(parseToMap(decodeJSON(data), jsonField)).toString();
+            boolean allAttributesNullInObjects = isAllAttributesNullInObjects(data);
+            if (allAttributesNullInObjects) {
+                return;
+            }
         }
         // page increase
         if (pageInfoOptional.isPresent()) {
@@ -317,6 +324,29 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
         jsonPaths = new JsonPath[jsonField.getFields().size()];
         for (int index = 0; index < jsonField.getFields().keySet().size(); index++) {
             jsonPaths[index] = JsonPath.compile(jsonField.getFields().values().toArray(new String[]{})[index]);
+        }
+    }
+
+    public static boolean isAllAttributesNullInObjects(String jsonArrayString) {
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            // 将 JSON 数组字符串转换为 List<Map<String, Object>>
+            List<Map<String, Object>> list = mapper.readValue(jsonArrayString, new TypeReference<List<Map<String, Object>>>() {
+            });
+
+            // 遍历 List 中的每个 Map 并检查它们的属性是否都是 null
+            for (Map<String, Object> object : list) {
+                for (Object value : object.values()) {
+                    if (value != null) {
+                        return false; // 如果找到不是 null 的属性，则返回 false
+                    }
+                }
+            }
+
+            return true; // 所有对象的所有属性都是 null
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error parsing JSON array string", e);
         }
     }
 }

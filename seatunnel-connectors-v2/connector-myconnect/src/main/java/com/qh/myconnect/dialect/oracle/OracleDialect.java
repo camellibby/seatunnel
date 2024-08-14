@@ -433,7 +433,7 @@ public class OracleDialect implements JdbcDialect {
             throw new RuntimeException(e);
         }
         String insertSql =
-                "insert into <table>"
+                "insert into <dbSchema>.<table>"
                         + "  (<columns:{sub | \"<sub.sinkColumnName>\"  }; separator=\", \">, operateFlag, operateTime)"
                         + " select  "
                         + "  <columns:{sub | \"<sub.sinkColumnName>\" }; separator=\", \">, 'D' operateFlag, '<operateTime>' operateTime"

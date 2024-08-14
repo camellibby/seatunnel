@@ -51,6 +51,7 @@ import com.google.auto.service.AutoService;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -60,6 +61,7 @@ import static org.apache.seatunnel.api.sink.SinkCommonOptions.MULTI_TABLE_SINK_R
 import static org.apache.seatunnel.api.sink.SinkReplaceNameConstant.REPLACE_DATABASE_NAME_KEY;
 import static org.apache.seatunnel.api.sink.SinkReplaceNameConstant.REPLACE_SCHEMA_NAME_KEY;
 import static org.apache.seatunnel.api.sink.SinkReplaceNameConstant.REPLACE_TABLE_NAME_KEY;
+import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcOptions.ALL_Columns;
 import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcOptions.AUTO_COMMIT;
 import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcOptions.BATCH_SIZE;
 import static org.apache.seatunnel.connectors.seatunnel.jdbc.config.JdbcOptions.COMPATIBLE_MODE;
@@ -109,10 +111,12 @@ public class JdbcSinkFactory implements TableSinkFactory {
         CatalogTable catalogTable = context.getCatalogTable();
         PrimaryKey primaryKey = catalogTable.getTableSchema().getPrimaryKey();
         Optional<Map<String, String>> optionalFieldMapper = config.getOptional(FIELD_MAPPER);
+
         List<Column> newColumns = new ArrayList<>();
         List<String> newPrimaryKeyColumnNames = new ArrayList<>();
         if (optionalFieldMapper.isPresent()) {
             Map<String, String> fieldMapper = optionalFieldMapper.get();
+
             for (Column column : catalogTable.getTableSchema().getColumns()) {
                 String oldName = column.getName();
                 String newName = fieldMapper.get(oldName);
@@ -123,9 +127,9 @@ public class JdbcSinkFactory implements TableSinkFactory {
             }
             if (config.getOptional(recordOperation).isPresent()) {
                 if (config.getOptional(recordOperation).get()) {
-                    Column operateFlag =  PhysicalColumn.of("operateflag", BasicType.STRING_TYPE, 30, false,"I","");
-                    Column operateTime =   PhysicalColumn.of("operatetime", LocalTimeType.LOCAL_DATE_TIME_TYPE, 30,
-                            false,new Date(),"");
+                    Column operateFlag = PhysicalColumn.of("operateflag", BasicType.STRING_TYPE, 30, false, "I", "");
+                    Column operateTime = PhysicalColumn.of("operatetime", LocalTimeType.LOCAL_DATE_TIME_TYPE, 30,
+                            false, new Date(), "");
                     newColumns.add(operateFlag);
                     newColumns.add(operateTime);
                 }

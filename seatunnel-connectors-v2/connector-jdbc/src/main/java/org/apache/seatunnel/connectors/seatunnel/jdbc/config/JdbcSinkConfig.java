@@ -42,11 +42,13 @@ public class JdbcSinkConfig implements Serializable {
     private String table;
     private List<String> primaryKeys;
     private boolean enableUpsert;
-    @Builder.Default private boolean isPrimaryKeyUpdated = true;
+    @Builder.Default
+    private boolean isPrimaryKeyUpdated = true;
     private boolean supportUpsertByInsertOnly;
     private boolean useCopyStatement;
     private Map<String, String> fieldMapper;
-    private Boolean recordOperation ;
+    private Map<String, String> valueMapper;
+    private Boolean recordOperation;
 
     public static JdbcSinkConfig of(ReadonlyConfig config) {
         JdbcSinkConfigBuilder builder = JdbcSinkConfig.builder();
@@ -61,6 +63,7 @@ public class JdbcSinkConfig implements Serializable {
         builder.simpleSql(config.get(JdbcOptions.QUERY));
         builder.useCopyStatement(config.get(JdbcOptions.USE_COPY_STATEMENT));
         config.getOptional(JdbcOptions.FIELD_MAPPER).ifPresent(builder::fieldMapper);
+        config.getOptional(JdbcOptions.VALUE_MAPPER).ifPresent(builder::valueMapper);
         config.getOptional(JdbcOptions.recordOperation).ifPresent(builder::recordOperation);
         return builder.build();
     }
