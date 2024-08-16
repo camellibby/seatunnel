@@ -19,6 +19,8 @@ package org.apache.seatunnel.connectors.seatunnel.jdbc.sink;
 
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
+import org.apache.seatunnel.api.event.DefaultEventProcessor;
+import org.apache.seatunnel.api.event.EventListener;
 import org.apache.seatunnel.api.serialization.DefaultSerializer;
 import org.apache.seatunnel.api.serialization.Serializer;
 import org.apache.seatunnel.api.sink.DataSaveMode;
@@ -49,6 +51,7 @@ import org.apache.seatunnel.connectors.seatunnel.jdbc.utils.JdbcCatalogUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -57,8 +60,8 @@ import static org.apache.seatunnel.api.common.SeaTunnelAPIErrorCode.HANDLE_SAVE_
 
 public class JdbcSink
         implements SeaTunnelSink<SeaTunnelRow, JdbcSinkState, XidInfo, JdbcAggregatedCommitInfo>,
-                SupportSaveMode,
-                SupportMultiTableSink {
+        SupportSaveMode,
+        SupportMultiTableSink {
 
     private final TableSchema tableSchema;
 
@@ -101,6 +104,19 @@ public class JdbcSink
     public SinkWriter<SeaTunnelRow, XidInfo, JdbcSinkState> createWriter(
             SinkWriter.Context context) {
         SinkWriter<SeaTunnelRow, XidInfo, JdbcSinkState> sinkWriter;
+        Optional<String> flinkJobId = Optional.empty();
+        if (context.getEventListener() instanceof DefaultEventProcessor) {
+            DefaultEventProcessor defaultEventProcessor = (DefaultEventProcessor) context.getEventListener();
+            Class<? extends DefaultEventProcessor> aClass = defaultEventProcessor.getClass();
+            try {
+                Field field = aClass.getDeclaredField("jobId");
+                field.setAccessible(true);
+                Object jobid = field.get(defaultEventProcessor);
+                flinkJobId = Optional.of(String.valueOf(jobid));
+            } catch (NoSuchFieldException | IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+        }
         if (jdbcSinkConfig.isExactlyOnce()) {
             sinkWriter =
                     new JdbcExactlyOnceSinkWriter(
@@ -110,15 +126,16 @@ public class JdbcSink
                             jdbcSinkConfig,
                             tableSchema,
                             new ArrayList<>());
-        } else {
+        }
+        else {
             if (catalogTable != null && catalogTable.getTableSchema().getPrimaryKey() != null) {
                 String keyName = tableSchema.getPrimaryKey().getColumnNames().get(0);
                 int index = tableSchema.toPhysicalRowDataType().indexOf(keyName);
                 if (index > -1) {
-                    return new JdbcSinkWriter(dialect, jdbcSinkConfig, tableSchema, index);
+                    return new JdbcSinkWriter(dialect, jdbcSinkConfig, tableSchema, index, flinkJobId.orElse(null));
                 }
             }
-            sinkWriter = new JdbcSinkWriter(dialect, jdbcSinkConfig, tableSchema, null);
+            sinkWriter = new JdbcSinkWriter(dialect, jdbcSinkConfig, tableSchema, null, flinkJobId.orElse(null));
         }
         return sinkWriter;
     }
@@ -135,7 +152,7 @@ public class JdbcSink
 
     @Override
     public Optional<SinkAggregatedCommitter<XidInfo, JdbcAggregatedCommitInfo>>
-            createAggregatedCommitter() {
+    createAggregatedCommitter() {
         if (jdbcSinkConfig.isExactlyOnce()) {
             return Optional.of(new JdbcSinkAggregatedCommitter(jdbcSinkConfig));
         }

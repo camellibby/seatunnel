@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.sink;
 
+import com.alibaba.fastjson.JSONObject;
 import org.apache.seatunnel.api.sink.MultiTableResourceManager;
 import org.apache.seatunnel.api.sink.SinkWriter;
 import org.apache.seatunnel.api.sink.SupportMultiTableSinkWriter;
@@ -39,15 +40,24 @@ import org.apache.seatunnel.connectors.seatunnel.jdbc.state.XidInfo;
 
 import com.zaxxer.hikari.HikariDataSource;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.seatunnel.shade.com.google.common.util.concurrent.RateLimiter;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -62,11 +72,22 @@ public class JdbcSinkWriter
     private final Integer primaryKeyIndex;
     private final JdbcSinkConfig jdbcSinkConfig;
 
+    private final RateLimiter rateLimiter = RateLimiter.create(0.5);
+    private Long insertCount = 0L;
+
+    private Long deleteCount = 0l;
+
+    private Long updateCount = 0L;
+
+    private final String flinkJobId;
+
     public JdbcSinkWriter(
             JdbcDialect dialect,
             JdbcSinkConfig jdbcSinkConfig,
             TableSchema tableSchema,
-            Integer primaryKeyIndex) {
+            Integer primaryKeyIndex,
+            String flinkJobId
+    ) {
         this.jdbcSinkConfig = jdbcSinkConfig;
         this.dialect = dialect;
         this.tableSchema = tableSchema;
@@ -77,6 +98,8 @@ public class JdbcSinkWriter
                 new JdbcOutputFormatBuilder(
                         dialect, connectionProvider, jdbcSinkConfig, tableSchema)
                         .build();
+        this.flinkJobId = flinkJobId;
+        startLog();
     }
 
     @Override
@@ -131,39 +154,71 @@ public class JdbcSinkWriter
 
     @Override
     public void write(SeaTunnelRow element) throws IOException {
+        if (element.getRowKind().equals(RowKind.INSERT)) {
+            this.insertCount++;
+        }
+        else if (element.getRowKind().equals(RowKind.DELETE)) {
+            this.deleteCount++;
+        }
+        else {
+            this.updateCount++;
+        }
         List<String> columns = tableSchema.getColumns().stream().map(Column::getName).collect(Collectors.toList());
-        Object[] newFields = new Object[element.getArity() + 2];
+        Object[] newFields = new Object[columns.size()];
         Map<String, String> valueMapper = jdbcSinkConfig.getValueMapper();
         if (valueMapper != null && !valueMapper.isEmpty()) {
-            newFields = new Object[valueMapper.size() + 2];
+            newFields = new Object[columns.size()];
             for (int i = 0; i < columns.size(); i++) {
                 String valueIndex = getKeyByValue(valueMapper, columns.get(i));
-                newFields[i]= element.getField(Integer.parseInt(valueIndex));
+                if (valueIndex != null) {
+                    newFields[i] = element.getField(Integer.parseInt(valueIndex));
+                }
             }
         }
 //        System.arraycopy(element.getFields(), 0, newFields, 0, element.getArity());
         SeaTunnelRow newRow = new SeaTunnelRow(newFields);
         newRow.setRowKind(element.getRowKind());
         newRow.setTableId(element.getTableId());
+
         if (jdbcSinkConfig.getRecordOperation() != null && jdbcSinkConfig.getRecordOperation()) {
             if (element.getRowKind().equals(RowKind.INSERT)) {
-                newRow.setField(element.getArity(), "U");
+                newRow.setField(newRow.getArity() - 2, "U");
             }
             else if (element.getRowKind().equals(RowKind.DELETE)) {
-                newRow.setRowKind(RowKind.INSERT);
-                newRow.setField(element.getArity(), "D");
+                newRow.setField(newRow.getArity() - 2, "D");
             }
             else if (element.getRowKind().equals(RowKind.UPDATE_AFTER)) {
-                newRow.setField(element.getArity(), "U");
+                newRow.setField(newRow.getArity() - 2, "U");
             }
             else {
-                newRow.setField(element.getArity(), "U");
+                newRow.setField(newRow.getArity() - 2, "U");
             }
 
-            newRow.setField(element.getArity() + 1, LocalDateTime.now());
+            newRow.setField(newRow.getArity() - 1, LocalDateTime.now());
         }
         tryOpen();
         outputFormat.writeRecord(newRow);
+        //限流2秒发送一次offset记录请求
+    }
+
+    private void startLog() {
+        ScheduledExecutorService service = new ScheduledThreadPoolExecutor(1);
+        service.scheduleAtFixedRate(() -> {
+            log.info("插入数据:" + String.valueOf(insertCount));
+            log.info("删除数据:" + String.valueOf(deleteCount));
+            log.info("更新数据:" + String.valueOf(updateCount));
+            JSONObject param = new JSONObject();
+            param.put("flinkJobId", this.flinkJobId);
+            param.put("insertCount", insertCount);
+            param.put("modifyCount", updateCount);
+            param.put("deleteCount", deleteCount);
+            String st_log_url = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/gatherJobLog";
+            try {
+                this.sendPostRequest(st_log_url, param.toString());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }, 1,2, TimeUnit.SECONDS);
     }
 
     @Override
@@ -205,12 +260,45 @@ public class JdbcSinkWriter
         outputFormat.close();
     }
 
-    public  <K, V> K getKeyByValue(Map<K, V> map, V value) {
+    public <K, V> K getKeyByValue(Map<K, V> map, V value) {
         for (Map.Entry<K, V> entry : map.entrySet()) {
             if (entry.getValue().equals(value)) {
                 return entry.getKey();
             }
         }
         return null; // 如果找不到，返回null
+    }
+    public String sendPostRequest(String url, String data) throws Exception {
+        URL apiUrl = new URL(url);
+        HttpURLConnection con = (HttpURLConnection) apiUrl.openConnection();
+        String result = null;
+        con.setRequestMethod("POST");
+        con.setRequestProperty("Content-Type", "application/json");
+        con.setRequestProperty("Accept", "application/json");
+        con.setDoOutput(true);
+        OutputStream outputStream = con.getOutputStream();
+        outputStream.write(data.getBytes());
+        outputStream.flush();
+        outputStream.close();
+
+        // 处理响应
+        int responseCode = con.getResponseCode();
+        if (responseCode == HttpURLConnection.HTTP_OK) {
+
+            InputStream is = con.getInputStream();
+            // 缓冲流包装字符输入流,放入内存中,读取效率更快
+            BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+            StringBuffer stringBuffer1 = new StringBuffer();
+            String line = null;
+            while ((line = br.readLine()) != null) {
+                // 将每次读取的行进行保存
+                stringBuffer1.append(line);
+            }
+            result = stringBuffer1.toString();
+        } else {
+            // 处理失败响应
+        }
+        con.disconnect();
+        return result;
     }
 }

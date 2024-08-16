@@ -11,8 +11,8 @@
     {
       "db_type": "MYSQL",
       "base-url": "jdbc:mysql://111.172.106.210:60173/DB_SOURCE?useUnicode=yes&characterEncoding=UTF-8&useSSL=false&serverTimezone=UTC",
-      "startup.specific-offset.file": "mysql-bin.000015",
-      "startup.mode": "specific",
+      "password": "XIJIAgreat2020!$",
+      "startup.mode": "initial",
       "query": "select * from DB_SOURCE.student_table1",
       "table-names": [
         "DB_SOURCE.student_table1"
@@ -206,8 +206,6 @@
       ],
       "result_table_name": "t1",
       "plugin_name": "MySQL-CDC",
-      "password": "XIJIAgreat2020!$",
-      "startup.specific-offset.pos": 629749457,
       "user": "root",
       "username": "root"
     }
@@ -218,35 +216,33 @@
       "db_type": "ORACLE",
       "dbSchema": "TESTSS",
       "primary_keys": [
-        "XH",
-        "XM"
+        "ID"
       ],
       "db_datasource_id": "1821383696019935233",
+      "recordOperation": false,
       "source_table_name": [
         "t1"
       ],
       "plugin_name": "JDBC",
       "url": "jdbc:oracle:thin:@111.172.106.210:41521/ORCL",
       "value_mapper": {
-        "0": "XH",
-        "1": "XM",
-        "2": "SG",
-        "3": "TZ",
-        "4": "BJDM"
+        "0": "ID",
+        "1": "NAME",
+        "4": "AGE",
+        "5": "SEX"
       },
       "database": "ORCL",
       "password": "oracle",
       "driver": "oracle.jdbc.driver.OracleDriver",
       "field_mapper": {
-        "xh": "XH",
-        "sg": "SG",
-        "xm": "XM",
-        "tz": "TZ",
-        "bjdm": "BJDM"
+        "xh": "ID",
+        "xm": "NAME",
+        "yxmc": "SEX",
+        "bjdm": "AGE"
       },
       "generate_sink_sql": true,
       "user": "scott",
-      "table": "TESTSS.STUDENT_INFO"
+      "table": "TESTSS.SS_TABLE2"
     }
   ]
 }
