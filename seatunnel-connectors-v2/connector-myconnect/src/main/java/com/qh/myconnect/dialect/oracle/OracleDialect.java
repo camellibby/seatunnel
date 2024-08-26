@@ -30,6 +30,7 @@ import com.qh.myconnect.dialect.JdbcConnectorException;
 import com.qh.myconnect.dialect.JdbcDialect;
 import com.qh.myconnect.dialect.JdbcDialectTypeMapper;
 
+import javax.annotation.Nullable;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -294,7 +295,7 @@ public class OracleDialect implements JdbcDialect {
                         + " where not exists "
                         + "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> b where <pks:{pk | a.<pk.sinkColumnName>=b.<pk.sinkColumnName> }; separator=\" and \">  ) ";
         ST template = new ST(delSql);
-        template.add("table", table);
+        template.add("table", StringUtils.join(table.split("."),"."));
         template.add("tmpTable", ucTable);
         template.add("pks", ucColumns);
         PreparedStatement preparedStatement = null;
@@ -316,7 +317,7 @@ public class OracleDialect implements JdbcDialect {
                         .map(x -> "\"" + x + "\"")
                         .collect(Collectors.toList());
         return format(
-                "create  table %s.%s as select  %s from %s.%s where 1=2 ",
+                "create  table \"%s\".\"%s\" as select  %s from \"%s\".\"%s\" where 1=2 ",
                 jdbcSinkConfig.getDbSchema(),
                 targetTable,
                 StringUtils.join(collect, ','),
@@ -330,7 +331,7 @@ public class OracleDialect implements JdbcDialect {
     }
 
     public String dropTable(JdbcSinkConfig jdbcSinkConfig, String tableName) {
-        return String.format("drop table  %s.%s", jdbcSinkConfig.getDbSchema(), tableName);
+        return String.format("drop table  \"%s\".\"%s\"", jdbcSinkConfig.getDbSchema(), tableName);
     }
 
     public String createIndex(String tmpTableName, JdbcSinkConfig jdbcSinkConfig) {
@@ -339,7 +340,7 @@ public class OracleDialect implements JdbcDialect {
                         .map(x -> "\"" + x + "\"")
                         .collect(Collectors.toList());
         return String.format(
-                "CREATE UNIQUE INDEX %s.%s ON %s.%s(%s)",
+                "CREATE UNIQUE INDEX \"%s\".\"%s\" ON \"%s\".\"%s\"(%s)",
                 jdbcSinkConfig.getDbSchema(),
                 tmpTableName,
                 jdbcSinkConfig.getDbSchema(),
@@ -392,6 +393,21 @@ public class OracleDialect implements JdbcDialect {
         }
         String sqlQuery = sqlQueryTemplate.render();
         return sqlQuery;
+    }
+    public Long getTableCount(Connection connection, @Nullable String schema, String table) {
+        long count = 0L;
+        try {
+            PreparedStatement preparedStatement =
+                    connection.prepareStatement(format("select  count(1) sl  from \"%s\"", table));
+            ResultSet resultSet = preparedStatement.executeQuery();
+            if (resultSet.next()) {
+                count = resultSet.getLong("sl");
+                preparedStatement.close();
+            }
+            return count;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public int deleteDataZipper(

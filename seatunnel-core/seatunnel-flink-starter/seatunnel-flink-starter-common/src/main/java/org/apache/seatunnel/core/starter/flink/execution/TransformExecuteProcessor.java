@@ -159,7 +159,7 @@ public class TransformExecuteProcessor
                                     else {
                                         SeaTunnelRow dataRow =
                                                 (SeaTunnelRow) transform.map(seaTunnelRow);
-                                        if (dataRow != null) {
+                                        if (dataRow != null ) {
                                             Row copy = transformOutputRowConverter.convert(dataRow);
                                             out.collect(copy);
                                         }

@@ -25,6 +25,7 @@ import com.qh.myconnect.config.JdbcSinkConfig;
 import com.qh.myconnect.converter.ColumnMapper;
 import com.qh.myconnect.converter.JdbcRowConverter;
 
+import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -413,12 +414,27 @@ public interface JdbcDialect extends Serializable {
             LocalDateTime startTime) {
         return 0;
     }
-
-    default Long getTableCount(Connection connection, String table) {
+    default Long getTableCount(Connection connection,  String table) {
         long count = 0L;
         try {
             PreparedStatement preparedStatement =
                     connection.prepareStatement(format("select  count(1) sl  from %s", table));
+            ResultSet resultSet = preparedStatement.executeQuery();
+            if (resultSet.next()) {
+                count = resultSet.getLong("sl");
+                preparedStatement.close();
+            }
+            return count;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    default Long getTableCount(Connection connection, String schema, String table) {
+        long count = 0L;
+        try {
+            PreparedStatement preparedStatement =
+                    connection.prepareStatement(format("select  count(1) sl  from \"%s\".\"%s\"",schema, table));
             ResultSet resultSet = preparedStatement.executeQuery();
             if (resultSet.next()) {
                 count = resultSet.getLong("sl");

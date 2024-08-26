@@ -49,6 +49,8 @@ public class JdbcSinkConfig implements Serializable {
     private Map<String, String> fieldMapper;
     private Map<String, String> valueMapper;
     private Boolean recordOperation;
+    private String dbDatasourceId;
+    private String dbSchema;
 
     public static JdbcSinkConfig of(ReadonlyConfig config) {
         JdbcSinkConfigBuilder builder = JdbcSinkConfig.builder();
@@ -65,6 +67,8 @@ public class JdbcSinkConfig implements Serializable {
         config.getOptional(JdbcOptions.FIELD_MAPPER).ifPresent(builder::fieldMapper);
         config.getOptional(JdbcOptions.VALUE_MAPPER).ifPresent(builder::valueMapper);
         config.getOptional(JdbcOptions.recordOperation).ifPresent(builder::recordOperation);
+        config.getOptional(JdbcOptions.DB_DATASOURCE_ID).ifPresent(builder::dbDatasourceId);
+        config.getOptional(JdbcOptions.dbSchema).ifPresent(builder::dbSchema);
         return builder.build();
     }
 }

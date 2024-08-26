@@ -27,6 +27,7 @@ import com.qh.myconnect.converter.JdbcRowConverter;
 import com.qh.myconnect.dialect.JdbcDialect;
 import com.qh.myconnect.dialect.JdbcDialectTypeMapper;
 
+import javax.annotation.Nullable;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -72,8 +73,8 @@ public class PostgresDialect implements JdbcDialect {
                         .map(
                                 fieldName ->
                                         quoteIdentifier(fieldName)
-                                                + "=EXCLUDED."
-                                                + quoteIdentifier(fieldName))
+                                        + "=EXCLUDED."
+                                        + quoteIdentifier(fieldName))
                         .collect(Collectors.joining(", "));
         String upsertSQL =
                 String.format(
@@ -95,7 +96,8 @@ public class PostgresDialect implements JdbcDialect {
                         queryTemplate, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
         if (fetchSize > 0) {
             statement.setFetchSize(fetchSize);
-        } else {
+        }
+        else {
             statement.setFetchSize(DEFAULT_POSTGRES_FETCH_SIZE);
         }
         return statement;
@@ -112,7 +114,7 @@ public class PostgresDialect implements JdbcDialect {
                 });
         String sql =
                 String.format(
-                        "select  %s from %s.%s where 1=2 ",
+                        "select  %s from \"%s\".\"%s\" where 1=2 ",
                         StringUtils.join(columns, ","), jdbcSourceConfig.getDbSchema(), table);
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.executeQuery();
@@ -125,8 +127,8 @@ public class PostgresDialect implements JdbcDialect {
                 columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         String sqlQueryString =
                 " select <columns:{sub | \"<sub.sinkColumnName>\" }; separator=\", \"> "
-                        + "  from <dbSchema>.<table> a "
-                        + " where  ";
+                + "  from \"<dbSchema>\".\"<table>\" a "
+                + " where  ";
         ST sqlQueryTemplate = new ST(sqlQueryString);
         sqlQueryTemplate.add("dbSchema", jdbcSinkConfig.getDbSchema());
         sqlQueryTemplate.add("table", jdbcSinkConfig.getTable());
@@ -144,7 +146,8 @@ public class PostgresDialect implements JdbcDialect {
         String wheres = StringUtils.join(where, "  or ");
         if (rowSize == 0) {
             sqlQuery = sqlQuery + " 1=2";
-        } else {
+        }
+        else {
             sqlQuery = sqlQuery + wheres;
         }
         return sqlQuery;
@@ -156,21 +159,21 @@ public class PostgresDialect implements JdbcDialect {
                 columns.stream().map(x -> "\"" + x + "\"").collect(Collectors.toList());
         String sql =
                 "insert into "
-                        + jdbcSinkConfig.getDbSchema()
-                        + "."
-                        + jdbcSinkConfig.getTable()
-                        + String.format("(%s)", StringUtils.join(newColumns, ","))
-                        + String.format("values (%s)", StringUtils.join(values, ","));
+                + "\"" + jdbcSinkConfig.getDbSchema() + "\""
+                + "."
+                + "\"" + jdbcSinkConfig.getTable() + "\""
+                + String.format("(%s)", StringUtils.join(newColumns, ","))
+                + String.format("values (%s)", StringUtils.join(values, ","));
         return sql;
     }
 
     public String truncateTable(JdbcSinkConfig jdbcSinkConfig) {
         return String.format(
-                "truncate  table %s.%s", jdbcSinkConfig.getDbSchema(), jdbcSinkConfig.getTable());
+                "truncate  table \"%s\".\"%s\"", jdbcSinkConfig.getDbSchema(), jdbcSinkConfig.getTable());
     }
 
     public String dropTable(JdbcSinkConfig jdbcSinkConfig, String tableName) {
-        return String.format("drop table  %s.%s", jdbcSinkConfig.getDbSchema(), tableName);
+        return String.format("drop table  \"%s\".\"%s\"", jdbcSinkConfig.getDbSchema(), tableName);
     }
 
     public String copyTableOnlyColumn(
@@ -180,7 +183,7 @@ public class PostgresDialect implements JdbcDialect {
                         .map(x -> "\"" + x + "\"")
                         .collect(Collectors.toList());
         return format(
-                "create  table %s.%s as select  %s from %s.%s where 1=2 ",
+                "create  table \"%s\".\"%s\" as select  %s from \"%s\".\"%s\" where 1=2 ",
                 jdbcSinkConfig.getDbSchema(),
                 targetTable,
                 StringUtils.join(collect, ','),
@@ -196,11 +199,11 @@ public class PostgresDialect implements JdbcDialect {
                 });
         String delSql =
                 "delete from  <table> a   "
-                        + " where not exists "
-                        + "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> b where <pks:{pk | a.<pk.sinkColumnName>=b.<pk.sinkColumnName> }; separator=\" and \">  ) ";
+                + " where not exists "
+                + "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> b where <pks:{pk | a.<pk.sinkColumnName>=b.<pk.sinkColumnName> }; separator=\" and \">  ) ";
         ST template = new ST(delSql);
-        template.add("table", table);
-        template.add("tmpTable", ucTable);
+        template.add("table", StringUtils.join(Arrays.stream(table.split("\\.")).map(x -> "\"" + x + "\"").collect(Collectors.toList()), "."));
+        template.add("tmpTable", StringUtils.join(Arrays.stream(ucTable.split("\\.")).map(x -> "\"" + x + "\"").collect(Collectors.toList()), "."));
         template.add("pks", ucColumns);
         PreparedStatement preparedStatement = null;
         int del = 0;
@@ -214,13 +217,29 @@ public class PostgresDialect implements JdbcDialect {
         return del;
     }
 
+    public Long getTableCount(Connection connection, String schema, String table) {
+        long count = 0L;
+        try {
+            PreparedStatement preparedStatement =
+                    connection.prepareStatement(format("select  count(1) sl  from \"%s\".\"%s\"", schema, table));
+            ResultSet resultSet = preparedStatement.executeQuery();
+            if (resultSet.next()) {
+                count = resultSet.getLong("sl");
+                preparedStatement.close();
+            }
+            return count;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public String createIndex(String tmpTableName, JdbcSinkConfig jdbcSinkConfig) {
         List<String> collect =
                 jdbcSinkConfig.getPrimaryKeys().stream()
                         .map(x -> "\"" + x + "\"")
                         .collect(Collectors.toList());
         return String.format(
-                "CREATE UNIQUE INDEX %s ON %s.%s(%s)",
+                "CREATE UNIQUE INDEX \"%s\" ON \"%s\".\"%s\"(%s)",
                 "inx_" + tmpTableName,
                 jdbcSinkConfig.getDbSchema(),
                 tmpTableName,

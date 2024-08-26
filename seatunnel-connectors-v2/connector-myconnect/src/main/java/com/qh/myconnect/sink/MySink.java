@@ -63,7 +63,7 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
                 this.tableCount =
                         jdbcDialect.getTableCount(
                                 conn,
-                                jdbcSinkConfig.getDbSchema() + "." + jdbcSinkConfig.getTable());
+                                jdbcSinkConfig.getDbSchema() , jdbcSinkConfig.getTable());
             }
             else {
                 this.tableCount = jdbcDialect.getTableCount(conn, jdbcSinkConfig.getTable());

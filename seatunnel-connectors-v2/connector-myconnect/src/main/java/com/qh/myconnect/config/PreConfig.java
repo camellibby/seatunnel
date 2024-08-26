@@ -39,7 +39,8 @@ public class PreConfig implements Serializable {
     @OptionMark(description = "ck 集群模式下 集群的名字")
     private String clusterName;
 
-    public PreConfig() {}
+    public PreConfig() {
+    }
 
     public void doPreConfig(Connection connection, JdbcSinkConfig jdbcSinkConfig)
             throws SQLException {
@@ -62,8 +63,8 @@ public class PreConfig implements Serializable {
         }
 
         if (this.insertMode.equalsIgnoreCase("complete")
-                && this.cleanTableWhenComplete
-                && this.cleanTableWhenCompleteNoDataIn) {
+            && this.cleanTableWhenComplete
+            && this.cleanTableWhenCompleteNoDataIn) {
             Statement st = connection.createStatement();
             st.execute(
                     JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType())
@@ -73,7 +74,7 @@ public class PreConfig implements Serializable {
 
         if (this.insertMode.equalsIgnoreCase("increment")) {
             if (null == jdbcSinkConfig.getPrimaryKeys()
-                    || jdbcSinkConfig.getPrimaryKeys().isEmpty()) {
+                || jdbcSinkConfig.getPrimaryKeys().isEmpty()) {
                 throw new RuntimeException(String.format("增量更新模式下,未标示逻辑主键", tableName));
             }
             String tmpTableName = "UC_" + tableName;
@@ -105,7 +106,8 @@ public class PreConfig implements Serializable {
                 } catch (SQLException e) {
                     System.out.println("删除报错意味着没有表");
                 }
-            } else {
+            }
+            else {
                 String dropSql =
                         JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType())
                                 .dropTable(jdbcSinkConfig, tmpTableName);
@@ -128,6 +130,13 @@ public class PreConfig implements Serializable {
                                         .createIndex(tmpTableName, jdbcSinkConfig));
                 preparedStatement2.execute();
                 preparedStatement2.close();
+            }
+            if (jdbcSinkConfig.getDbType().equalsIgnoreCase("pgsql")) {
+                PreparedStatement preparedStatement = connection.prepareStatement(
+                        String.format("ALTER TABLE  \"%s\".\"%s\" REPLICA IDENTITY FULL",jdbcSinkConfig.getDbSchema(),
+                                tmpTableName));
+                preparedStatement.execute();
+                preparedStatement.close();
             }
         }
     }

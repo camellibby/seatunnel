@@ -209,6 +209,11 @@ public class JdbcSinkWriter
             log.info("更新数据:" + String.valueOf(updateCount));
             JSONObject param = new JSONObject();
             param.put("flinkJobId", this.flinkJobId);
+            param.put("dataSourceId", jdbcSinkConfig.getDbDatasourceId());
+            if (this.jdbcSinkConfig.getDbSchema() != null) {
+                param.put("dbSchema",this.jdbcSinkConfig.getDbSchema());
+            }
+            param.put("tableName", this.jdbcSinkConfig.getTable());
             param.put("insertCount", insertCount);
             param.put("modifyCount", updateCount);
             param.put("deleteCount", deleteCount);

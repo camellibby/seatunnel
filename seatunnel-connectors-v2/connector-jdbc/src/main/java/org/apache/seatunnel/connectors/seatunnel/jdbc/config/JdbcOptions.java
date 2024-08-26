@@ -244,4 +244,12 @@ public interface JdbcOptions {
                     .booleanType()
                     .noDefaultValue()
                     .withDescription("是否记录操作类型与时间戳");
+
+    Option<String> DB_DATASOURCE_ID =
+            Options.key("db_datasource_id")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("db_datasource_id");
+    Option<String> dbSchema =
+            Options.key("dbSchema").stringType().noDefaultValue().withDescription("数据库Schema");
 }

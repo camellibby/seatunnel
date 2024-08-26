@@ -61,13 +61,18 @@ public class ClickHouseTypeMapper implements JdbcDialectTypeMapper {
     private static final String CLICKHOUSE_INT16 = "INT16";
     private static final String CLICKHOUSE_INT32 = "INT32";
     private static final String CLICKHOUSE_INT64 = "INT64";
-
+    private static final String CLICKHOUSE_FLOAT64 = "FLOAT64";
+    private static final String CLICKHOUSE_FLOAT32= "FLOAT32";
 
     private static final String CLICKHOUSE_INT_NULLABLE = "NULLABLE(INT)";
     private static final String CLICKHOUSE_INT8_NULLABLE = "NULLABLE(INT8)";
     private static final String CLICKHOUSE_INT16_NULLABLE = "NULLABLE(INT16)";
     private static final String CLICKHOUSE_INT32_NULLABLE = "NULLABLE(INT32)";
     private static final String CLICKHOUSE_INT64_NULLABLE = "NULLABLE(INT64)";
+    private static final String CLICKHOUSE_FLOAT64_NULLABLE = "NULLABLE(FLOAT64)";
+    private static final String CLICKHOUSE_FLOAT32_NULLABLE = "NULLABLE(FLOAT32)";
+    private static final String CLICKHOUSE_NULLABLE_NOTHING = "NULLABLE(NOTHING)";
+    private static final String CLICKHOUSE_NOTHING = "NOTHING";
 
 
     private static final String CLICKHOUSE_INT_UNSIGNED = "INT UNSIGNED";
@@ -161,6 +166,10 @@ public class ClickHouseTypeMapper implements JdbcDialectTypeMapper {
             case CLICKHOUSE_DECIMAL_UNSIGNED:
                 return new DecimalType(precision + 1, scale);
             case CLICKHOUSE_FLOAT:
+            case CLICKHOUSE_FLOAT32:
+            case CLICKHOUSE_FLOAT64:
+            case CLICKHOUSE_FLOAT32_NULLABLE:
+            case CLICKHOUSE_FLOAT64_NULLABLE:
                 return BasicType.FLOAT_TYPE;
             case CLICKHOUSE_FLOAT_UNSIGNED:
                 LOG.warn("{} will probably cause value overflow.", CLICKHOUSE_FLOAT_UNSIGNED);
@@ -174,6 +183,8 @@ public class ClickHouseTypeMapper implements JdbcDialectTypeMapper {
             case CLICKHOUSE_NULLABLE_STRING:
             case CLICKHOUSE_LOWCARDINALITY_STRING:
             case CLICKHOUSE_JSON:
+            case CLICKHOUSE_NULLABLE_NOTHING:
+            case CLICKHOUSE_NOTHING :
                 return BasicType.STRING_TYPE;
             case CLICKHOUSE_DATE:
                 return LocalTimeType.LOCAL_DATE_TYPE;
@@ -196,10 +207,9 @@ public class ClickHouseTypeMapper implements JdbcDialectTypeMapper {
             case CLICKHOUSE_UNKNOWN:
             default:
                 final String jdbcColumnName = metadata.getColumnName(colIndex);
-                throw new JdbcConnectorException(
-                        CommonErrorCode.UNSUPPORTED_DATA_TYPE,
+                throw new RuntimeException(
                         String.format(
-                                "Doesn't support CLickHouse type '%s' on column '%s'  yet.",
+                                "Doesn't support CLickHouse type '%s' on column '%s'  yet.请联系系统管理员",
                                 mysqlType, jdbcColumnName));
         }
     }
