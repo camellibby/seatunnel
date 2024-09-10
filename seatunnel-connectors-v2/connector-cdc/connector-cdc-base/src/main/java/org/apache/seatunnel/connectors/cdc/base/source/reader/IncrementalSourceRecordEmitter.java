@@ -119,7 +119,7 @@ public class IncrementalSourceRecordEmitter<T>
         final Iterator<SourceRecord> elementIterator = sourceRecords.iterator();
         while (elementIterator.hasNext()) {
             SourceRecord next = elementIterator.next();
-            System.out.println("实时偏移量: " + next.sourceOffset());
+//            System.out.println("实时偏移量: " + next.sourceOffset());
             reportMetrics(next);
             processElement(next, collector, splitState);
             markEnterPureIncrementPhase(next, splitState);
@@ -155,7 +155,7 @@ public class IncrementalSourceRecordEmitter<T>
                     && element.sourceOffset().containsKey("file")
                     && element.sourceOffset().get("file") != null
                     && element.sourceOffset().get("file") != "") {
-                    System.out.println("实时偏移量: " + element.sourceOffset());
+//                    System.out.println("实时偏移量: " + element.sourceOffset());
                     if (flinkJobId.isPresent()) {
                         JSONObject param = new JSONObject();
                         param.put("flinkJobId", flinkJobId.get());

@@ -573,7 +573,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             statisticalResults(conn);
             this.conn.close();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            log.error("接口退出错误", e);
         }
     }
 }

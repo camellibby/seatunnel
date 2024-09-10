@@ -1,357 +1,178 @@
 {
   "env": {
-    "job.mode": "STREAMING",
-    "isRecordErrorData": 0,
+    "job.mode": "BATCH",
+    "isRecordErrorData": 1,
     "execution.parallelism": 1,
-    "maxRecordNumber": 0,
-    "job.name": "2",
-    "checkpoint.interval": 5000
+    "maxRecordNumber": 100,
+    "job.name": "INT_CaiWuXiTong_T_STUDENT01"
   },
   "source": [
     {
-      "db_type": "MYSQL",
-      "base-url": "jdbc:mysql://111.172.106.210:60173/DB_SOURCE?useUnicode=yes&characterEncoding=UTF-8&useSSL=false&serverTimezone=UTC",
-      "password": "XIJIAgreat2020!$",
-      "query": "select * from DB_SOURCE.student_table3",
-      "table-names": [
-        "DB_SOURCE.student_table3"
+      "db_type": "ORACLE",
+      "dbSchema": "TESTCS",
+      "columns": [
+        "XH",
+        "NAME",
+        "STUDENTTYPE",
+        "COLLEGENAME",
+        "ADMINISTATIVECLASSNAME",
+        "EDUCATIONLENGTH",
+        "ENROLLYEAR"
       ],
-      "db_datasource_id": "1797079933655703553",
+      "query": " select  \"XH\",\"NAME\",\"STUDENTTYPE\",\"COLLEGENAME\",\"ADMINISTATIVECLASSNAME\",\"EDUCATIONLENGTH\",\"ENROLLYEAR\" from  \"TESTCS\".\"T_STUDENT01\" ",
+      "input_type": "table",
+      "db_datasource_id": "1831155282188505090",
       "result_columns": [
         {
-          "fullAlias": "(主键)id",
-          "nullable": true,
-          "typeName": "VARCHAR",
-          "isPrimaryKey": false,
-          "remark": "主键",
-          "type": "VARCHAR",
-          "database": "DB_SOURCE",
+          "fullAlias": "(学号)XH",
+          "nullable": false,
+          "isPrimaryKey": true,
+          "remark": "学号",
+          "type": "VARCHAR2",
           "decimalDigit": 0,
-          "size": 50,
+          "size": 100,
           "autoincrement": false,
-          "name": "id",
-          "finalAlias": "主键",
-          "table": "student_table3",
-          "order": 1,
-          "primaryKey": false
+          "name": "XH",
+          "finalAlias": "学号",
+          "order": 0,
+          "primaryKey": true,
+          "sourceColumn": "1831155282188505090.TESTCS.T_STUDENT01.XH"
         },
         {
-          "fullAlias": "(url地址)zpdz",
+          "fullAlias": "(姓名)NAME",
           "nullable": true,
-          "typeName": "VARCHAR",
           "isPrimaryKey": false,
-          "remark": "url地址",
-          "type": "VARCHAR",
-          "database": "DB_SOURCE",
+          "remark": "姓名",
+          "type": "VARCHAR2",
           "decimalDigit": 0,
-          "size": 200,
+          "size": 100,
           "autoincrement": false,
-          "name": "zpdz",
-          "finalAlias": "url地址",
-          "table": "student_table3",
-          "order": 2,
-          "primaryKey": false
+          "name": "NAME",
+          "finalAlias": "姓名",
+          "order": 0,
+          "primaryKey": false,
+          "sourceColumn": "1831155282188505090.TESTCS.T_STUDENT01.NAME"
         },
         {
-          "fullAlias": "(照片名称)zpmc",
+          "fullAlias": "(学生类型)STUDENTTYPE",
           "nullable": true,
-          "typeName": "VARCHAR",
           "isPrimaryKey": false,
-          "remark": "照片名称",
-          "type": "VARCHAR",
-          "database": "DB_SOURCE",
+          "remark": "学生类型",
+          "type": "VARCHAR2",
           "decimalDigit": 0,
-          "size": 50,
+          "size": 100,
           "autoincrement": false,
-          "name": "zpmc",
-          "finalAlias": "照片名称",
-          "table": "student_table3",
-          "order": 3,
-          "primaryKey": false
+          "name": "STUDENTTYPE",
+          "finalAlias": "学生类型",
+          "order": 0,
+          "primaryKey": false,
+          "sourceColumn": "1831155282188505090.TESTCS.T_STUDENT01.STUDENTTYPE"
         },
         {
-          "fullAlias": "(照片内容)zpwz",
+          "fullAlias": "(学校名称)COLLEGENAME",
           "nullable": true,
-          "typeName": "TEXT",
           "isPrimaryKey": false,
-          "remark": "照片内容",
-          "type": "TEXT",
-          "database": "DB_SOURCE",
+          "remark": "学校名称",
+          "type": "VARCHAR2",
           "decimalDigit": 0,
-          "size": 65535,
+          "size": 100,
           "autoincrement": false,
-          "name": "zpwz",
-          "finalAlias": "照片内容",
-          "table": "student_table3",
-          "order": 4,
-          "primaryKey": false
+          "name": "COLLEGENAME",
+          "finalAlias": "学校名称",
+          "order": 0,
+          "primaryKey": false,
+          "sourceColumn": "1831155282188505090.TESTCS.T_STUDENT01.COLLEGENAME"
         },
         {
-          "fullAlias": "(照片属性)zpsx",
+          "fullAlias": "(班级名称)ADMINISTATIVECLASSNAME",
           "nullable": true,
-          "typeName": "TEXT",
           "isPrimaryKey": false,
-          "remark": "照片属性",
-          "type": "TEXT",
-          "database": "DB_SOURCE",
+          "remark": "班级名称",
+          "type": "VARCHAR2",
           "decimalDigit": 0,
-          "size": 65535,
+          "size": 100,
           "autoincrement": false,
-          "name": "zpsx",
-          "finalAlias": "照片属性",
-          "table": "student_table3",
-          "order": 5,
-          "primaryKey": false
+          "name": "ADMINISTATIVECLASSNAME",
+          "finalAlias": "班级名称",
+          "order": 0,
+          "primaryKey": false,
+          "sourceColumn": "1831155282188505090.TESTCS.T_STUDENT01.ADMINISTATIVECLASSNAME"
+        },
+        {
+          "fullAlias": "(学制)EDUCATIONLENGTH",
+          "nullable": true,
+          "isPrimaryKey": false,
+          "remark": "学制",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 100,
+          "autoincrement": false,
+          "name": "EDUCATIONLENGTH",
+          "finalAlias": "学制",
+          "order": 0,
+          "primaryKey": false,
+          "sourceColumn": "1831155282188505090.TESTCS.T_STUDENT01.EDUCATIONLENGTH"
+        },
+        {
+          "fullAlias": "(注册年份)ENROLLYEAR",
+          "nullable": true,
+          "isPrimaryKey": false,
+          "remark": "注册年份",
+          "type": "VARCHAR2",
+          "decimalDigit": 0,
+          "size": 100,
+          "autoincrement": false,
+          "name": "ENROLLYEAR",
+          "finalAlias": "注册年份",
+          "order": 0,
+          "primaryKey": false,
+          "sourceColumn": "1831155282188505090.TESTCS.T_STUDENT01.ENROLLYEAR"
         }
       ],
       "result_table_name": "t1",
-      "plugin_name": "MySQL-CDC",
-      "user": "root",
-      "username": "root"
+      "plugin_name": "JDBC",
+      "table_name": "T_STUDENT01",
+      "url": "jdbc:oracle:thin:@111.172.106.210:41521/ORCL",
+      "password": "oracle",
+      "database": "ORCL",
+      "driver": "oracle.jdbc.driver.OracleDriver",
+      "user": "scott"
     }
   ],
-  "transform": [
+  "transform": [],
+  "sink": [
     {
-      "result_columns": [
-        {
-          "fullAlias": "(主键)id",
-          "nullable": true,
-          "typeName": "VARCHAR",
-          "remark": "主键",
-          "type": "VARCHAR",
-          "decimalDigit": 0,
-          "database": "DB_SOURCE",
-          "size": 50,
-          "autoincrement": false,
-          "name": "id",
-          "table": "student_table3",
-          "finalAlias": "主键",
-          "order": 1,
-          "primaryKey": false,
-          "sourceColumn": "1797079933655703553..student_table3.id"
-        },
-        {
-          "fullAlias": "(url地址)zpdz",
-          "nullable": true,
-          "typeName": "VARCHAR",
-          "remark": "url地址",
-          "type": "VARCHAR",
-          "decimalDigit": 0,
-          "database": "DB_SOURCE",
-          "size": 200,
-          "autoincrement": false,
-          "name": "zpdz",
-          "table": "student_table3",
-          "finalAlias": "url地址",
-          "order": 2,
-          "primaryKey": false,
-          "sourceColumn": "1797079933655703553..student_table3.zpdz"
-        },
-        {
-          "fullAlias": "(照片名称)zpmc",
-          "nullable": true,
-          "typeName": "VARCHAR",
-          "remark": "照片名称",
-          "type": "VARCHAR",
-          "decimalDigit": 0,
-          "database": "DB_SOURCE",
-          "size": 50,
-          "autoincrement": false,
-          "name": "zpmc",
-          "table": "student_table3",
-          "finalAlias": "照片名称",
-          "order": 3,
-          "primaryKey": false,
-          "sourceColumn": "1797079933655703553..student_table3.zpmc"
-        },
-        {
-          "fullAlias": "(照片内容)zpwz",
-          "nullable": true,
-          "typeName": "TEXT",
-          "remark": "照片内容",
-          "type": "TEXT",
-          "decimalDigit": 0,
-          "database": "DB_SOURCE",
-          "size": 65535,
-          "autoincrement": false,
-          "name": "zpwz",
-          "table": "student_table3",
-          "finalAlias": "照片内容",
-          "order": 4,
-          "primaryKey": false,
-          "sourceColumn": "1797079933655703553..student_table3.zpwz"
-        },
-        {
-          "fullAlias": "(照片属性)zpsx",
-          "nullable": true,
-          "typeName": "TEXT",
-          "remark": "照片属性",
-          "type": "TEXT",
-          "decimalDigit": 0,
-          "database": "DB_SOURCE",
-          "size": 65535,
-          "autoincrement": false,
-          "name": "zpsx",
-          "table": "student_table3",
-          "finalAlias": "照片属性",
-          "order": 5,
-          "primaryKey": false,
-          "sourceColumn": "1797079933655703553..student_table3.zpsx"
-        }
+      "db_type": "ORACLE",
+      "dbSchema": "ALICE_ODS",
+      "primary_keys": [
+        "XH"
       ],
+      "db_datasource_id": "1828600489370824706",
       "source_table_name": [
         "t1"
       ],
-      "result_table_name": "t3",
-      "plugin_name": "Encrypt",
-      "encrypt_columns": [
-        "zpmc"
-      ]
-    },
-    {
-      "output_fields": [
-        "zp1",
-        "zp2"
-      ],
-      "split_field": "zpdz",
-      "result_columns": [
-        {
-          "fullAlias": "(主键)id",
-          "nullable": true,
-          "typeName": "VARCHAR",
-          "remark": "主键",
-          "type": "VARCHAR",
-          "decimalDigit": 0,
-          "database": "DB_SOURCE",
-          "size": 50,
-          "autoincrement": false,
-          "name": "id",
-          "table": "student_table3",
-          "finalAlias": "主键",
-          "order": 1,
-          "primaryKey": false,
-          "sourceColumn": "1797079933655703553..student_table3.id"
-        },
-        {
-          "fullAlias": "(url地址)zpdz",
-          "nullable": true,
-          "typeName": "VARCHAR",
-          "remark": "url地址",
-          "type": "VARCHAR",
-          "decimalDigit": 0,
-          "database": "DB_SOURCE",
-          "size": 200,
-          "autoincrement": false,
-          "name": "zpdz",
-          "table": "student_table3",
-          "finalAlias": "url地址",
-          "order": 2,
-          "primaryKey": false,
-          "sourceColumn": "1797079933655703553..student_table3.zpdz"
-        },
-        {
-          "fullAlias": "(照片名称)zpmc",
-          "nullable": true,
-          "typeName": "VARCHAR",
-          "remark": "照片名称",
-          "type": "VARCHAR",
-          "decimalDigit": 0,
-          "database": "DB_SOURCE",
-          "size": 50,
-          "autoincrement": false,
-          "name": "zpmc",
-          "table": "student_table3",
-          "finalAlias": "照片名称",
-          "order": 3,
-          "primaryKey": false,
-          "sourceColumn": "1797079933655703553..student_table3.zpmc"
-        },
-        {
-          "fullAlias": "(照片内容)zpwz",
-          "nullable": true,
-          "typeName": "TEXT",
-          "remark": "照片内容",
-          "type": "TEXT",
-          "decimalDigit": 0,
-          "database": "DB_SOURCE",
-          "size": 65535,
-          "autoincrement": false,
-          "name": "zpwz",
-          "table": "student_table3",
-          "finalAlias": "照片内容",
-          "order": 4,
-          "primaryKey": false,
-          "sourceColumn": "1797079933655703553..student_table3.zpwz"
-        },
-        {
-          "fullAlias": "(照片属性)zpsx",
-          "nullable": true,
-          "typeName": "TEXT",
-          "remark": "照片属性",
-          "type": "TEXT",
-          "decimalDigit": 0,
-          "database": "DB_SOURCE",
-          "size": 65535,
-          "autoincrement": false,
-          "name": "zpsx",
-          "table": "student_table3",
-          "finalAlias": "照片属性",
-          "order": 5,
-          "primaryKey": false,
-          "sourceColumn": "1797079933655703553..student_table3.zpsx"
-        },
-        {
-          "name": "zp1",
-          "remark": "zp1",
-          "type": "VARCHAR"
-        },
-        {
-          "name": "zp2",
-          "remark": "zp2",
-          "type": "VARCHAR"
-        }
-      ],
-      "source_table_name": [
-        "t3"
-      ],
-      "result_table_name": "t5",
-      "plugin_name": "Split",
-      "separator": "\\."
-    }
-  ],
-  "sink": [
-    {
-      "db_type": "MYSQL",
-      "dbSchema": "",
-      "primary_keys": [
-        "bh"
-      ],
-      "db_datasource_id": "1800365225788276738",
-      "source_table_name": [
-        "t5"
-      ],
-      "plugin_name": "JDBC",
-      "url": "jdbc:mysql://111.172.106.210:60173/testcs?useUnicode=yes&characterEncoding=UTF-8&useSSL=false&serverTimezone=UTC",
-      "value_mapper": {
-        "0": "bh",
-        "1": "dz",
-        "2": "mc",
-        "5": "zp1",
-        "6": "zp2"
-      },
-      "database": "testcs",
-      "password": "XIJIAgreat2020!$",
-      "driver": "com.mysql.cj.jdbc.Driver",
+      "plugin_name": "XJJDBC",
+      "url": "jdbc:oracle:thin:@111.172.106.210:41521/ORCL",
+      "password": "oracle",
+      "driver": "oracle.jdbc.driver.OracleDriver",
       "field_mapper": {
-        "zpdz": "dz",
-        "zpmc": "mc",
-        "zp1": "zp1",
-        "id": "bh",
-        "zp2": "zp2"
+        "XH": "XH",
+        "EDUCATIONLENGTH": "EDUCATIONLENGTH",
+        "STUDENTTYPE": "STUDENTTYPE",
+        "ADMINISTATIVECLASSNAME": "ADMINISTATIVECLASSNAME",
+        "COLLEGENAME": "COLLEGENAME",
+        "ENROLLYEAR": "ENROLLYEAR",
+        "NAME": "NAME"
       },
-      "generate_sink_sql": true,
-      "user": "root",
-      "table": "model202"
+      "user": "scott",
+      "table": "T_CAIWUXITONG_T_STUDENT01",
+      "pre_config": {
+        "cleanTableWhenCompleteNoDataIn": false,
+        "ignoreTstamp": true,
+        "cleanTableWhenComplete": true,
+        "incrementMode": "update",
+        "insertMode": "increment"
+      }
     }
   ]
 }

@@ -151,7 +151,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         }
         try {
             insertTmpUks(oldRows, this.metaDataHash, conn);
-            compareData(sourceRows);
+            this.compareData(sourceRows);
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -170,17 +170,21 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                             SeaTunnelRow sinkRowIgnoreTstamp = this.copyIgnoreTstamp(sinkRow);
                             if (!sourceRowIgnoreTstamp.equals(sinkRowIgnoreTstamp)) {
                                 needUpdate.put(k, sourceRow);
-                            } else {
-                                this.keepCount++;
                             }
-                        } else {
-                            if (!sourceRow.equals(sinkRow)) {
-                                needUpdate.put(k, sourceRow);
-                            } else {
+                            else {
                                 this.keepCount++;
                             }
                         }
-                    } else {
+                        else {
+                            if (!sourceRow.equals(sinkRow)) {
+                                needUpdate.put(k, sourceRow);
+                            }
+                            else {
+                                this.keepCount++;
+                            }
+                        }
+                    }
+                    else {
                         needInsertRows.add(sourceRow);
                     }
                 });
@@ -246,8 +250,9 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                 this.consumeData();
                 cld.clear();
             }
-        } else if (jobContext.getJobMode().equals(JobMode.STREAMING)
-                && element.getRowKind().equals(RowKind.DELETE)) {
+        }
+        else if (jobContext.getJobMode().equals(JobMode.STREAMING)
+                 && element.getRowKind().equals(RowKind.DELETE)) {
             this.consumeData();
             cld.clear();
             {
@@ -258,18 +263,19 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                                     .collect(Collectors.toList());
                     long del = 0;
                     if (this.jdbcSinkConfig.getDbSchema() != null
-                            && !this.jdbcSinkConfig.getDbSchema().equals("")) {
+                        && !this.jdbcSinkConfig.getDbSchema().equals("")) {
                         del =
                                 this.jdbcDialect.deleteData(
                                         conn,
                                         this.jdbcSinkConfig.getDbSchema() + "." + table,
                                         this.jdbcSinkConfig.getDbSchema() + "." + tmpTable,
                                         ucColumns);
-                    } else if (null != this.jdbcSinkConfig.getPreConfig().getClusterName()
-                            && !this.jdbcSinkConfig
-                                    .getPreConfig()
-                                    .getClusterName()
-                                    .equalsIgnoreCase("")) {
+                    }
+                    else if (null != this.jdbcSinkConfig.getPreConfig().getClusterName()
+                             && !this.jdbcSinkConfig
+                            .getPreConfig()
+                            .getClusterName()
+                            .equalsIgnoreCase("")) {
                         del =
                                 this.jdbcDialect.deleteDataOnCluster(
                                         conn,
@@ -277,7 +283,8 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                                         tmpTable,
                                         ucColumns,
                                         this.jdbcSinkConfig.getPreConfig().getClusterName());
-                    } else {
+                    }
+                    else {
                         del = this.jdbcDialect.deleteData(conn, table, tmpTable, ucColumns);
                     }
                     conn.commit();
@@ -290,13 +297,15 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                 truncateTable.setFlinkJobId(this.jobContext.getJobId());
                 truncateTable.setDataSourceId(this.jdbcSinkConfig.getDbDatasourceId());
                 if (this.jdbcSinkConfig.getDbSchema() != null
-                        && !this.jdbcSinkConfig.getDbSchema().equalsIgnoreCase("")) {
+                    && !this.jdbcSinkConfig.getDbSchema().equalsIgnoreCase("")) {
                     truncateTable.setDbSchema(this.jdbcSinkConfig.getDbSchema());
                     truncateTable.setTableName(this.jdbcSinkConfig.getDbSchema() + "." + tmpTable);
-                } else {
+                }
+                else {
                     if (this.jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
                         truncateTable.setTableName(String.format("`%s`", tmpTable));
-                    } else {
+                    }
+                    else {
                         truncateTable.setTableName(tmpTable);
                     }
                 }
@@ -378,8 +387,8 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                     } catch (SQLException ee) {
                         this.errorCount++;
                         if (this.jobContext.getIsRecordErrorData() == 1
-                                && this.errorCount <= this.jobContext.getMaxRecordNumber()
-                                && !sqlErrorType.contains(ee.getMessage())) {
+                            && this.errorCount <= this.jobContext.getMaxRecordNumber()
+                            && !sqlErrorType.contains(ee.getMessage())) {
                             LinkedHashMap<String, Object> jsonObject = new LinkedHashMap<>();
                             for (int i = 0; i < this.columnMappers.size(); i++) {
                                 jsonObject.put(
@@ -429,13 +438,14 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
             if (jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
                 templateInsert =
                         "update `<table>` set "
-                                + "<columns:{sub | `<sub.sinkColumnName>` = ? }; separator=\", \"> "
-                                + " where  <pks:{pk | `<pk.sinkColumnName>` = ? }; separator=\" and \"> ";
-            } else {
+                        + "<columns:{sub | `<sub.sinkColumnName>` = ? }; separator=\", \"> "
+                        + " where  <pks:{pk | `<pk.sinkColumnName>` = ? }; separator=\" and \"> ";
+            }
+            else {
                 templateInsert =
                         "update <table> set "
-                                + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> "
-                                + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
+                        + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> "
+                        + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
             }
 
             ST template = new ST(templateInsert);
@@ -504,8 +514,8 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                     this.columnMappers.stream().filter(x -> !x.isUc()).collect(Collectors.toList());
             String templateInsert =
                     "update <table> set "
-                            + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> "
-                            + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
+                    + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> "
+                    + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
             ST template = new ST(templateInsert);
             template.add("table", jdbcSinkConfig.getTable());
             template.add("columns", columnMappers);
@@ -544,8 +554,8 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                 } catch (SQLException ee) {
                     this.errorCount++;
                     if (this.jobContext.getIsRecordErrorData() == 1
-                            && this.errorCount.longValue() <= this.jobContext.getMaxRecordNumber()
-                            && !sqlErrorType.contains(ee.getMessage())) {
+                        && this.errorCount.longValue() <= this.jobContext.getMaxRecordNumber()
+                        && !sqlErrorType.contains(ee.getMessage())) {
                         LinkedHashMap<String, Object> jsonObject = new LinkedHashMap<>();
                         for (int i = 0; i < this.columnMappers.size(); i++) {
                             jsonObject.put(
@@ -648,18 +658,19 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                                 .collect(Collectors.toList());
                 long del = 0;
                 if (this.jdbcSinkConfig.getDbSchema() != null
-                        && !this.jdbcSinkConfig.getDbSchema().equals("")) {
+                    && !this.jdbcSinkConfig.getDbSchema().equals("")) {
                     del =
                             this.jdbcDialect.deleteData(
                                     conn,
                                     this.jdbcSinkConfig.getDbSchema() + "." + table,
                                     this.jdbcSinkConfig.getDbSchema() + "." + tmpTable,
                                     ucColumns);
-                } else if (null != this.jdbcSinkConfig.getPreConfig().getClusterName()
-                        && !this.jdbcSinkConfig
-                                .getPreConfig()
-                                .getClusterName()
-                                .equalsIgnoreCase("")) {
+                }
+                else if (null != this.jdbcSinkConfig.getPreConfig().getClusterName()
+                         && !this.jdbcSinkConfig
+                        .getPreConfig()
+                        .getClusterName()
+                        .equalsIgnoreCase("")) {
                     del =
                             this.jdbcDialect.deleteDataOnCluster(
                                     conn,
@@ -667,7 +678,8 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                                     tmpTable,
                                     ucColumns,
                                     this.jdbcSinkConfig.getPreConfig().getClusterName());
-                } else {
+                }
+                else {
                     del = this.jdbcDialect.deleteData(conn, table, tmpTable, ucColumns);
                 }
                 conn.commit();
@@ -738,7 +750,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
             statisticalResults(conn);
             conn.close();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            log.error("接口退出错误", e);
         }
     }
 

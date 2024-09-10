@@ -32,9 +32,9 @@ public class SeaTunnelApiExample {
     public static void main(String[] args)
             throws FileNotFoundException, URISyntaxException, CommandException {
         //本地json文件执行
-//        runLocal(args);
+        runLocal(args);
         //从数据库获取配置文件执行
-            runFromDb(args);
+//            runFromDb(args);
 
     }
 

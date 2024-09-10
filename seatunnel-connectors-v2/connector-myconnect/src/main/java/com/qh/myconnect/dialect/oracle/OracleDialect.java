@@ -123,12 +123,12 @@ public class OracleDialect implements JdbcDialect {
         String upsertSQL =
                 String.format(
                         " MERGE INTO %s TARGET"
-                                + " USING (%s) SOURCE"
-                                + " ON (%s) "
-                                + " WHEN MATCHED THEN"
-                                + " UPDATE SET %s"
-                                + " WHEN NOT MATCHED THEN"
-                                + " INSERT (%s) VALUES (%s)",
+                        + " USING (%s) SOURCE"
+                        + " ON (%s) "
+                        + " WHEN MATCHED THEN"
+                        + " UPDATE SET %s"
+                        + " WHEN NOT MATCHED THEN"
+                        + " INSERT (%s) VALUES (%s)",
                         tableIdentifier(database, tableName),
                         usingClause,
                         onConditions,
@@ -147,7 +147,8 @@ public class OracleDialect implements JdbcDialect {
                         queryTemplate, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
         if (fetchSize > 0) {
             statement.setFetchSize(fetchSize);
-        } else {
+        }
+        else {
             statement.setFetchSize(DEFAULT_ORACLE_FETCH_SIZE);
         }
         return statement;
@@ -159,7 +160,8 @@ public class OracleDialect implements JdbcDialect {
             throws SQLException {
         if (value == null) {
             preparedStatement.setObject(position, null);
-        } else {
+        }
+        else {
             switch (oracleType) {
                 case OracleTypeMapper.ORACLE_INTEGER:
                     preparedStatement.setInt(position, Integer.parseInt(value));
@@ -213,7 +215,7 @@ public class OracleDialect implements JdbcDialect {
                 case OracleTypeMapper.ORACLE_BFILE:
                     preparedStatement.setBytes(position, value.getBytes());
                     break;
-                    // Doesn't support yet
+                // Doesn't support yet
                 case OracleTypeMapper.ORACLE_UNKNOWN:
                 default:
                     throw new JdbcConnectorException(
@@ -249,8 +251,8 @@ public class OracleDialect implements JdbcDialect {
                 columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         String sqlQueryString =
                 " select <columns:{sub | \"<sub.sinkColumnName>\" }; separator=\", \"> "
-                        + "  from <dbSchema>.<table> a "
-                        + " where  ";
+                + "  from <dbSchema>.<table> a "
+                + " where  ";
         ST sqlQueryTemplate = new ST(sqlQueryString);
         sqlQueryTemplate.add("dbSchema", jdbcSinkConfig.getDbSchema());
         sqlQueryTemplate.add("table", jdbcSinkConfig.getTable());
@@ -268,7 +270,8 @@ public class OracleDialect implements JdbcDialect {
         String wheres = StringUtils.join(where, "  or ");
         if (rowSize == 0) {
             sqlQuery = sqlQuery + " 1=2";
-        } else {
+        }
+        else {
             sqlQuery = sqlQuery + wheres;
         }
         return sqlQuery;
@@ -280,11 +283,11 @@ public class OracleDialect implements JdbcDialect {
                 columns.stream().map(x -> "\"" + x + "\"").collect(Collectors.toList());
         String sql =
                 "insert into "
-                        + jdbcSinkConfig.getDbSchema()
-                        + "."
-                        + jdbcSinkConfig.getTable()
-                        + String.format("(%s)", StringUtils.join(newColumns, ","))
-                        + String.format("values (%s)", StringUtils.join(values, ","));
+                + jdbcSinkConfig.getDbSchema()
+                + "."
+                + jdbcSinkConfig.getTable()
+                + String.format("(%s)", StringUtils.join(newColumns, ","))
+                + String.format("values (%s)", StringUtils.join(values, ","));
         return sql;
     }
 
@@ -292,10 +295,10 @@ public class OracleDialect implements JdbcDialect {
             Connection connection, String table, String ucTable, List<ColumnMapper> ucColumns) {
         String delSql =
                 "delete from  <table> a   "
-                        + " where not exists "
-                        + "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> b where <pks:{pk | a.<pk.sinkColumnName>=b.<pk.sinkColumnName> }; separator=\" and \">  ) ";
+                + " where not exists "
+                + "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> b where <pks:{pk | a.<pk.sinkColumnName>=b.<pk.sinkColumnName> }; separator=\" and \">  ) ";
         ST template = new ST(delSql);
-        template.add("table", StringUtils.join(table.split("."),"."));
+        template.add("table", StringUtils.join(table.split("\\."), "."));
         template.add("tmpTable", ucTable);
         template.add("pks", ucColumns);
         PreparedStatement preparedStatement = null;
@@ -354,15 +357,15 @@ public class OracleDialect implements JdbcDialect {
                 columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         String sqlQueryString =
                 "select  "
-                        + " <columns:{sub | \"<sub.sinkColumnName>\"  }; separator=\", \"> "
-                        + "  from (select   "
-                        + " <columns:{sub | \"<sub.sinkColumnName>\"  }; separator=\", \"> "
-                        + "               ,OPERATEFLAG,row_number() over(partition by <ucs:{uc | \"<uc.sinkColumnName>\"   }; separator=\", \"> order by OPERATETIME desc) hang  "
-                        + "          from <dbSchema>.<table>  "
-                        + "         )  "
-                        + " where hang = 1  "
-                        + "   and  OPERATEFLAG in ('I', 'U')"
-                        + "   and <filter> ";
+                + " <columns:{sub | \"<sub.sinkColumnName>\"  }; separator=\", \"> "
+                + "  from (select   "
+                + " <columns:{sub | \"<sub.sinkColumnName>\"  }; separator=\", \"> "
+                + "               ,OPERATEFLAG,row_number() over(partition by <ucs:{uc | \"<uc.sinkColumnName>\"   }; separator=\", \"> order by OPERATETIME desc) hang  "
+                + "          from <dbSchema>.<table>  "
+                + "         )  "
+                + " where hang = 1  "
+                + "   and  OPERATEFLAG in ('I', 'U')"
+                + "   and <filter> ";
         ST sqlQueryTemplate = new ST(sqlQueryString);
         sqlQueryTemplate.add("dbSchema", jdbcSinkConfig.getDbSchema());
         sqlQueryTemplate.add("table", jdbcSinkConfig.getTable());
@@ -370,7 +373,8 @@ public class OracleDialect implements JdbcDialect {
         sqlQueryTemplate.add("ucs", ucColumns);
         if (rowSize == 0) {
             sqlQueryTemplate.add("filter", "1=2");
-        } else {
+        }
+        else {
             String where = "(";
             List<String> collect =
                     ucColumns.stream()
@@ -394,11 +398,12 @@ public class OracleDialect implements JdbcDialect {
         String sqlQuery = sqlQueryTemplate.render();
         return sqlQuery;
     }
+
     public Long getTableCount(Connection connection, @Nullable String schema, String table) {
         long count = 0L;
         try {
             PreparedStatement preparedStatement =
-                    connection.prepareStatement(format("select  count(1) sl  from \"%s\"", table));
+                    connection.prepareStatement(format("select  count(1) sl  from \"%s\".\"%s\"", schema, table));
             ResultSet resultSet = preparedStatement.executeQuery();
             if (resultSet.next()) {
                 count = resultSet.getLong("sl");
@@ -420,14 +425,14 @@ public class OracleDialect implements JdbcDialect {
         int insert = 0;
         String insertSql1 =
                 "select count(1) sl "
-                        + "  from (select * "
-                        + "          from (select <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \">, "
-                        + "                       OPERATEFLAG, "
-                        + "                       row_number() over(partition by <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \"> order by OPERATETIME desc) hang "
-                        + "                  from <dbSchema>.<table>) "
-                        + "         where hang = 1 "
-                        + "           and OPERATEFLAG in ('I', 'U')) "
-                        + " where <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \"> not in (select <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \"> from <dbSchema>.<ucTable>)";
+                + "  from (select * "
+                + "          from (select <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \">, "
+                + "                       OPERATEFLAG, "
+                + "                       row_number() over(partition by <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \"> order by OPERATETIME desc) hang "
+                + "                  from <dbSchema>.<table>) "
+                + "         where hang = 1 "
+                + "           and OPERATEFLAG in ('I', 'U')) "
+                + " where <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \"> not in (select <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \"> from <dbSchema>.<ucTable>)";
         ST template1 = new ST(insertSql1);
         template1.add("dbSchema", jdbcSinkConfig.getDbSchema());
         template1.add("table", jdbcSinkConfig.getTable());
@@ -450,16 +455,16 @@ public class OracleDialect implements JdbcDialect {
         }
         String insertSql =
                 "insert into <dbSchema>.<table>"
-                        + "  (<columns:{sub | \"<sub.sinkColumnName>\"  }; separator=\", \">, operateFlag, operateTime)"
-                        + " select  "
-                        + "  <columns:{sub | \"<sub.sinkColumnName>\" }; separator=\", \">, 'D' operateFlag, '<operateTime>' operateTime"
-                        + "  from (select *  "
-                        + "          from (select <columns:{sub | \"<sub.sinkColumnName>\" }; separator=\", \">,operateFlag,  "
-                        + "                       row_number() over(partition by <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \"> order by OPERATETIME desc) hang  "
-                        + "                  from <dbSchema>.<table>)  "
-                        + "         where hang = 1  "
-                        + "           and OPERATEFLAG in ('I', 'U'))  "
-                        + " where <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \"> not in (select <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \"> from  <dbSchema>.<ucTable> )";
+                + "  (<columns:{sub | \"<sub.sinkColumnName>\"  }; separator=\", \">, operateFlag, operateTime)"
+                + " select  "
+                + "  <columns:{sub | \"<sub.sinkColumnName>\" }; separator=\", \">, 'D' operateFlag, '<operateTime>' operateTime"
+                + "  from (select *  "
+                + "          from (select <columns:{sub | \"<sub.sinkColumnName>\" }; separator=\", \">,operateFlag,  "
+                + "                       row_number() over(partition by <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \"> order by OPERATETIME desc) hang  "
+                + "                  from <dbSchema>.<table>)  "
+                + "         where hang = 1  "
+                + "           and OPERATEFLAG in ('I', 'U'))  "
+                + " where <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \"> not in (select <pks:{pk | \"<pk.sinkColumnName>\" }; separator=\", \"> from  <dbSchema>.<ucTable> )";
         ST template = new ST(insertSql);
         template.add("dbSchema", jdbcSinkConfig.getDbSchema());
         template.add("table", jdbcSinkConfig.getTable());

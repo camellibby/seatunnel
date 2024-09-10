@@ -23,8 +23,6 @@ import org.apache.seatunnel.transform.sql.zeta.ZetaSQLEngine;
 
 public class SQLEngineFactory {
     public static SQLEngine getSQLEngine(EngineType engineType) {
-        System.out.println("AAAAAAAAAAAAAAAAAAAAAAAAA" + EngineType.values());
-
         switch (engineType) {
             case ZETA:
             case INTERNAL:

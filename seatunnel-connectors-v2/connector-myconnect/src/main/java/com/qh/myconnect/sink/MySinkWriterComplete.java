@@ -147,7 +147,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
             conn.close();
             statisticalResults();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            log.error("接口退出错误", e);
         }
     }
 

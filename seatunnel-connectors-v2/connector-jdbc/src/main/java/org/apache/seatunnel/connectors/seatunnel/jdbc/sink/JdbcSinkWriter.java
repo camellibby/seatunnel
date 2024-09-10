@@ -204,9 +204,9 @@ public class JdbcSinkWriter
     private void startLog() {
         ScheduledExecutorService service = new ScheduledThreadPoolExecutor(1);
         service.scheduleAtFixedRate(() -> {
-            log.info("插入数据:" + String.valueOf(insertCount));
-            log.info("删除数据:" + String.valueOf(deleteCount));
-            log.info("更新数据:" + String.valueOf(updateCount));
+//            log.info("插入数据:" + String.valueOf(insertCount));
+//            log.info("删除数据:" + String.valueOf(deleteCount));
+//            log.info("更新数据:" + String.valueOf(updateCount));
             JSONObject param = new JSONObject();
             param.put("flinkJobId", this.flinkJobId);
             param.put("dataSourceId", jdbcSinkConfig.getDbDatasourceId());
