@@ -149,6 +149,12 @@ public interface JdbcOptions {
                     .noDefaultValue()
                     .withDescription(
                             "Specify the field mapping relationship between input and output");
+    Option<Map<String, String>> CODE_MAPPER =
+            Options.key("code_mapper")
+                    .mapType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Specify the field mapping relationship between input and output");
 
     Option<PreConfig> PRE_CONFIG =
             Options.key("pre_config")
@@ -160,4 +166,5 @@ public interface JdbcOptions {
             Options.key("db_type").stringType().noDefaultValue().withDescription("数据库类型");
     Option<String> dbSchema =
             Options.key("dbSchema").stringType().noDefaultValue().withDescription("数据库Schema");
+
 }

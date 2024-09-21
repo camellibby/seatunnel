@@ -116,7 +116,7 @@ public class PreConfig implements Serializable {
                     drop.execute();
                     drop.close();
                 } catch (SQLException e) {
-                    System.out.println("删除报错意味着没有表");
+                    System.out.println(dropSql + "删除报错意味着没有表" + e.getMessage());
                 }
             }
             PreparedStatement preparedStatement1 =
@@ -133,7 +133,7 @@ public class PreConfig implements Serializable {
             }
             if (jdbcSinkConfig.getDbType().equalsIgnoreCase("pgsql")) {
                 PreparedStatement preparedStatement = connection.prepareStatement(
-                        String.format("ALTER TABLE  \"%s\".\"%s\" REPLICA IDENTITY FULL",jdbcSinkConfig.getDbSchema(),
+                        String.format("ALTER TABLE  \"%s\".\"%s\" REPLICA IDENTITY FULL", jdbcSinkConfig.getDbSchema(),
                                 tmpTableName));
                 preparedStatement.execute();
                 preparedStatement.close();

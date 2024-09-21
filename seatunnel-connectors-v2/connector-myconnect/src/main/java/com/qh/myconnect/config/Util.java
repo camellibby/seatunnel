@@ -137,20 +137,26 @@ public class Util {
             if (value instanceof java.util.Date) {
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
                 return formatter.format(((Date) value).toInstant());
-            } else if (value instanceof Long) {
+            }
+            else if (value instanceof Long) {
                 return Long.toString((Long) value);
-            } else if (value instanceof BigDecimal) {
+            }
+            else if (value instanceof BigDecimal) {
                 return ((BigDecimal) value).stripTrailingZeros().toPlainString();
-            } else if (value instanceof LocalDate) {
+            }
+            else if (value instanceof LocalDate) {
                 DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd");
                 return ((LocalDate) value).format(df);
-            } else if (value instanceof LocalDateTime) {
+            }
+            else if (value instanceof LocalDateTime) {
                 DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
                 return df.format((LocalDateTime) value);
-            } else if (value instanceof byte[]) {
+            }
+            else if (value instanceof byte[]) {
                 String newValue = Base64.getEncoder().encodeToString((byte[]) value);
                 return "data:image/png;base64," + newValue;
-            } else {
+            }
+            else {
                 return String.valueOf(value);
             }
         }
@@ -284,7 +290,8 @@ public class Util {
                 stringBuffer1.append(line);
             }
             result = stringBuffer1.toString();
-        } else {
+        }
+        else {
             // 处理失败响应
         }
         con.disconnect();
@@ -306,6 +313,24 @@ public class Util {
                 throw new JdbcConnectorException(
                         JdbcConnectorErrorCode.NO_SUITABLE_DRIVER,
                         "No suitable driver found for " + jdbcSinkConfig.getUrl());
+            }
+            return conn;
+        } catch (ClassNotFoundException | SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Connection getPanguConnection() {
+        try {
+            Driver driver = this.loadDriver("com.mysql.cj.jdbc.Driver");
+            Properties info = new Properties();
+            info.setProperty("user", System.getenv("PANGU_MYSQL_ROOT_USER"));
+            info.setProperty("password", System.getenv("PANGU_MYSQL_ROOT_PASSWORD"));
+            Connection conn = driver.connect(System.getenv("PANGU_MYSQL_URL"), info);
+            if (conn == null) {
+                throw new JdbcConnectorException(
+                        JdbcConnectorErrorCode.NO_SUITABLE_DRIVER,
+                        "业务mysql无法连接，请检查");
             }
             return conn;
         } catch (ClassNotFoundException | SQLException e) {

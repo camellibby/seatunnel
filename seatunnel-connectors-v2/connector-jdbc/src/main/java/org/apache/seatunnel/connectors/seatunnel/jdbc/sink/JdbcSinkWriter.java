@@ -49,16 +49,27 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.sql.Connection;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 @Slf4j
 public class JdbcSinkWriter
@@ -81,6 +92,8 @@ public class JdbcSinkWriter
 
     private final String flinkJobId;
 
+    private CodeConverter converter = new CodeConverter();
+
     public JdbcSinkWriter(
             JdbcDialect dialect,
             JdbcSinkConfig jdbcSinkConfig,
@@ -99,6 +112,26 @@ public class JdbcSinkWriter
                         dialect, connectionProvider, jdbcSinkConfig, tableSchema)
                         .build();
         this.flinkJobId = flinkJobId;
+        List<String> allDms = new ArrayList<>();
+        Map<String, String> dmMap = new HashMap<>();
+        Map<String, String> codeMapper = jdbcSinkConfig.getCodeMapper();
+        if (codeMapper != null) {
+            allDms = codeMapper.values().stream().filter(x -> x.startsWith("DM")).distinct().collect(Collectors.toList());
+        }
+        for (String allDm : allDms) {
+            String[] split = allDm.split("\\.");
+            String sql = String.format("select %s,%s from %s", split[2], split[3], split[1]);
+            try (Connection con = this.getPanguConnection();
+                 Statement stmt = con.createStatement()) {
+                ResultSet rs = stmt.executeQuery(sql);
+                while (rs.next()) {
+                    dmMap.put(allDm + "." + rs.getString(split[2]), rs.getString(split[3]));
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        converter.setDmMap(dmMap);
         startLog();
     }
 
@@ -166,12 +199,20 @@ public class JdbcSinkWriter
         List<String> columns = tableSchema.getColumns().stream().map(Column::getName).collect(Collectors.toList());
         Object[] newFields = new Object[columns.size()];
         Map<String, String> valueMapper = jdbcSinkConfig.getValueMapper();
+        Map<String, String> codeMapper = jdbcSinkConfig.getCodeMapper();
         if (valueMapper != null && !valueMapper.isEmpty()) {
             newFields = new Object[columns.size()];
             for (int i = 0; i < columns.size(); i++) {
                 String valueIndex = getKeyByValue(valueMapper, columns.get(i));
+                String code = codeMapper.get(columns.get(i));
                 if (valueIndex != null) {
-                    newFields[i] = element.getField(Integer.parseInt(valueIndex));
+                    if (code == null) {
+                        newFields[i] = element.getField(Integer.parseInt(valueIndex));
+                    }
+                    else {
+                        newFields[i] = converter.convert(code,
+                                String.valueOf(element.getField(Integer.parseInt(valueIndex))));
+                    }
                 }
             }
         }
@@ -211,7 +252,7 @@ public class JdbcSinkWriter
             param.put("flinkJobId", this.flinkJobId);
             param.put("dataSourceId", jdbcSinkConfig.getDbDatasourceId());
             if (this.jdbcSinkConfig.getDbSchema() != null) {
-                param.put("dbSchema",this.jdbcSinkConfig.getDbSchema());
+                param.put("dbSchema", this.jdbcSinkConfig.getDbSchema());
             }
             param.put("tableName", this.jdbcSinkConfig.getTable());
             param.put("insertCount", insertCount);
@@ -223,7 +264,7 @@ public class JdbcSinkWriter
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-        }, 1,2, TimeUnit.SECONDS);
+        }, 1, 2, TimeUnit.SECONDS);
     }
 
     @Override
@@ -273,6 +314,7 @@ public class JdbcSinkWriter
         }
         return null; // 如果找不到，返回null
     }
+
     public String sendPostRequest(String url, String data) throws Exception {
         URL apiUrl = new URL(url);
         HttpURLConnection con = (HttpURLConnection) apiUrl.openConnection();
@@ -300,10 +342,50 @@ public class JdbcSinkWriter
                 stringBuffer1.append(line);
             }
             result = stringBuffer1.toString();
-        } else {
+        }
+        else {
             // 处理失败响应
         }
         con.disconnect();
         return result;
+    }
+
+    public Connection getPanguConnection() {
+        try {
+            Driver driver = this.loadDriver("com.mysql.cj.jdbc.Driver");
+            Properties info = new Properties();
+            info.setProperty("user", System.getenv("PANGU_MYSQL_ROOT_USER"));
+            info.setProperty("password", System.getenv("PANGU_MYSQL_ROOT_PASSWORD"));
+            Connection conn = driver.connect(System.getenv("PANGU_MYSQL_URL"), info);
+            if (conn == null) {
+                throw new JdbcConnectorException(
+                        JdbcConnectorErrorCode.NO_SUITABLE_DRIVER,
+                        "业务mysql无法连接，请检查");
+            }
+            return conn;
+        } catch (ClassNotFoundException | SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public java.sql.Driver loadDriver(String driverName) throws ClassNotFoundException {
+        checkNotNull(driverName);
+        Enumeration<Driver> drivers = DriverManager.getDrivers();
+        while (drivers.hasMoreElements()) {
+            java.sql.Driver driver = drivers.nextElement();
+            if (driver.getClass().getName().equals(driverName)) {
+                return driver;
+            }
+        }
+        Class<?> clazz =
+                Class.forName(driverName, true, Thread.currentThread().getContextClassLoader());
+        try {
+            return (java.sql.Driver) clazz.getDeclaredConstructor().newInstance();
+        } catch (Exception ex) {
+            throw new JdbcConnectorException(
+                    JdbcConnectorErrorCode.CREATE_DRIVER_FAILED,
+                    "Fail to create driver of class " + driverName,
+                    ex);
+        }
     }
 }

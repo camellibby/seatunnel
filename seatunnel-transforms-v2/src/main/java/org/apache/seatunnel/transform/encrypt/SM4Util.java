@@ -23,7 +23,7 @@ import java.util.Arrays;
  * @since
  * @email marydon20170307@163.com
  */
-public class SM4Util {
+    public class SM4Util {
 
     static {
         Security.addProvider(new BouncyCastleProvider());

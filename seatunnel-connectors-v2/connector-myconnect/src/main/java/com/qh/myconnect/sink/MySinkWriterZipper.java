@@ -1,5 +1,7 @@
 package com.qh.myconnect.sink;
 
+import com.qh.myconnect.converter.CodeConverter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
@@ -22,6 +24,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -50,7 +53,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     private final JdbcSinkConfig jdbcSinkConfig;
     private JobContext jobContext;
     private LocalDateTime startTime;
-    private int batchSize = 2000;
+    private int batchSize = 1000;
     private JdbcDialect jdbcDialect;
     private String table;
     private String tmpTable;
@@ -66,6 +69,8 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
 
     private Set sqlErrorType = new HashSet();
     private final Integer currentTaskId;
+
+    private CodeConverter converter = new CodeConverter();
 
     public MySinkWriterZipper(
             SeaTunnelRowType seaTunnelRowType,
@@ -139,10 +144,12 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                     if (null != sinkRow) {
                         if (!sourceRow.equals(sinkRow)) {
                             needUpdate.put(k, sourceRow);
-                        } else {
+                        }
+                        else {
                             this.keepCount++;
                         }
-                    } else {
+                    }
+                    else {
                         needInsertRows.add(sourceRow);
                     }
                 });
@@ -154,8 +161,27 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             JdbcSinkConfig jdbcSinkConfig,
             SeaTunnelRowType sourceRowType,
             SeaTunnelRowType sinkTableRowType,
-            Connection conn) {
+            Connection conn) throws SQLException {
         Map<String, String> fieldMapper = jdbcSinkConfig.getFieldMapper();
+        Map<String, String> codeMapper = jdbcSinkConfig.getCodeMapper();
+        Map<String, String> dmMap = new HashMap<>();
+        List<String> allDms = new ArrayList<>();
+        if (codeMapper != null) {
+            allDms = codeMapper.values().stream().filter(x -> x.startsWith("DM")).distinct().collect(Collectors.toList());
+        }
+        for (String allDm : allDms) {
+            String[] split = allDm.split("\\.");
+            String sql = String.format("select %s,%s from %s", split[2], split[3], split[1]);
+            try (Connection con = util.getPanguConnection();
+                 Statement stmt = con.createStatement()) {
+                ResultSet rs = stmt.executeQuery(sql);
+                while (rs.next()) {
+                    dmMap.put(allDm + "." + rs.getString(split[2]), rs.getString(split[3]));
+                }
+            }
+        }
+        converter.setDmMap(dmMap);
+
         fieldMapper.forEach(
                 (k, v) -> {
                     ColumnMapper columnMapper = new ColumnMapper();
@@ -195,6 +221,17 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
+                    if (codeMapper != null) {
+                        String safeCode = codeMapper.get(v);
+                        if (safeCode != null && StringUtils.isNoneBlank(safeCode)) {
+                            if (safeCode.startsWith("DM")) {
+                                columnMapper.setConverter(converter.dmConverter(safeCode));
+                            }
+                            else if (safeCode.startsWith("ENCRYPT")) {
+                                columnMapper.setConverter(converter.encryptConverter(safeCode));
+                            }
+                        }
+                    }
                     columnMappers.add(columnMapper);
                 });
     }
@@ -202,6 +239,12 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     @Override
     public void write(SeaTunnelRow element) {
         this.writeCount++;
+        for (int i = 0; i < columnMappers.size(); i++) {
+            Integer sourceRowPosition = columnMappers.get(i).getSourceRowPosition();
+            if (sourceRowPosition != null) {
+                element.setField(sourceRowPosition, columnMappers.get(i).getConverter().apply(element.getField(sourceRowPosition)));
+            }
+        }
         this.cld.add(element);
         if (this.writeCount.longValue() % batchSize == 0) {
             this.consumeData();
@@ -261,6 +304,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             this.insertCount = tmpInsertCount;
             doInsertOneByOne(rows);
         }
+
     }
 
     private void doInsertOneByOne(List<SeaTunnelRow> rows) throws Exception {
@@ -299,8 +343,8 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             } catch (SQLException e) {
                 this.errorCount++;
                 if (this.jobContext.getIsRecordErrorData() == 1
-                        && this.errorCount <= this.jobContext.getMaxRecordNumber()
-                        && !sqlErrorType.contains(e.getMessage())) {
+                    && this.errorCount <= this.jobContext.getMaxRecordNumber()
+                    && !sqlErrorType.contains(e.getMessage())) {
                     LinkedHashMap<String, Object> jsonObject = new LinkedHashMap<>();
                     for (int i = 0; i < columnMappers.size(); i++) {
                         jsonObject.put(columnMappers.get(i).getSourceColumnName(), row.getField(i));
@@ -323,6 +367,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                     }
                 }
             }
+
         }
     }
 
@@ -419,8 +464,8 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                 } catch (SQLException e) {
                     this.errorCount++;
                     if (this.jobContext.getIsRecordErrorData() == 1
-                            && this.errorCount <= this.jobContext.getMaxRecordNumber()
-                            && !sqlErrorType.contains(e.getMessage())) {
+                        && this.errorCount <= this.jobContext.getMaxRecordNumber()
+                        && !sqlErrorType.contains(e.getMessage())) {
                         LinkedHashMap<String, Object> jsonObject = new LinkedHashMap<>();
                         for (int i = 0; i < columnMappers.size(); i++) {
                             jsonObject.put(

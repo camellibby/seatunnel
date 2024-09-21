@@ -59,7 +59,9 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
                              jdbcSinkConfig.getPassWord())) {
             JdbcDialect jdbcDialect = JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType());
             if (jdbcSinkConfig.getDbType().equalsIgnoreCase("oracle")
-                || jdbcSinkConfig.getDbType().equalsIgnoreCase("pgsql")) {
+                || jdbcSinkConfig.getDbType().equalsIgnoreCase("pgsql")
+                || jdbcSinkConfig.getDbType().equalsIgnoreCase("sqlserver")
+            ) {
                 this.tableCount =
                         jdbcDialect.getTableCount(
                                 conn,

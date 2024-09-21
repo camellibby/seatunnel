@@ -139,7 +139,7 @@ public abstract class AbstractJdbcRowConverter implements JdbcRowConverter {
 
             switch (seaTunnelDataType.getSqlType()) {
                 case STRING:
-                    statement.setString(statementIndex, row.getField(fieldIndex).toString().replace("\0", ""));
+                    statement.setString(statementIndex, row.getField(fieldIndex) == null ? null : row.getField(fieldIndex).toString().replace("\0", ""));
                     break;
                 case BOOLEAN:
                     statement.setBoolean(statementIndex, (Boolean) row.getField(fieldIndex));

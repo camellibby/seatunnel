@@ -231,6 +231,12 @@ public interface JdbcOptions {
                     .noDefaultValue()
                     .withDescription(
                             "Specify the field mapping relationship between input and output");
+    Option<Map<String, String>> CODE_MAPPER =
+            Options.key("code_mapper")
+                    .mapType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "code_mapper");
 
     Option<List<String>> ALL_Columns =
             Options.key("allColumns")

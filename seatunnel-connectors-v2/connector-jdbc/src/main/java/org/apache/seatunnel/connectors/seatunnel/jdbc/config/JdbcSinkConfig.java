@@ -48,6 +48,7 @@ public class JdbcSinkConfig implements Serializable {
     private boolean useCopyStatement;
     private Map<String, String> fieldMapper;
     private Map<String, String> valueMapper;
+    private Map<String, String> codeMapper;
     private Boolean recordOperation;
     private String dbDatasourceId;
     private String dbSchema;
@@ -66,6 +67,7 @@ public class JdbcSinkConfig implements Serializable {
         builder.useCopyStatement(config.get(JdbcOptions.USE_COPY_STATEMENT));
         config.getOptional(JdbcOptions.FIELD_MAPPER).ifPresent(builder::fieldMapper);
         config.getOptional(JdbcOptions.VALUE_MAPPER).ifPresent(builder::valueMapper);
+        config.getOptional(JdbcOptions.CODE_MAPPER).ifPresent(builder::codeMapper);
         config.getOptional(JdbcOptions.recordOperation).ifPresent(builder::recordOperation);
         config.getOptional(JdbcOptions.DB_DATASOURCE_ID).ifPresent(builder::dbDatasourceId);
         config.getOptional(JdbcOptions.dbSchema).ifPresent(builder::dbSchema);

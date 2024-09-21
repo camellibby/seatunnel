@@ -59,13 +59,14 @@ public class PostgresJdbcRowConverter extends AbstractJdbcRowConverter {
             switch (seaTunnelDataType.getSqlType()) {
                 case STRING:
                     if (metaDataColumnType.equals(PG_GEOMETRY)
-                            || metaDataColumnType.equals(PG_GEOGRAPHY)) {
+                        || metaDataColumnType.equals(PG_GEOGRAPHY)) {
                         fields[fieldIndex] =
                                 rs.getObject(resultSetIndex) == null
                                         ? null
                                         : rs.getObject(resultSetIndex).toString();
-                    } else {
-                        fields[fieldIndex] = JdbcFieldTypeUtils.getString(rs, resultSetIndex).replace("\0", "");
+                    }
+                    else {
+                        fields[fieldIndex] = JdbcFieldTypeUtils.getString(rs, resultSetIndex) == null ? null : JdbcFieldTypeUtils.getString(rs, resultSetIndex).replace("\0", "");
                     }
                     break;
                 case BOOLEAN:
@@ -127,7 +128,8 @@ public class PostgresJdbcRowConverter extends AbstractJdbcRowConverter {
                             .getTypeClass()
                             .equals(arrayObject.getClass())) {
                         fields[fieldIndex] = arrayObject;
-                    } else {
+                    }
+                    else {
                         throw new JdbcConnectorException(
                                 CommonErrorCodeDeprecated.UNSUPPORTED_DATA_TYPE,
                                 "Unexpected value: " + seaTunnelDataType.getTypeClass());

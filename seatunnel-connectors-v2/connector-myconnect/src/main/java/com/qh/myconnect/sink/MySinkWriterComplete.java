@@ -1,5 +1,7 @@
 package com.qh.myconnect.sink;
 
+import com.qh.myconnect.converter.CodeConverter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
@@ -26,6 +28,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -73,6 +76,8 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
     private final Integer currentTaskId;
 
     private Set sqlErrorType = new HashSet();
+
+    private CodeConverter converter = new CodeConverter();
 
     public MySinkWriterComplete(SeaTunnelRowType seaTunnelRowType, Context context, ReadonlyConfig config, JobContext jobContext, Long tableCount) throws SQLException {
         this.jobContext = jobContext;
@@ -164,7 +169,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
                 if (seaTunnelRow != null) {
                     for (int i = 0; i < this.columnMappers.size(); i++) {
                         Integer valueIndex = this.columnMappers.get(i).getSourceRowPosition();
-                        Object field = seaTunnelRow.getField(valueIndex);
+                        Object field = this.columnMappers.get(i).getConverter().apply(seaTunnelRow.getField(valueIndex));
                         String column = columns.get(i);
                         String dbType = metaDataHash.get(column);
                         jdbcDialect.setPreparedStatementValueByDbType(i + 1, psUpsert, dbType, util.Object2String(field));
@@ -222,13 +227,12 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
             List<String> columns = this.columnMappers.stream().map(x -> x.getSinkColumnName()).collect(Collectors.toList());
             List<String> values = this.columnMappers.stream().map(x -> "?").collect(Collectors.toList());
             String sql = jdbcDialect.insertTableSql(this.jdbcSinkConfig, columns, values);
-
             for (SeaTunnelRow seaTunnelRow : this.cld) {
                 if (seaTunnelRow != null) {
                     PreparedStatement psUpsert = conn.prepareStatement(sql);
                     for (int i = 0; i < this.columnMappers.size(); i++) {
                         Integer valueIndex = this.columnMappers.get(i).getSourceRowPosition();
-                        Object field = seaTunnelRow.getField(valueIndex);
+                        Object field = this.columnMappers.get(i).getConverter().apply(seaTunnelRow.getField(valueIndex));
                         String column = columns.get(i);
                         String dbType = metaDataHash.get(column);
                         jdbcDialect.setPreparedStatementValueByDbType(i + 1, psUpsert, dbType, util.Object2String(field));
@@ -272,6 +276,24 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
 
     private void initColumnMappers(JdbcSinkConfig jdbcSinkConfig, SeaTunnelRowType sourceRowType, SeaTunnelRowType sinkTableRowType, Connection conn) throws SQLException {
         Map<String, String> fieldMapper = jdbcSinkConfig.getFieldMapper();
+        Map<String, String> codeMapper = jdbcSinkConfig.getCodeMapper();
+        Map<String, String> dmMap = new HashMap<>();
+        List<String> allDms = new ArrayList<>();
+        if (codeMapper != null) {
+            allDms = codeMapper.values().stream().filter(x -> x.startsWith("DM")).distinct().collect(Collectors.toList());
+        }
+        for (String allDm : allDms) {
+            String[] split = allDm.split("\\.");
+            String sql = String.format("select %s,%s from %s", split[2], split[3], split[1]);
+            try (Connection con = util.getPanguConnection();
+                 Statement stmt = con.createStatement()) {
+                ResultSet rs = stmt.executeQuery(sql);
+                while (rs.next()) {
+                    dmMap.put(allDm + "." + rs.getString(split[2]), rs.getString(split[3]));
+                }
+            }
+        }
+        converter.setDmMap(dmMap);
         fieldMapper.forEach((k, v) -> {
             ColumnMapper columnMapper = new ColumnMapper();
             columnMapper.setSourceColumnName(k);
@@ -293,6 +315,17 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
                 }
             } catch (SQLException e) {
                 throw new RuntimeException(e);
+            }
+            if (codeMapper != null) {
+                String safeCode = codeMapper.get(v);
+                if (safeCode != null && StringUtils.isNoneBlank(safeCode)) {
+                    if (safeCode.startsWith("DM")) {
+                        columnMapper.setConverter(converter.dmConverter(safeCode));
+                    }
+                    else if (safeCode.startsWith("ENCRYPT")) {
+                        columnMapper.setConverter(converter.encryptConverter(safeCode));
+                    }
+                }
             }
             columnMappers.add(columnMapper);
         });

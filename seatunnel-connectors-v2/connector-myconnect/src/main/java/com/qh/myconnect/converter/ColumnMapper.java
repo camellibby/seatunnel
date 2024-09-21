@@ -2,6 +2,8 @@ package com.qh.myconnect.converter;
 
 import lombok.Data;
 
+import java.util.function.Function;
+
 @Data
 public class ColumnMapper {
     private String sourceColumnName;
@@ -12,4 +14,5 @@ public class ColumnMapper {
     private Integer sinkRowPosition;
     private boolean uc = false;
     private String sinkColumnDbType;
+    private Function<Object, Object> converter = str ->  str;
 }
