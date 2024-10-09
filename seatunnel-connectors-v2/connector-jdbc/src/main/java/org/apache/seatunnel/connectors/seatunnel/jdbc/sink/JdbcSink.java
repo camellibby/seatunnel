@@ -111,8 +111,8 @@ public class JdbcSink
             try {
                 Field field = aClass.getDeclaredField("jobId");
                 field.setAccessible(true);
-                Object jobid = field.get(defaultEventProcessor);
-                flinkJobId = Optional.of(String.valueOf(jobid));
+                Object jobId = field.get(defaultEventProcessor);
+                flinkJobId = Optional.of(String.valueOf(jobId));
             } catch (NoSuchFieldException | IllegalAccessException e) {
                 throw new RuntimeException(e);
             }

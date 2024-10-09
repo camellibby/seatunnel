@@ -140,4 +140,43 @@ public class PreConfig implements Serializable {
             }
         }
     }
+
+    public void dropUcTable(Connection connection, JdbcSinkConfig jdbcSinkConfig) throws SQLException{
+        String tableName = jdbcSinkConfig.getTable();
+        if (this.insertMode.equalsIgnoreCase("increment")) {
+            String tmpTableName = "UC_" + tableName;
+            String copyTableOnlyColumnSql =
+                    JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType())
+                            .copyTableOnlyColumn(tableName, tmpTableName, jdbcSinkConfig);
+            if (clusterName != null && !clusterName.equalsIgnoreCase("")) {
+                String dropSqlCluster =
+                        JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType())
+                                .dropTableOnCluster(
+                                        jdbcSinkConfig,
+                                        ((ClickHouseConnectionImpl) connection)
+                                                .getCurrentDatabase(),
+                                        tmpTableName,
+                                        clusterName);
+                try {
+                    PreparedStatement drop = connection.prepareStatement(dropSqlCluster);
+                    drop.execute();
+                    drop.close();
+                } catch (SQLException e) {
+                    System.out.println("删除报错意味着没有表");
+                }
+            }
+            else {
+                String dropSql =
+                        JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType())
+                                .dropTable(jdbcSinkConfig, tmpTableName);
+                try {
+                    PreparedStatement drop = connection.prepareStatement(dropSql);
+                    drop.execute();
+                    drop.close();
+                } catch (SQLException e) {
+                    System.out.println(dropSql + "删除报错意味着没有表" + e.getMessage());
+                }
+            }
+        }
+    }
 }

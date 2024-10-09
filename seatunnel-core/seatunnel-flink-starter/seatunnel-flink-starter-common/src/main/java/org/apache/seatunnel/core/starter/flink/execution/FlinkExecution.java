@@ -183,10 +183,7 @@ public class FlinkExecution implements TaskExecution {
             StreamExecutionEnvironment env = flinkRuntimeEnvironment
                     .getStreamExecutionEnvironment();
             env.registerJobListener(new MyJobListener(this.jobContext.getJobId()));
-            env.setRestartStrategy(RestartStrategies.fixedDelayRestart(
-                    3, // 尝试重启的次数
-                    Time.of(5, TimeUnit.SECONDS) // 间隔
-            ));
+            env.setRestartStrategy(RestartStrategies.noRestart());
             final long jobStartTime = System.currentTimeMillis();
             JobExecutionResult jobResult =
                     flinkRuntimeEnvironment

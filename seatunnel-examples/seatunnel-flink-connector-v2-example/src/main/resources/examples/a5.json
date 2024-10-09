@@ -1,180 +1,111 @@
 {
   "env": {
-    "job.mode": "BATCH",
-    "isRecordErrorData": 1,
+    "job.mode": "STREAMING",
+    "isRecordErrorData": 0,
     "execution.parallelism": 1,
-    "maxRecordNumber": 100,
-    "job.name": "INT_UNKNOWN_dws_student_inz"
+    "maxRecordNumber": 0,
+    "job.name": "CDC模式实时同步接口测试",
+    "checkpoint.interval": 5000
   },
   "source": [
     {
-      "db_type": "PGSQL",
-      "dbSchema": "usr_ods",
-      "columns": [
-        "sno",
-        "course",
-        "score",
-        "timestamp",
-        "id",
-        "name"
+      "plugin_name": "MySQL-CDC",
+      "startup.mode": "initial",
+      "base-url": "jdbc:mysql://rm-8vb52u35x4v4u79l7go.mysql.zhangbei.rds.aliyuncs.com:3306/udm?useUnicode=yes&characterEncoding=UTF-8&useSSL=false&serverTimezone=UTC",
+      "username": "xjudw",
+      "password": "Xjcz80882488",
+      "db_datasource_id": "1838779629542502402",
+      "db_type": "MYSQL",
+      "table-names": [
+        "udm.tag_table"
       ],
-      "query": "select \"sno\",\"course\",\"score\",\"timestamp\",\"id\",\"name\" from \"usr_ods\".\"dws_student_inz\"",
-      "input_type": "table",
-      "db_datasource_id": "1828974205372051458",
+      "query": "select * from udm.tag_table",
       "result_columns": [
         {
-          "schema": "usr_ods",
-          "fullAlias": "(编码)sno",
-          "nullable": true,
-          "typeName": "varchar",
-          "remark": "编码",
-          "type": "varchar",
-          "decimalDigit": 0,
-          "database": "usr_ods_db",
-          "size": 442,
           "autoincrement": false,
-          "name": "sno",
-          "table": "dws_student_inz",
-          "finalAlias": "编码",
+          "database": "udm",
+          "decimalDigit": 0,
+          "fullAlias": "id",
+          "isPrimaryKey": true,
+          "name": "id",
+          "nullable": false,
           "order": 1,
-          "primaryKey": false,
-          "sourceColumn": "1828974205372051458.usr_ods.dws_student_inz.sno"
+          "primaryKey": true,
+          "remark": "",
+          "size": 11,
+          "table": "tag_table",
+          "type": "INT",
+          "typeName": "INT"
         },
         {
-          "schema": "usr_ods",
-          "fullAlias": "(课程编号)course",
-          "nullable": true,
-          "typeName": "varchar",
-          "remark": "课程编号",
-          "type": "varchar",
-          "decimalDigit": 0,
-          "database": "usr_ods_db",
-          "size": 442,
           "autoincrement": false,
-          "name": "course",
-          "table": "dws_student_inz",
-          "finalAlias": "课程编号",
+          "database": "udm",
+          "decimalDigit": 0,
+          "fullAlias": "name",
+          "isPrimaryKey": false,
+          "name": "name",
+          "nullable": true,
           "order": 2,
           "primaryKey": false,
-          "sourceColumn": "1828974205372051458.usr_ods.dws_student_inz.course"
+          "remark": "",
+          "size": 255,
+          "table": "tag_table",
+          "type": "VARCHAR",
+          "typeName": "VARCHAR"
         },
         {
-          "schema": "usr_ods",
-          "fullAlias": "(成绩)score",
-          "nullable": true,
-          "typeName": "varchar",
-          "remark": "成绩",
-          "type": "varchar",
-          "decimalDigit": 0,
-          "database": "usr_ods_db",
-          "size": 442,
           "autoincrement": false,
-          "name": "score",
-          "table": "dws_student_inz",
-          "finalAlias": "成绩",
+          "database": "udm",
+          "decimalDigit": 0,
+          "fullAlias": "sex",
+          "isPrimaryKey": false,
+          "name": "sex",
+          "nullable": true,
           "order": 3,
           "primaryKey": false,
-          "sourceColumn": "1828974205372051458.usr_ods.dws_student_inz.score"
-        },
-        {
-          "schema": "usr_ods",
-          "fullAlias": "(时间戳)timestamp",
-          "nullable": true,
-          "typeName": "varchar",
-          "remark": "时间戳",
-          "type": "varchar",
-          "decimalDigit": 0,
-          "database": "usr_ods_db",
-          "size": 306,
-          "autoincrement": false,
-          "name": "timestamp",
-          "table": "dws_student_inz",
-          "finalAlias": "时间戳",
-          "order": 4,
-          "primaryKey": false,
-          "sourceColumn": "1828974205372051458.usr_ods.dws_student_inz.timestamp"
-        },
-        {
-          "schema": "usr_ods",
-          "fullAlias": "(编号)id",
-          "nullable": true,
-          "typeName": "varchar",
-          "remark": "编号",
-          "type": "varchar",
-          "decimalDigit": 0,
-          "database": "usr_ods_db",
-          "size": 368,
-          "autoincrement": false,
-          "name": "id",
-          "table": "dws_student_inz",
-          "finalAlias": "编号",
-          "order": 5,
-          "primaryKey": false,
-          "sourceColumn": "1828974205372051458.usr_ods.dws_student_inz.id"
-        },
-        {
-          "schema": "usr_ods",
-          "fullAlias": "(姓名)name",
-          "nullable": true,
-          "typeName": "varchar",
-          "remark": "姓名",
-          "type": "varchar",
-          "decimalDigit": 0,
-          "database": "usr_ods_db",
-          "size": 442,
-          "autoincrement": false,
-          "name": "name",
-          "table": "dws_student_inz",
-          "finalAlias": "姓名",
-          "order": 6,
-          "primaryKey": false,
-          "sourceColumn": "1828974205372051458.usr_ods.dws_student_inz.name"
+          "remark": "",
+          "size": 255,
+          "table": "tag_table",
+          "type": "VARCHAR",
+          "typeName": "VARCHAR"
         }
       ],
-      "result_table_name": "t1",
-      "plugin_name": "JDBC",
-      "table_name": "dws_student_inz",
-      "url": "jdbc:postgresql://192.168.9.146:5432/usr_ods_db",
-      "password": "usr_ods#20231024",
-      "database": "usr_ods_db",
-      "driver": "org.postgresql.Driver",
-      "user": "usr_ods"
+      "result_table_name": "t1"
     }
   ],
-  "transform": [],
+  "transform": [
+
+  ],
   "sink": [
     {
-      "db_type": "SQLSERVER",
-      "dbSchema": "test1",
+      "plugin_name": "JDBC",
+      "generate_sink_sql": true,
+      "value_mapper": {
+        "0": "id",
+        "1": "name",
+        "2": "sex"
+      },
+      "db_type": "CLICKHOUSE",
+      "url": "jdbc:clickhouse://124.220.134.47:8123/xj_ods?socket_timeout=60000",
+      "driver": "com.clickhouse.jdbc.ClickHouseDriver",
+      "user": "default",
+      "database": "xj_ods",
+      "password": "Xjcz#qwe@20200720",
+      "db_datasource_id": "1838352898415325186",
+      "dbSchema": "",
+      "table": "T_XCGL_tag_table",
       "primary_keys": [
-        "字段1"
+        "id"
       ],
-      "code_mapper": {},
-      "db_datasource_id": "1828974881451913218",
+      "field_mapper": {
+        "id": "id",
+        "name": "name",
+        "sex": "sex"
+      },
+      "recordOperation": false,
       "source_table_name": [
         "t1"
-      ],
-      "plugin_name": "XJJDBC",
-      "url": "jdbc:sqlserver://111.172.106.210:60022;databaseName=datax_test;",
-      "password": "Xjcz80882488",
-      "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
-      "field_mapper": {
-        "score": "score",
-        "sno": "sno",
-        "name": "name",
-        "course": "course",
-        "id": "id",
-        "timestamp": "timestamp"
-      },
-      "user": "sa",
-      "table": "t_unknown_dws_student_inz",
-      "pre_config": {
-        "cleanTableWhenCompleteNoDataIn": false,
-        "ignoreTstamp": true,
-        "cleanTableWhenComplete": true,
-        "incrementMode": "update",
-        "insertMode": "complete"
-      }
+      ]
     }
   ]
 }

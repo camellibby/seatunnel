@@ -8,6 +8,7 @@ import cn.hutool.crypto.digest.DigestUtil;
 import cn.hutool.crypto.symmetric.AES;
 import cn.hutool.crypto.symmetric.SM4;
 import lombok.Data;
+
 import java.util.Map;
 import java.util.function.Function;
 
@@ -23,8 +24,19 @@ public class CodeConverter {
             return dmMap.get(safeCode + '.' + str);
         };
     }
-    public CodeConverter(){
+
+    public CodeConverter() {
         byte[] key = "pangu123pangu123".getBytes();
+        this.aes = new AES(key);
+        byte[] privateKey = HexUtil.decodeHex("308193020100301306072a8648ce3d020106082a811ccf5501822d0479307702010104203192b1f7b849bcaef11e682b09d4d719f30b5ba43f2be6f81ac289ee2e50f9b8a00a06082a811ccf5501822da144034200041122423fd69fb39e8cb09d0269cdda139513f22c080eacda9158047ac8c6f3bd1193c01fa81dd3896c01ac9a554c4d9feacb9a80677bc493363c8b9e83f42f99");
+        byte[] publicKey = HexUtil.decodeHex(
+                "3059301306072a8648ce3d020106082a811ccf5501822d034200041122423fd69fb39e8cb09d0269cdda139513f22c080eacda9158047ac8c6f3bd1193c01fa81dd3896c01ac9a554c4d9feacb9a80677bc493363c8b9e83f42f99");
+        this.sm2 = SmUtil.sm2(privateKey, publicKey);
+        this.sm4 = new SM4(key);
+    }
+
+    public CodeConverter(String encryptKey) {
+        byte[] key = encryptKey.substring(0, 16).getBytes();
         this.aes = new AES(key);
         byte[] privateKey = HexUtil.decodeHex("308193020100301306072a8648ce3d020106082a811ccf5501822d0479307702010104203192b1f7b849bcaef11e682b09d4d719f30b5ba43f2be6f81ac289ee2e50f9b8a00a06082a811ccf5501822da144034200041122423fd69fb39e8cb09d0269cdda139513f22c080eacda9158047ac8c6f3bd1193c01fa81dd3896c01ac9a554c4d9feacb9a80677bc493363c8b9e83f42f99");
         byte[] publicKey = HexUtil.decodeHex(
@@ -35,17 +47,20 @@ public class CodeConverter {
 
     public Function<Object, Object> encryptConverter(String safeCode) {
         return str -> {
-            if(safeCode.equalsIgnoreCase("ENCRYPT.AES")){
+            if (safeCode.startsWith("ENCRYPT.AES")) {
+                if(str == null) return null;
                 byte[] encrypt = aes.encrypt(String.valueOf(str).getBytes());
                 return HexUtil.encodeHexStr(encrypt);
                 /**
                  * String decryptedContent = aes.decryptStr(encryptedBytes);
                  */
             }
-            if(safeCode.equalsIgnoreCase("ENCRYPT.MD5")){
+            if (safeCode.startsWith("ENCRYPT.MD5")) {
+                if(str == null) return null;
                 return DigestUtil.md5Hex(String.valueOf(str));
             }
-            if(safeCode.equalsIgnoreCase("ENCRYPT.SM2")){
+            if (safeCode.startsWith("ENCRYPT.SM2")) {
+                if(str == null) return null;
                 return sm2.encryptBcd(String.valueOf(str), KeyType.PublicKey);
                 /* 解密方法
                  *         byte[] privateKey = HexUtil.decodeHex("308193020100301306072a8648ce3d020106082a811ccf5501822d0479307702010104203192b1f7b849bcaef11e682b09d4d719f30b5ba43f2be6f81ac289ee2e50f9b8a00a06082a811ccf5501822da144034200041122423fd69fb39e8cb09d0269cdda139513f22c080eacda9158047ac8c6f3bd1193c01fa81dd3896c01ac9a554c4d9feacb9a80677bc493363c8b9e83f42f99");
@@ -56,10 +71,12 @@ public class CodeConverter {
                  *         System.out.println(decryptStr2);
                  */
             }
-            if(safeCode.equalsIgnoreCase("ENCRYPT.SM3")){
+            if (safeCode.startsWith("ENCRYPT.SM3")) {
+                if(str == null) return null;
                 return SmUtil.sm3(String.valueOf(str));
             }
-            if(safeCode.equalsIgnoreCase("ENCRYPT.SM4")){
+            if (safeCode.startsWith("ENCRYPT.SM4")) {
+                if(str == null) return null;
                 return sm4.encryptHex(String.valueOf(str));
             }
             return safeCode + '.' + str;

@@ -40,8 +40,11 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -197,6 +200,12 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         doUpdate(needUpdate, this.metaDataHash);
     }
 
+    private boolean containsAtLeastTwoDotsRegex(String str) {
+        Pattern pattern = Pattern.compile("\\..*\\.");
+        Matcher matcher = pattern.matcher(str);
+        return matcher.find();
+    }
+
     private void initColumnMappers(
             JdbcSinkConfig jdbcSinkConfig,
             SeaTunnelRowType sourceRowType,
@@ -205,6 +214,12 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
             throws SQLException {
         Map<String, String> fieldMapper = jdbcSinkConfig.getFieldMapper();
         Map<String, String> codeMapper = jdbcSinkConfig.getCodeMapper();
+        if (codeMapper != null) {
+            Optional<String> any = codeMapper.values().stream().filter(x -> x.startsWith("ENCRYPT.") && containsAtLeastTwoDotsRegex(x)).findAny();
+            any.ifPresent(x -> {
+                converter = new CodeConverter(x.split("\\.")[2]);
+            });
+        }
         Map<String, String> dmMap = new HashMap<>();
         List<String> allDms = new ArrayList<>();
         if (codeMapper != null) {
@@ -804,9 +819,10 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         try {
             this.consumeData();
             statisticalResults(conn);
+            jdbcSinkConfig.getPreConfig().dropUcTable(conn, jdbcSinkConfig);
             conn.close();
         } catch (Exception e) {
-            log.error("接口退出错误", e);
+            throw new RuntimeException(e);
         }
     }
 

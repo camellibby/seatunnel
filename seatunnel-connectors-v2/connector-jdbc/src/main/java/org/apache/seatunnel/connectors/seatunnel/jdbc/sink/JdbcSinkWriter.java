@@ -204,7 +204,7 @@ public class JdbcSinkWriter
             newFields = new Object[columns.size()];
             for (int i = 0; i < columns.size(); i++) {
                 String valueIndex = getKeyByValue(valueMapper, columns.get(i));
-                String code = codeMapper.get(columns.get(i));
+                String code = codeMapper != null ? codeMapper.get(columns.get(i)) : null;
                 if (valueIndex != null) {
                     if (code == null) {
                         newFields[i] = element.getField(Integer.parseInt(valueIndex));

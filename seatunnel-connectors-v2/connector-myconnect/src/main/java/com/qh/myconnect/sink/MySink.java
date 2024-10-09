@@ -103,7 +103,7 @@ public class MySink extends AbstractSimpleSink<SeaTunnelRow, Void> {
             PreConfig preConfig = jdbcSinkConfig.getPreConfig();
             try (Connection conn = DriverManager.getConnection(jdbcSinkConfig.getUrl(), jdbcSinkConfig.getUser(),
                     jdbcSinkConfig.getPassWord())) {
-                System.out.println("执行了一次预定动作");
+                log.info("执行了一次预定动作");
                 preConfig.doPreConfig(conn, jdbcSinkConfig);
             } catch (SQLException e) {
                 throw new RuntimeException(e);

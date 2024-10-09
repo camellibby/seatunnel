@@ -188,6 +188,9 @@ public class Util {
                         .getEndTime()
                         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         String st_log_url = System.getenv("ST_SERVICE_URL") + "/SeaTunnelJob/gatherJobLog";
+        if(statisticalLog.getErrorMsg()!=null){
+            param.put("errorMsg", statisticalLog.getErrorMsg());
+        }
         this.sendPostRequest(st_log_url, param.toString());
     }
 
