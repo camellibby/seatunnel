@@ -144,6 +144,13 @@
             <version>42.5.0</version>
         </dependency>
 
+
+        <dependency>
+            <groupId>io.trino</groupId>
+            <artifactId>trino-jdbc</artifactId>
+            <version>427</version>
+        </dependency>
+
         <!--   seatunnel connectors   -->
         <!--flink-->
         <dependency>

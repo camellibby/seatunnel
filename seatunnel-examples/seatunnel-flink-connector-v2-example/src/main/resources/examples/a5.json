@@ -1,111 +1,93 @@
 {
   "env": {
-    "job.mode": "STREAMING",
-    "isRecordErrorData": 0,
+    "job.mode": "BATCH",
+    "isRecordErrorData": 1,
     "execution.parallelism": 1,
-    "maxRecordNumber": 0,
-    "job.name": "CDC模式实时同步接口测试",
-    "checkpoint.interval": 5000
+    "maxRecordNumber": 100,
+    "job.name": "测试trino"
   },
   "source": [
     {
-      "plugin_name": "MySQL-CDC",
-      "startup.mode": "initial",
-      "base-url": "jdbc:mysql://rm-8vb52u35x4v4u79l7go.mysql.zhangbei.rds.aliyuncs.com:3306/udm?useUnicode=yes&characterEncoding=UTF-8&useSSL=false&serverTimezone=UTC",
-      "username": "xjudw",
-      "password": "Xjcz80882488",
-      "db_datasource_id": "1838779629542502402",
-      "db_type": "MYSQL",
-      "table-names": [
-        "udm.tag_table"
+      "db_type": "TRINO",
+      "dbSchema": "test",
+      "columns": [
+        "id",
+        "name"
       ],
-      "query": "select * from udm.tag_table",
+      "query": "select \"id\",\"name\" from \"test\".\"test_table\"",
+      "input_type": "table",
+      "db_datasource_id": "1843915250973847554",
       "result_columns": [
         {
-          "autoincrement": false,
-          "database": "udm",
-          "decimalDigit": 0,
+          "schema": "test",
           "fullAlias": "id",
-          "isPrimaryKey": true,
-          "name": "id",
           "nullable": false,
+          "typeName": "integer",
+          "type": "integer",
+          "decimalDigit": 0,
+          "database": "hive",
+          "size": 10,
+          "autoincrement": false,
+          "name": "id",
+          "table": "test_table",
           "order": 1,
-          "primaryKey": true,
-          "remark": "",
-          "size": 11,
-          "table": "tag_table",
-          "type": "INT",
-          "typeName": "INT"
+          "primaryKey": false,
+          "sourceColumn": "1843915250973847554.test.test_table.id"
         },
         {
-          "autoincrement": false,
-          "database": "udm",
-          "decimalDigit": 0,
+          "schema": "test",
           "fullAlias": "name",
-          "isPrimaryKey": false,
+          "nullable": false,
+          "typeName": "varchar(300)",
+          "type": "varchar(300)",
+          "decimalDigit": 0,
+          "database": "hive",
+          "size": 300,
+          "autoincrement": false,
           "name": "name",
-          "nullable": true,
+          "table": "test_table",
           "order": 2,
           "primaryKey": false,
-          "remark": "",
-          "size": 255,
-          "table": "tag_table",
-          "type": "VARCHAR",
-          "typeName": "VARCHAR"
-        },
-        {
-          "autoincrement": false,
-          "database": "udm",
-          "decimalDigit": 0,
-          "fullAlias": "sex",
-          "isPrimaryKey": false,
-          "name": "sex",
-          "nullable": true,
-          "order": 3,
-          "primaryKey": false,
-          "remark": "",
-          "size": 255,
-          "table": "tag_table",
-          "type": "VARCHAR",
-          "typeName": "VARCHAR"
+          "sourceColumn": "1843915250973847554.test.test_table.name"
         }
       ],
-      "result_table_name": "t1"
+      "result_table_name": "t1",
+      "plugin_name": "JDBC",
+      "table_name": "test_table",
+      "url": "jdbc:trino://192.168.9.71:8281/hive",
+      "database": "hive",
+      "driver": "io.trino.jdbc.TrinoDriver",
+      "user": "hive"
     }
   ],
-  "transform": [
-
-  ],
+  "transform": [],
   "sink": [
     {
-      "plugin_name": "JDBC",
-      "generate_sink_sql": true,
-      "value_mapper": {
-        "0": "id",
-        "1": "name",
-        "2": "sex"
-      },
-      "db_type": "CLICKHOUSE",
-      "url": "jdbc:clickhouse://124.220.134.47:8123/xj_ods?socket_timeout=60000",
-      "driver": "com.clickhouse.jdbc.ClickHouseDriver",
-      "user": "default",
-      "database": "xj_ods",
-      "password": "Xjcz#qwe@20200720",
-      "db_datasource_id": "1838352898415325186",
-      "dbSchema": "",
-      "table": "T_XCGL_tag_table",
-      "primary_keys": [
-        "id"
-      ],
-      "field_mapper": {
-        "id": "id",
-        "name": "name",
-        "sex": "sex"
-      },
-      "recordOperation": false,
+      "db_type": "ORACLE",
+      "dbSchema": "TYDB",
+      "code_mapper": {},
+      "query": "select * from \"TYDB\".\"TEST_TRINO\"",
+      "db_datasource_id": "1831155282188505090",
       "source_table_name": [
         "t1"
-      ]
+      ],
+      "plugin_name": "XJJDBC",
+      "url": "jdbc:oracle:thin:@111.172.106.210:41521/ORCL",
+      "password": "oracle",
+      "driver": "oracle.jdbc.driver.OracleDriver",
+      "field_mapper": {
+        "name": "NAME",
+        "id": "ID"
+      },
+      "user": "scott",
+      "table": "TEST_TRINO",
+      "pre_config": {
+        "cleanTableWhenCompleteNoDataIn": true,
+        "ignoreTstamp": true,
+        "cleanTableWhenComplete": true,
+        "incrementMode": "update",
+        "insertMode": "complete"
+      }
     }
   ]
 }
