@@ -4,89 +4,141 @@
     "isRecordErrorData": 1,
     "execution.parallelism": 1,
     "maxRecordNumber": 100,
-    "job.name": "测试trino"
+    "job.name": "测试ETL清单_退休部的令牌_前台pg"
   },
   "source": [
     {
-      "db_type": "TRINO",
-      "dbSchema": "test",
+      "db_type": "MYSQL",
+      "dbSchema": "",
       "columns": [
+        "age",
         "id",
-        "name"
+        "name",
+        "sex",
+        "time"
       ],
-      "query": "select \"id\",\"name\" from \"test\".\"test_table\"",
-      "input_type": "table",
-      "db_datasource_id": "1843915250973847554",
+      "query": "select `age`,`id`,`name`,`sex`,`time` from `table_one`",
+      "input_type": "sql",
+      "db_datasource_id": "1836233499927699458",
       "result_columns": [
         {
-          "schema": "test",
-          "fullAlias": "id",
+          "fullAlias": "(年龄)age",
           "nullable": false,
-          "typeName": "integer",
-          "type": "integer",
+          "isPrimaryKey": false,
+          "remark": "年龄",
+          "type": "INT",
           "decimalDigit": 0,
-          "database": "hive",
+          "size": 10,
+          "autoincrement": false,
+          "name": "age",
+          "finalAlias": "年龄",
+          "order": 0,
+          "primaryKey": false,
+          "sourceColumn": "1836233499927699458.test_ads.table_one.age"
+        },
+        {
+          "fullAlias": "(学号)id",
+          "nullable": false,
+          "isPrimaryKey": false,
+          "remark": "学号",
+          "type": "INT",
+          "decimalDigit": 0,
           "size": 10,
           "autoincrement": false,
           "name": "id",
-          "table": "test_table",
-          "order": 1,
+          "finalAlias": "学号",
+          "order": 0,
           "primaryKey": false,
-          "sourceColumn": "1843915250973847554.test.test_table.id"
+          "sourceColumn": "1836233499927699458.test_ads.table_one.id"
         },
         {
-          "schema": "test",
-          "fullAlias": "name",
+          "fullAlias": "(姓名)name",
           "nullable": false,
-          "typeName": "varchar(300)",
-          "type": "varchar(300)",
+          "isPrimaryKey": false,
+          "remark": "姓名",
+          "type": "VARCHAR",
           "decimalDigit": 0,
-          "database": "hive",
-          "size": 300,
+          "size": 255,
           "autoincrement": false,
           "name": "name",
-          "table": "test_table",
-          "order": 2,
+          "finalAlias": "姓名",
+          "order": 0,
           "primaryKey": false,
-          "sourceColumn": "1843915250973847554.test.test_table.name"
+          "sourceColumn": "1836233499927699458.test_ads.table_one.name"
+        },
+        {
+          "fullAlias": "(性别)sex",
+          "nullable": false,
+          "isPrimaryKey": false,
+          "remark": "性别",
+          "type": "VARCHAR",
+          "decimalDigit": 0,
+          "size": 255,
+          "autoincrement": false,
+          "name": "sex",
+          "finalAlias": "性别",
+          "order": 0,
+          "primaryKey": false,
+          "sourceColumn": "1836233499927699458.test_ads.table_one.sex"
+        },
+        {
+          "fullAlias": "(时间)time",
+          "nullable": false,
+          "isPrimaryKey": false,
+          "remark": "时间",
+          "type": "DATETIME",
+          "decimalDigit": 0,
+          "size": 19,
+          "autoincrement": false,
+          "name": "time",
+          "finalAlias": "时间",
+          "order": 0,
+          "primaryKey": false,
+          "sourceColumn": "1836233499927699458.test_ads.table_one.time"
         }
       ],
       "result_table_name": "t1",
       "plugin_name": "JDBC",
-      "table_name": "test_table",
-      "url": "jdbc:trino://192.168.9.71:8281/hive",
-      "database": "hive",
-      "driver": "io.trino.jdbc.TrinoDriver",
-      "user": "hive"
+      "table_name": "",
+      "url": "jdbc:mysql://111.172.106.210:60173/test_ads?useUnicode=yes&characterEncoding=UTF-8&useSSL=false&serverTimezone=UTC",
+      "password": "XIJIAgreat2020!$",
+      "database": "test_ads",
+      "driver": "com.mysql.cj.jdbc.Driver",
+      "user": "root"
     }
   ],
   "transform": [],
   "sink": [
     {
-      "db_type": "ORACLE",
-      "dbSchema": "TYDB",
+      "db_type": "PGSQL",
+      "dbSchema": "public",
+      "primary_keys": [
+        "id"
+      ],
       "code_mapper": {},
-      "query": "select * from \"TYDB\".\"TEST_TRINO\"",
-      "db_datasource_id": "1831155282188505090",
+      "db_datasource_id": "1838041663289208833",
       "source_table_name": [
         "t1"
       ],
       "plugin_name": "XJJDBC",
-      "url": "jdbc:oracle:thin:@111.172.106.210:41521/ORCL",
-      "password": "oracle",
-      "driver": "oracle.jdbc.driver.OracleDriver",
+      "url": "jdbc:postgresql://192.168.9.146:5432/usr_ods_db",
+      "password": "usr_ods#20231024",
+      "driver": "org.postgresql.Driver",
       "field_mapper": {
-        "name": "NAME",
-        "id": "ID"
+        "sex": "sex",
+        "name": "name",
+        "id": "id",
+        "time": "time",
+        "age": "age"
       },
-      "user": "scott",
-      "table": "TEST_TRINO",
+      "user": "usr_ods",
+      "table": "t_txbdlp_csetlqd",
       "pre_config": {
         "cleanTableWhenCompleteNoDataIn": true,
         "ignoreTstamp": true,
         "cleanTableWhenComplete": true,
         "incrementMode": "update",
-        "insertMode": "complete"
+        "insertMode": "increment"
       }
     }
   ]

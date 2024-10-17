@@ -1,5 +1,6 @@
 package com.qh.myconnect.sink;
 
+import com.alibaba.fastjson2.JSONWriter;
 import com.qh.myconnect.converter.CodeConverter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.common.JobContext;
@@ -8,8 +9,7 @@ import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.serializer.SerializerFeature;
+import com.alibaba.fastjson2.JSON;
 import com.qh.myconnect.config.JdbcSinkConfig;
 import com.qh.myconnect.config.SeaTunnelJobsHistoryErrorRecord;
 import com.qh.myconnect.config.StatisticalLog;
@@ -363,7 +363,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                     for (int i = 0; i < columnMappers.size(); i++) {
                         jsonObject.put(columnMappers.get(i).getSourceColumnName(), row.getField(i));
                     }
-                    log.info(JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
+                    log.info(JSON.toJSONString(jsonObject, JSONWriter.Feature.WriteMapNullValue, JSONWriter.Feature.WriteNullListAsEmpty));
                     SeaTunnelJobsHistoryErrorRecord errorRecord =
                             new SeaTunnelJobsHistoryErrorRecord();
                     errorRecord.setFlinkJobId(this.jobContext.getJobId());
@@ -371,7 +371,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                     errorRecord.setDbSchema(jdbcSinkConfig.getDbSchema());
                     errorRecord.setTableName(jdbcSinkConfig.getTable());
                     errorRecord.setErrorData(
-                            JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
+                            JSON.toJSONString(jsonObject, JSONWriter.Feature.WriteMapNullValue, JSONWriter.Feature.WriteNullListAsEmpty));
                     errorRecord.setErrorMessage(e.getMessage());
                     sqlErrorType.add(e.getMessage());
                     try {
@@ -486,7 +486,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                                     columnMappers.get(i).getSourceColumnName(), row.getField(i));
                         }
                         log.info(
-                                JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
+                                JSON.toJSONString(jsonObject, JSONWriter.Feature.WriteMapNullValue, JSONWriter.Feature.WriteNullListAsEmpty));
                         SeaTunnelJobsHistoryErrorRecord errorRecord =
                                 new SeaTunnelJobsHistoryErrorRecord();
                         errorRecord.setFlinkJobId(this.jobContext.getJobId());
@@ -494,7 +494,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
                         errorRecord.setDbSchema(jdbcSinkConfig.getDbSchema());
                         errorRecord.setTableName(jdbcSinkConfig.getTable());
                         errorRecord.setErrorData(
-                                JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
+                                JSON.toJSONString(jsonObject, JSONWriter.Feature.WriteMapNullValue, JSONWriter.Feature.WriteNullListAsEmpty));
                         errorRecord.setErrorMessage(e.getMessage());
                         sqlErrorType.add(e.getMessage());
                         try {

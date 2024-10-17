@@ -1,5 +1,6 @@
 package com.qh.myconnect.sink;
 
+import com.alibaba.fastjson2.JSONWriter;
 import com.qh.myconnect.converter.CodeConverter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.common.JobContext;
@@ -12,8 +13,7 @@ import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
 
 import org.stringtemplate.v4.ST;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.serializer.SerializerFeature;
+import com.alibaba.fastjson2.JSON;
 import com.qh.myconnect.config.JdbcSinkConfig;
 import com.qh.myconnect.config.SeaTunnelJobsHistoryErrorRecord;
 import com.qh.myconnect.config.StatisticalLog;
@@ -461,7 +461,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                             }
                             log.info(
                                     JSON.toJSONString(
-                                            jsonObject, SerializerFeature.WriteMapNullValue));
+                                            jsonObject, JSONWriter.Feature.WriteMapNullValue, JSONWriter.Feature.WriteNullListAsEmpty));
                             SeaTunnelJobsHistoryErrorRecord errorRecord =
                                     new SeaTunnelJobsHistoryErrorRecord();
                             errorRecord.setFlinkJobId(this.jobContext.getJobId());
@@ -470,7 +470,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                             errorRecord.setTableName(jdbcSinkConfig.getTable());
                             errorRecord.setErrorData(
                                     JSON.toJSONString(
-                                            jsonObject, SerializerFeature.WriteMapNullValue));
+                                            jsonObject, JSONWriter.Feature.WriteMapNullValue, JSONWriter.Feature.WriteNullListAsEmpty));
                             errorRecord.setErrorMessage(ee.getMessage());
                             sqlErrorType.add(ee.getMessage());
                             try {
@@ -582,12 +582,26 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                             .collect(Collectors.toList());
             List<ColumnMapper> columnMappers =
                     this.columnMappers.stream().filter(x -> !x.isUc()).collect(Collectors.toList());
-            String templateInsert =
-                    "update <table> set "
-                    + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> "
-                    + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
+            String templateInsert = "";
+            if (jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
+                templateInsert =
+                        "update `<table>` set "
+                        + "<columns:{sub | `<sub.sinkColumnName>` = ? }; separator=\", \"> "
+                        + " where  <pks:{pk | `<pk.sinkColumnName>` = ? }; separator=\" and \"> ";
+            }
+            else {
+                templateInsert =
+                        "update <table> set "
+                        + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> "
+                        + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
+            }
             ST template = new ST(templateInsert);
-            template.add("table", jdbcSinkConfig.getTable());
+            if (jdbcSinkConfig.getDbSchema() != null && !jdbcSinkConfig.getDbSchema().isEmpty()) {
+                template.add("table", jdbcSinkConfig.getDbSchema() + "." + jdbcSinkConfig.getTable());
+            }
+            else {
+                template.add("table", jdbcSinkConfig.getTable());
+            }
             template.add("columns", columnMappers);
             template.add("pks", listUc);
             String updateSql = template.render();
@@ -634,15 +648,13 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                                     this.columnMappers.get(i).getSourceColumnName(),
                                     row.getField(i));
                         }
-                        log.info(JSON.toJSONString(jsonObject));
                         SeaTunnelJobsHistoryErrorRecord errorRecord =
                                 new SeaTunnelJobsHistoryErrorRecord();
                         errorRecord.setFlinkJobId(this.jobContext.getJobId());
                         errorRecord.setDataSourceId(jdbcSinkConfig.getDbDatasourceId());
                         errorRecord.setDbSchema(jdbcSinkConfig.getDbSchema());
                         errorRecord.setTableName(jdbcSinkConfig.getTable());
-                        errorRecord.setErrorData(
-                                JSON.toJSONString(jsonObject, SerializerFeature.WriteMapNullValue));
+                        errorRecord.setErrorData(JSON.toJSONString(jsonObject, JSONWriter.Feature.WriteMapNullValue, JSONWriter.Feature.WriteNullListAsEmpty));
                         errorRecord.setErrorMessage(ee.getMessage());
                         sqlErrorType.add(ee.getMessage());
                         try {
@@ -819,7 +831,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         try {
             this.consumeData();
             statisticalResults(conn);
-            jdbcSinkConfig.getPreConfig().dropUcTable(conn, jdbcSinkConfig);
+//            jdbcSinkConfig.getPreConfig().dropUcTable(conn, jdbcSinkConfig);
             conn.close();
         } catch (Exception e) {
             throw new RuntimeException(e);

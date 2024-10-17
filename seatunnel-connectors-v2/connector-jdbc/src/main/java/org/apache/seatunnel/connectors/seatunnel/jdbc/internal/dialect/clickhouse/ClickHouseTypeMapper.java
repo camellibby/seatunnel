@@ -96,8 +96,10 @@ public class ClickHouseTypeMapper implements JdbcDialectTypeMapper {
 
     // ------------------------------time-------------------------
     private static final String CLICKHOUSE_DATE = "DATE";
+    private static final String CLICKHOUSE_NULLABLE_DATE = "NULLABLE(DATE)";
     private static final String CLICKHOUSE_DATETIME = "DATETIME";
     private static final String CLICKHOUSE_TIME = "TIME";
+    private static final String CLICKHOUSE_NULLABLE_TIME = "NULLABLE(TIME)";
     private static final String CLICKHOUSE_TIMESTAMP = "TIMESTAMP";
     private static final String CLICKHOUSE_YEAR = "YEAR";
 
@@ -187,8 +189,10 @@ public class ClickHouseTypeMapper implements JdbcDialectTypeMapper {
             case CLICKHOUSE_NOTHING :
                 return BasicType.STRING_TYPE;
             case CLICKHOUSE_DATE:
+            case CLICKHOUSE_NULLABLE_DATE:
                 return LocalTimeType.LOCAL_DATE_TYPE;
             case CLICKHOUSE_TIME:
+            case CLICKHOUSE_NULLABLE_TIME:
                 return LocalTimeType.LOCAL_TIME_TYPE;
             case CLICKHOUSE_DATETIME:
             case CLICKHOUSE_TIMESTAMP:
@@ -206,6 +210,16 @@ public class ClickHouseTypeMapper implements JdbcDialectTypeMapper {
             case CLICKHOUSE_GEOMETRY:
             case CLICKHOUSE_UNKNOWN:
             default:
+                if(mysqlType.toUpperCase().contains("DECIMAL")){
+                    if (precision > 38) {
+                        LOG.warn("{} will probably cause value overflow.", CLICKHOUSE_DECIMAL);
+                        return new DecimalType(38, 18);
+                    }
+                    return new DecimalType(precision, scale);
+                }
+                else if (mysqlType.toUpperCase().contains("DATETIME")) {
+                    return LocalTimeType.LOCAL_DATE_TIME_TYPE;
+                }
                 final String jdbcColumnName = metadata.getColumnName(colIndex);
                 throw new RuntimeException(
                         String.format(
