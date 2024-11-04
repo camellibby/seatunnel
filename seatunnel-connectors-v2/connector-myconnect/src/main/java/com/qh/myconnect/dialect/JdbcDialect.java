@@ -74,7 +74,9 @@ public interface JdbcDialect extends Serializable {
      */
     JdbcDialectTypeMapper getJdbcDialectTypeMapper();
 
-    /** Quotes the identifier for table name or field name */
+    /**
+     * Quotes the identifier for table name or field name
+     */
     default String quoteIdentifier(String identifier) {
         return identifier;
     }
@@ -234,24 +236,33 @@ public interface JdbcDialect extends Serializable {
         if (null != value) {
             if (value instanceof Date) {
                 preparedStatement.setTimestamp(position, new Timestamp(((Date) value).getTime()));
-            } else if (value instanceof LocalDate) {
+            }
+            else if (value instanceof LocalDate) {
                 preparedStatement.setDate(position, java.sql.Date.valueOf((LocalDate) value));
-            } else if (value instanceof Integer) {
+            }
+            else if (value instanceof Integer) {
                 preparedStatement.setInt(position, (Integer) value);
-            } else if (value instanceof Long) {
+            }
+            else if (value instanceof Long) {
                 preparedStatement.setLong(position, (Long) value);
-            } else if (value instanceof Double) {
+            }
+            else if (value instanceof Double) {
                 preparedStatement.setDouble(position, (Double) value);
-            } else if (value instanceof Float) {
+            }
+            else if (value instanceof Float) {
                 preparedStatement.setFloat(position, (Float) value);
-            } else if (value instanceof LocalDateTime) {
+            }
+            else if (value instanceof LocalDateTime) {
                 preparedStatement.setTimestamp(position, Timestamp.valueOf((LocalDateTime) value));
-            } else if (value instanceof BigDecimal) {
+            }
+            else if (value instanceof BigDecimal) {
                 preparedStatement.setBigDecimal(position, (BigDecimal) value);
-            } else {
+            }
+            else {
                 preparedStatement.setString(position, (String) value);
             }
-        } else {
+        }
+        else {
             preparedStatement.setNull(position, Types.NULL);
         }
     }
@@ -262,8 +273,8 @@ public interface JdbcDialect extends Serializable {
                 columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         String sqlQueryString =
                 " select <columns:{sub | <sub.sinkColumnName>}; separator=\", \"> "
-                        + "  from <table> a "
-                        + " where  ";
+                + "  from <table> a "
+                + " where  ";
         ST sqlQueryTemplate = new ST(sqlQueryString);
         sqlQueryTemplate.add("table", jdbcSinkConfig.getTable());
         sqlQueryTemplate.add("columns", columnMappers);
@@ -279,7 +290,8 @@ public interface JdbcDialect extends Serializable {
         String wheres = StringUtils.join(where, "  or ");
         if (rowSize == 0) {
             sqlQuery = sqlQuery + " 1=2";
-        } else {
+        }
+        else {
             sqlQuery = sqlQuery + wheres;
         }
         return sqlQuery;
@@ -289,14 +301,14 @@ public interface JdbcDialect extends Serializable {
             JdbcSinkConfig jdbcSinkConfig, List<String> columns, List<String> values) {
         String sql =
                 "insert into "
-                        + jdbcSinkConfig.getTable()
-                        + String.format("(%s)", StringUtils.join(columns, ","))
-                        + String.format("values (%s)", StringUtils.join(values, ","));
+                + jdbcSinkConfig.getTable()
+                + String.format("(%s)", StringUtils.join(columns, ","))
+                + String.format("values (%s)", StringUtils.join(values, ","));
         return sql;
     }
 
     default String insertTableOnlyColumn(
-            JdbcSinkConfig jdbcSinkConfig,  List<String> columns) {
+            JdbcSinkConfig jdbcSinkConfig, List<String> columns) {
         return null;
     }
 
@@ -306,8 +318,8 @@ public interface JdbcDialect extends Serializable {
                 columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
         String sqlQueryString =
                 " select <columns:{sub | <sub.sinkColumnName>}; separator=\", \"> "
-                        + "  from <table> a "
-                        + " where  ";
+                + "  from <table> a "
+                + " where  ";
         ST sqlQueryTemplate = new ST(sqlQueryString);
         sqlQueryTemplate.add("table", jdbcSinkConfig.getTable());
         sqlQueryTemplate.add("columns", columnMappers);
@@ -324,7 +336,8 @@ public interface JdbcDialect extends Serializable {
         String wheres = StringUtils.join(where, "  or ");
         if (rowSize == 0) {
             sqlQuery = sqlQuery + " 1=2";
-        } else {
+        }
+        else {
             sqlQuery = sqlQuery + wheres;
         }
         return sqlQuery;
@@ -334,7 +347,9 @@ public interface JdbcDialect extends Serializable {
             String sourceTable, String targetTable, JdbcSinkConfig jdbcSinkConfig) {
         return format(
                 "create  table %s as select  %s from %s where 1=2 ",
-                targetTable, StringUtils.join(jdbcSinkConfig.getPrimaryKeys(), ','), sourceTable);
+                targetTable,
+                StringUtils.join(jdbcSinkConfig.getPrimaryKeys().stream().map(x -> "`" + x + "`").collect(Collectors.toList()), ','),
+                "`" + sourceTable + "`");
     }
 
     default String copyTableOnlyColumnOnCluster(
@@ -344,15 +359,16 @@ public interface JdbcDialect extends Serializable {
             String clusterName,
             String dataBase) {
         return String.format(
-                "create  table %s on CLUSTER %s ENGINE=ReplicatedMergeTree() order by (%s) as select %s "
-                        + "from  %s.%s "
-                        + "where 1=2 ",
-                targetTable,
+                "create  table %s on CLUSTER %s ENGINE=ReplicatedMergeTree() order by (%s) settings "
+                + "allow_nullable_key=1 as select %s "
+                + "from  %s.%s "
+                + "where 1=2 ",
+                "`" + targetTable + "`",
                 clusterName,
-                StringUtils.join(jdbcSinkConfig.getPrimaryKeys(), ','),
-                StringUtils.join(jdbcSinkConfig.getPrimaryKeys(), ','),
+                StringUtils.join(jdbcSinkConfig.getPrimaryKeys().stream().map(x -> "`" + x + "`").collect(Collectors.toList()), ','),
+                StringUtils.join(jdbcSinkConfig.getPrimaryKeys().stream().map(x -> "`" + x + "`").collect(Collectors.toList()), ','),
                 dataBase,
-                sourceTable);
+                "`" + sourceTable + "`");
     }
 
     default String truncateTable(JdbcSinkConfig jdbcSinkConfig) {
@@ -360,13 +376,13 @@ public interface JdbcDialect extends Serializable {
     }
 
     default String dropTable(JdbcSinkConfig jdbcSinkConfig, String tableName) {
-        return String.format("drop table  %s", tableName);
+        return String.format("drop table  %s", "`" + tableName + "`");
     }
 
     default String dropTableOnCluster(
             JdbcSinkConfig jdbcSinkConfig, String database, String tableName, String clusterName) {
         return String.format(
-                "drop table  %s.%s on cluster %s no delay ", database, tableName, clusterName);
+                "drop table  %s.%s on cluster %s no delay ", database, "`" + tableName + "`", clusterName);
     }
 
     default String createIndex(String tmpTableName, JdbcSinkConfig jdbcSinkConfig) {
@@ -379,8 +395,8 @@ public interface JdbcDialect extends Serializable {
             Connection connection, String table, String ucTable, List<ColumnMapper> ucColumns) {
         String delSql =
                 "delete from  <table>    "
-                        + " where not exists "
-                        + "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> where <pks:{pk | <table>.<pk.sinkColumnName>=<tmpTable>.<pk.sinkColumnName> }; separator=\" and \">  ) ";
+                + " where not exists "
+                + "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> where <pks:{pk | <table>.<pk.sinkColumnName>=<tmpTable>.<pk.sinkColumnName> }; separator=\" and \">  ) ";
         ST template = new ST(delSql);
         template.add("table", table);
         template.add("tmpTable", ucTable);
@@ -414,7 +430,8 @@ public interface JdbcDialect extends Serializable {
             LocalDateTime startTime) {
         return 0;
     }
-    default Long getTableCount(Connection connection,  String table) {
+
+    default Long getTableCount(Connection connection, String table) {
         long count = 0L;
         try {
             PreparedStatement preparedStatement =
@@ -434,7 +451,7 @@ public interface JdbcDialect extends Serializable {
         long count = 0L;
         try {
             PreparedStatement preparedStatement =
-                    connection.prepareStatement(format("select  count(1) sl  from \"%s\".\"%s\"",schema, table));
+                    connection.prepareStatement(format("select  count(1) sl  from \"%s\".\"%s\"", schema, table));
             ResultSet resultSet = preparedStatement.executeQuery();
             if (resultSet.next()) {
                 count = resultSet.getLong("sl");

@@ -53,6 +53,8 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     private Long insertCount = 0L;
     private Long errorCount = 0L;
 
+    private Long qualityCount = 0L;
+
     private final JdbcSinkConfig jdbcSinkConfig;
     private JobContext jobContext;
     private LocalDateTime startTime;
@@ -88,7 +90,7 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
         this.startTime = startTime;
         this.currentTaskId = context.getIndexOfSubtask();
         this.table = this.jdbcSinkConfig.getTable();
-        this.tmpTable = "UC_" + this.jdbcSinkConfig.getTable();
+        this.tmpTable = "XJ$_" + this.jdbcSinkConfig.getTable();
         this.jdbcDialect = JdbcDialectFactory.getJdbcDialect(this.jdbcSinkConfig.getDbType());
         this.conn = util.getConnection(this.jdbcSinkConfig);
         conn.setAutoCommit(false);
@@ -253,6 +255,10 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
     @Override
     public void write(SeaTunnelRow element) {
         this.writeCount++;
+        if(this.jdbcSinkConfig.isOpenQuality()){
+//            this.qualityCount++;
+//            return;
+        }
         for (int i = 0; i < columnMappers.size(); i++) {
             Integer sourceRowPosition = columnMappers.get(i).getSourceRowPosition();
             if (sourceRowPosition != null) {
@@ -614,12 +620,13 @@ public class MySinkWriterZipper extends AbstractSinkWriter<SeaTunnelRow, Void> {
             statisticalLog.setDbSchema(this.jdbcSinkConfig.getDbSchema());
         }
         statisticalLog.setTableName(this.jdbcSinkConfig.getTable());
-        statisticalLog.setWriteCount(writeCount.longValue());
-        statisticalLog.setModifyCount(updateCount.longValue());
-        statisticalLog.setDeleteCount(deleteCount.longValue());
-        statisticalLog.setInsertCount(insertCount.longValue());
-        statisticalLog.setKeepCount(keepCount.longValue());
-        statisticalLog.setErrorCount(errorCount.longValue());
+        statisticalLog.setWriteCount(writeCount);
+        statisticalLog.setQualityCount(qualityCount);
+        statisticalLog.setModifyCount(updateCount);
+        statisticalLog.setDeleteCount(deleteCount);
+        statisticalLog.setInsertCount(insertCount);
+        statisticalLog.setKeepCount(keepCount);
+        statisticalLog.setErrorCount(errorCount);
         statisticalLog.setStartTime(startTime);
         statisticalLog.setEndTime(endTime);
         util.insertLog(statisticalLog);

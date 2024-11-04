@@ -77,7 +77,7 @@ public class PreConfig implements Serializable {
                 || jdbcSinkConfig.getPrimaryKeys().isEmpty()) {
                 throw new RuntimeException(String.format("增量更新模式下,未标示逻辑主键", tableName));
             }
-            String tmpTableName = "UC_" + tableName;
+            String tmpTableName = "XJ$_" + tableName;
             String copyTableOnlyColumnSql =
                     JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType())
                             .copyTableOnlyColumn(tableName, tmpTableName, jdbcSinkConfig);
@@ -119,6 +119,9 @@ public class PreConfig implements Serializable {
                     System.out.println(dropSql + "删除报错意味着没有表" + e.getMessage());
                 }
             }
+            System.out.println("----------------sql------------------------");
+            System.out.println(copyTableOnlyColumnSql);
+            System.out.println("----------------sql------------------------");
             PreparedStatement preparedStatement1 =
                     connection.prepareStatement(copyTableOnlyColumnSql);
             preparedStatement1.execute();
@@ -144,7 +147,7 @@ public class PreConfig implements Serializable {
     public void dropUcTable(Connection connection, JdbcSinkConfig jdbcSinkConfig) throws SQLException{
         String tableName = jdbcSinkConfig.getTable();
         if (this.insertMode.equalsIgnoreCase("increment")) {
-            String tmpTableName = "UC_" + tableName;
+            String tmpTableName = "XJ$_" + tableName;
             String copyTableOnlyColumnSql =
                     JdbcDialectFactory.getJdbcDialect(jdbcSinkConfig.getDbType())
                             .copyTableOnlyColumn(tableName, tmpTableName, jdbcSinkConfig);

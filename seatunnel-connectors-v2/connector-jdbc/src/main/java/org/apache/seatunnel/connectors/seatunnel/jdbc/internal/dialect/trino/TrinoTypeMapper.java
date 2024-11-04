@@ -172,9 +172,10 @@ public class TrinoTypeMapper implements JdbcDialectTypeMapper {
                 final String jdbcColumnName = metadata.getColumnName(colIndex);
                 if(TRINOType.contains("CHAR")){
                     return BasicType.STRING_TYPE;
+                } else if (TRINOType.toUpperCase().contains("TIMESTAMP")) {
+                    return LocalTimeType.LOCAL_DATE_TIME_TYPE;
                 }
-                throw new JdbcConnectorException(
-                        CommonErrorCode.CONVERT_TO_CONNECTOR_TYPE_ERROR,
+                throw new RuntimeException(
                         String.format(
                                 "Doesn't support TRINO type '%s' on column '%s'  yet.",
                                 TRINOType, jdbcColumnName));

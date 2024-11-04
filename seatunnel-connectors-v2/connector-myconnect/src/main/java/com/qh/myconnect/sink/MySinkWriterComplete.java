@@ -54,6 +54,8 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
     private Long deleteCount = 0l;
 
     private Long errorCount = 0L;
+
+    private Long qualityCount = 0L;
     private final JdbcSinkConfig jdbcSinkConfig;
     private JobContext jobContext;
 
@@ -116,6 +118,10 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
     @Override
     public void write(SeaTunnelRow element) throws IOException {
         this.writeCount++;
+        if(this.jdbcSinkConfig.isOpenQuality()){
+//            this.qualityCount++;
+//            return;
+        }
         if (this.writeCount == 1 && this.preConfig.isCleanTableWhenComplete()) {
             TruncateTable truncateTable = new TruncateTable();
             truncateTable.setFlinkJobId(this.jobContext.getJobId());
@@ -216,6 +222,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
         }
         statisticalLog.setTableName(this.jdbcSinkConfig.getTable());
         statisticalLog.setWriteCount(writeCount);
+        statisticalLog.setQualityCount(qualityCount);
         statisticalLog.setModifyCount(0L);
         statisticalLog.setDeleteCount(deleteCount);
         statisticalLog.setInsertCount(this.insertCount);

@@ -4,6 +4,13 @@ import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 
 import org.apache.commons.lang3.StringUtils;
 
+import org.apache.velocity.Template;
+import org.apache.velocity.VelocityContext;
+import org.apache.velocity.app.Velocity;
+import org.apache.velocity.app.VelocityEngine;
+import org.apache.velocity.runtime.RuntimeConstants;
+import org.apache.velocity.runtime.resource.loader.StringResourceLoader;
+import org.apache.velocity.runtime.resource.util.StringResourceRepository;
 import org.stringtemplate.v4.ST;
 
 import com.qh.myconnect.config.JdbcSinkConfig;
@@ -12,6 +19,7 @@ import com.qh.myconnect.converter.JdbcRowConverter;
 import com.qh.myconnect.dialect.JdbcDialect;
 import com.qh.myconnect.dialect.JdbcDialectTypeMapper;
 
+import java.io.StringWriter;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -257,7 +265,7 @@ public class ClickHouseDialect implements JdbcDialect {
         template1.add("table", jdbcSinkConfig.getTable());
         template1.add("columns", columnMappers);
         template1.add("pks", ucColumns);
-        template1.add("ucTable", "UC_" + jdbcSinkConfig.getTable());
+        template1.add("ucTable", "XJ$_" + jdbcSinkConfig.getTable());
         template1.add(
                 "OPERATETIME",
                 startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -287,7 +295,7 @@ public class ClickHouseDialect implements JdbcDialect {
         template.add("table", jdbcSinkConfig.getTable());
         template.add("columns", columnMappers);
         template.add("pks", ucColumns);
-        template.add("ucTable", "UC_" + jdbcSinkConfig.getTable());
+        template.add("ucTable", "XJ$_" + jdbcSinkConfig.getTable());
         template.add(
                 "OPERATETIME",
                 startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -323,6 +331,7 @@ public class ClickHouseDialect implements JdbcDialect {
             List<ColumnMapper> columnMappers, int rowSize, JdbcSinkConfig jdbcSinkConfig) {
         List<ColumnMapper> ucColumns =
                 columnMappers.stream().filter(ColumnMapper::isUc).collect(Collectors.toList());
+        /*
         String sqlQueryString =
                 " select <columns:{sub | `<sub.sinkColumnName>`}; separator=\", \"> "
                 + "  from `<table>` a "
@@ -331,13 +340,48 @@ public class ClickHouseDialect implements JdbcDialect {
         sqlQueryTemplate.add("table", jdbcSinkConfig.getTable());
         sqlQueryTemplate.add("columns", columnMappers);
         String sqlQuery = sqlQueryTemplate.render();
+        */
+        String sqlQueryString =
+                "#set($separator = '') "
+                + " select "
+                + "#foreach( $item in $columns )"
+                + " $separator  `$item` "
+                + "#set($separator = ',') "
+                + "#end"
+                + "  from `${table}` a "
+                + " where  ";
+        VelocityEngine ve = new VelocityEngine();
+        ve.init();
+        Velocity.init();
+        VelocityContext context = new VelocityContext();
+        context.put("table", jdbcSinkConfig.getTable());
+        context.put("columns", columnMappers.stream().map(ColumnMapper::getSinkColumnName).collect(Collectors.toList()));
+        StringWriter writer = new StringWriter();
+        Velocity.evaluate(context, writer, "mystring2", sqlQueryString);
+        String sqlQuery = writer.toString();
         List<String> where = new ArrayList<>();
         for (int i = 0; i < rowSize; i++) {
+            /*
             String tmpWhere = "( <ucs:{uc | `<uc.sinkColumnName>` = ?  }; separator=\" and \">  )";
             ST tmpst = new ST(tmpWhere);
             tmpst.add("ucs", ucColumns);
             String render = tmpst.render();
-            where.add(render);
+            */
+            String tmpWhere = "#set($separator2 = '') "
+                              + "("
+                              + "#foreach( $item in $pks )"
+                              + " $separator2  `$item` = ?"
+                              + "#set($separator2 = ' and  ') "
+                              + "#end"
+                              + ")";
+            VelocityEngine ve2 = new VelocityEngine();
+            ve2.init();
+            Velocity.init();
+            VelocityContext context2 = new VelocityContext();
+            context2.put("pks", ucColumns.stream().map(ColumnMapper::getSinkColumnName).collect(Collectors.toList()));
+            StringWriter writer2 = new StringWriter();
+            Velocity.evaluate(context2, writer2, "mystring2", tmpWhere);
+            where.add(writer2.toString());
         }
         String wheres = StringUtils.join(where, "  or ");
         if (rowSize == 0) {

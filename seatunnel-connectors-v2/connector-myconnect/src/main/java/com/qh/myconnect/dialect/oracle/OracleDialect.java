@@ -437,7 +437,7 @@ public class OracleDialect implements JdbcDialect {
         template1.add("dbSchema", jdbcSinkConfig.getDbSchema());
         template1.add("table", jdbcSinkConfig.getTable());
         template1.add("pks", ucColumns);
-        template1.add("ucTable", "UC_" + jdbcSinkConfig.getTable());
+        template1.add("ucTable", "XJ$_" + jdbcSinkConfig.getTable());
         template1.add(
                 "operateTime",
                 startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -470,7 +470,7 @@ public class OracleDialect implements JdbcDialect {
         template.add("table", jdbcSinkConfig.getTable());
         template.add("columns", columnMappers);
         template.add("pks", ucColumns);
-        template.add("ucTable", "UC_" + jdbcSinkConfig.getTable());
+        template.add("ucTable", "XJ$_" + jdbcSinkConfig.getTable());
         template.add(
                 "operateTime",
                 startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));

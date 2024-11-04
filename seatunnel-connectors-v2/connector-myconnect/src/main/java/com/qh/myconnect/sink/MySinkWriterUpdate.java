@@ -10,9 +10,10 @@ import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.constants.JobMode;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
-
-import org.stringtemplate.v4.ST;
-
+import org.apache.velocity.Template;
+import org.apache.velocity.VelocityContext;
+import org.apache.velocity.app.Velocity;
+import org.apache.velocity.app.VelocityEngine;
 import com.alibaba.fastjson2.JSON;
 import com.qh.myconnect.config.JdbcSinkConfig;
 import com.qh.myconnect.config.SeaTunnelJobsHistoryErrorRecord;
@@ -26,6 +27,7 @@ import com.qh.myconnect.dialect.JdbcDialectFactory;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -59,6 +61,8 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
     private Long insertCount = 0L;
 
     private Long errorCount = 0L;
+
+    private Long qualityCount = 0L;
 
     private final JdbcSinkConfig jdbcSinkConfig;
     private JobContext jobContext;
@@ -97,8 +101,11 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         this.startTime = startTime;
         this.table = this.jdbcSinkConfig.getTable();
         this.currentTaskId = context.getIndexOfSubtask();
-        this.tmpTable = "UC_" + this.jdbcSinkConfig.getTable();
+        this.tmpTable = "XJ$_" + this.jdbcSinkConfig.getTable();
         this.jdbcDialect = JdbcDialectFactory.getJdbcDialect(this.jdbcSinkConfig.getDbType());
+        if (this.jdbcSinkConfig.getDbType().equalsIgnoreCase("CLICKHOUSE")) {
+            this.batchSize = 3000;
+        }
         this.conn = util.getConnection(this.jdbcSinkConfig);
         conn.setAutoCommit(false);
         this.sinkTableRowType = util.initTableField(conn, this.jdbcDialect, this.jdbcSinkConfig);
@@ -132,6 +139,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+
     }
 
     private void consumeData() {
@@ -228,7 +236,6 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         for (String allDm : allDms) {
             String[] split = allDm.split("\\.");
             String sql = String.format("select %s,%s from %s", split[2], split[3], split[1]);
-            System.out.println("sql" + "-----------------------------------------------------------------------------------------------------------------------------" + sql);
             try (Connection con = util.getPanguConnection();
                  Statement stmt = con.createStatement()) {
                 ResultSet rs = stmt.executeQuery(sql);
@@ -295,6 +302,10 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
     public void write(SeaTunnelRow element) throws IOException {
         if (element.getRowKind().equals(RowKind.INSERT)) {
             this.writeCount++;
+            if(this.jdbcSinkConfig.isOpenQuality()){
+//                this.qualityCount++;
+//                return;
+            }
             for (int i = 0; i < columnMappers.size(); i++) {
                 Integer sourceRowPosition = columnMappers.get(i).getSourceRowPosition();
                 if (sourceRowPosition != null) {
@@ -498,29 +509,34 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                             .collect(Collectors.toList());
             List<ColumnMapper> columnMappers =
                     this.columnMappers.stream().filter(x -> !x.isUc()).collect(Collectors.toList());
-            String templateInsert = "";
-            if (jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
-                templateInsert =
-                        "update `<table>` set "
-                        + "<columns:{sub | `<sub.sinkColumnName>` = ? }; separator=\", \"> "
-                        + " where  <pks:{pk | `<pk.sinkColumnName>` = ? }; separator=\" and \"> ";
-            }
-            else {
-                templateInsert =
-                        "update <table> set "
-                        + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> "
-                        + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
-            }
-            ST template = new ST(templateInsert);
+            String templateInsert =
+                    " #set($separator = '') "
+                    + "#set($separator2 = '') "
+                    + "update ${table} set "
+                    + "#foreach( $item in $columns )"
+                    + " $separator  $item = ?"
+                    + "#set($separator = ',') "
+                    + "#end"
+                    + " where "
+                    + "#foreach( $item in $pks )"
+                    + " $separator2  $item = ?"
+                    + "#set($separator2 = ' and  ') "
+                    + "#end";
+            VelocityEngine ve = new VelocityEngine();
+            ve.init();
+            Velocity.init();
+            VelocityContext context = new VelocityContext();
             if (jdbcSinkConfig.getDbSchema() != null && !jdbcSinkConfig.getDbSchema().isEmpty()) {
-                template.add("table", jdbcSinkConfig.getDbSchema() + "." + jdbcSinkConfig.getTable());
+                context.put("table", jdbcSinkConfig.getDbSchema() + "." + jdbcSinkConfig.getTable());
             }
             else {
-                template.add("table", jdbcSinkConfig.getTable());
+                context.put("table", jdbcSinkConfig.getTable());
             }
-            template.add("columns", columnMappers);
-            template.add("pks", listUc);
-            String updateSql = template.render();
+            context.put("columns", columnMappers.stream().map(ColumnMapper::getSinkColumnName).collect(Collectors.toList()));
+            context.put("pks", listUc.stream().map(ColumnMapper::getSinkColumnName).collect(Collectors.toList()));
+            StringWriter writer = new StringWriter();
+            Velocity.evaluate(context, writer, "mystring2", templateInsert);
+            String updateSql = writer.toString();
             if (this.jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
                 updateSql = updateSql + " SETTINGS mutations_sync=0";
             }
@@ -582,29 +598,34 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                             .collect(Collectors.toList());
             List<ColumnMapper> columnMappers =
                     this.columnMappers.stream().filter(x -> !x.isUc()).collect(Collectors.toList());
-            String templateInsert = "";
-            if (jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
-                templateInsert =
-                        "update `<table>` set "
-                        + "<columns:{sub | `<sub.sinkColumnName>` = ? }; separator=\", \"> "
-                        + " where  <pks:{pk | `<pk.sinkColumnName>` = ? }; separator=\" and \"> ";
-            }
-            else {
-                templateInsert =
-                        "update <table> set "
-                        + "<columns:{sub | <sub.sinkColumnName> = ? }; separator=\", \"> "
-                        + " where  <pks:{pk | <pk.sinkColumnName> = ? }; separator=\" and \"> ";
-            }
-            ST template = new ST(templateInsert);
+            String templateInsert =
+                    "#set($separator = '') "
+                    + "#set($separator2 = '') "
+                    + "update `${table}` set "
+                    + "#foreach( $item in $columns )"
+                    + " $separator  $item = ?"
+                    + "#set($separator = ', ') "
+                    + "#end"
+                    + " where "
+                    + "#foreach( $item in $pks )"
+                    + " $separator2  $item = ?"
+                    + "#set($separator2 = ' and  ') "
+                    + "#end";
+            VelocityEngine ve = new VelocityEngine();
+            ve.init();
+            Velocity.init();
+            VelocityContext context = new VelocityContext();
             if (jdbcSinkConfig.getDbSchema() != null && !jdbcSinkConfig.getDbSchema().isEmpty()) {
-                template.add("table", jdbcSinkConfig.getDbSchema() + "." + jdbcSinkConfig.getTable());
+                context.put("table", jdbcSinkConfig.getDbSchema() + "." + jdbcSinkConfig.getTable());
             }
             else {
-                template.add("table", jdbcSinkConfig.getTable());
+                context.put("table", jdbcSinkConfig.getTable());
             }
-            template.add("columns", columnMappers);
-            template.add("pks", listUc);
-            String updateSql = template.render();
+            context.put("columns", columnMappers.stream().map(ColumnMapper::getSinkColumnName).collect(Collectors.toList()));
+            context.put("pks", listUc.stream().map(ColumnMapper::getSinkColumnName).collect(Collectors.toList()));
+            StringWriter writer = new StringWriter();
+            Velocity.evaluate(context, writer, "mystring1", templateInsert);
+            String updateSql = writer.toString();
             if (this.jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
                 updateSql = updateSql + " SETTINGS mutations_sync=0";
             }
@@ -780,12 +801,13 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
             statisticalLog.setDbSchema(this.jdbcSinkConfig.getDbSchema());
         }
         statisticalLog.setTableName(this.jdbcSinkConfig.getTable());
-        statisticalLog.setWriteCount(writeCount.longValue());
-        statisticalLog.setModifyCount(updateCount.longValue());
-        statisticalLog.setDeleteCount(deleteCount.longValue());
-        statisticalLog.setInsertCount(insertCount.longValue());
-        statisticalLog.setKeepCount(keepCount.longValue());
-        statisticalLog.setErrorCount(errorCount.longValue());
+        statisticalLog.setWriteCount(writeCount);
+        statisticalLog.setQualityCount(qualityCount);
+        statisticalLog.setModifyCount(updateCount);
+        statisticalLog.setDeleteCount(deleteCount);
+        statisticalLog.setInsertCount(insertCount);
+        statisticalLog.setKeepCount(keepCount);
+        statisticalLog.setErrorCount(errorCount);
         statisticalLog.setStartTime(startTime);
         statisticalLog.setEndTime(endTime);
         util.insertLog(statisticalLog);

@@ -17,6 +17,7 @@ public class StatisticalLog implements Serializable {
     private Long keepCount;
     private Long insertCount;
     private Long errorCount;
+    private Long qualityCount;
     private String flinkJobId;
     private java.time.LocalDateTime startTime;
     private LocalDateTime endTime;

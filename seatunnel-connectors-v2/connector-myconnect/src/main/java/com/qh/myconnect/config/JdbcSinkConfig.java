@@ -48,6 +48,7 @@ public class JdbcSinkConfig implements Serializable {
     private String driver;
     private String dbSchema;
     private String dbDatasourceId;
+    private boolean openQuality;
 
     public static JdbcSinkConfig of(ReadonlyConfig config) {
         JdbcSinkConfig.Builder builder = JdbcSinkConfig.builder();
@@ -69,6 +70,7 @@ public class JdbcSinkConfig implements Serializable {
         config.getOptional(JdbcOptions.FIELD_MAPPER).ifPresent(builder::fieldMapper);
         config.getOptional(JdbcOptions.CODE_MAPPER).ifPresent(builder::codeMapper);
         config.getOptional(JdbcOptions.DB_DATASOURCE_ID).ifPresent(builder::dbDatasourceId);
+        config.getOptional(JdbcOptions.openQuality).ifPresent(builder::openQuality);
         ;
         return builder.build();
     }

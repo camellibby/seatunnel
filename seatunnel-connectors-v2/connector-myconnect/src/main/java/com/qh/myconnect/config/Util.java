@@ -177,6 +177,7 @@ public class Util {
         param.put("keepCount", statisticalLog.getKeepCount());
         param.put("insertCount", statisticalLog.getInsertCount());
         param.put("errorCount", statisticalLog.getErrorCount());
+        param.put("qualityCount", statisticalLog.getQualityCount());
         param.put(
                 "startTime",
                 statisticalLog

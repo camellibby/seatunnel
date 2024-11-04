@@ -4,141 +4,89 @@
     "isRecordErrorData": 1,
     "execution.parallelism": 1,
     "maxRecordNumber": 100,
-    "job.name": "测试ETL清单_退休部的令牌_前台pg"
+    "job.name": "INT_JY_测试学生统计"
   },
   "source": [
     {
       "db_type": "MYSQL",
       "dbSchema": "",
       "columns": [
-        "age",
-        "id",
-        "name",
-        "sex",
-        "time"
+        "学号",
+        "姓名"
       ],
-      "query": "select `age`,`id`,`name`,`sex`,`time` from `table_one`",
-      "input_type": "sql",
-      "db_datasource_id": "1836233499927699458",
+      "query": " select  `学号`,`姓名` from  测试学生统计 ",
+      "input_type": "view",
+      "db_datasource_id": "1850815597287284737",
       "result_columns": [
         {
-          "fullAlias": "(年龄)age",
-          "nullable": false,
-          "isPrimaryKey": false,
-          "remark": "年龄",
-          "type": "INT",
+          "fullAlias": "学号",
           "decimalDigit": 0,
-          "size": 10,
+          "nullable": false,
+          "size": 20,
           "autoincrement": false,
-          "name": "age",
-          "finalAlias": "年龄",
+          "name": "学号",
+          "isPrimaryKey": false,
+          "remark": "",
+          "type": "CHAR",
           "order": 0,
           "primaryKey": false,
-          "sourceColumn": "1836233499927699458.test_ads.table_one.age"
+          "sourceColumn": "1850815597287284737..测试学生统计.学号"
         },
         {
-          "fullAlias": "(学号)id",
-          "nullable": false,
-          "isPrimaryKey": false,
-          "remark": "学号",
-          "type": "INT",
+          "fullAlias": "姓名",
           "decimalDigit": 0,
-          "size": 10,
+          "nullable": false,
+          "size": 50,
           "autoincrement": false,
-          "name": "id",
-          "finalAlias": "学号",
+          "name": "姓名",
+          "isPrimaryKey": false,
+          "remark": "",
+          "type": "CHAR",
           "order": 0,
           "primaryKey": false,
-          "sourceColumn": "1836233499927699458.test_ads.table_one.id"
-        },
-        {
-          "fullAlias": "(姓名)name",
-          "nullable": false,
-          "isPrimaryKey": false,
-          "remark": "姓名",
-          "type": "VARCHAR",
-          "decimalDigit": 0,
-          "size": 255,
-          "autoincrement": false,
-          "name": "name",
-          "finalAlias": "姓名",
-          "order": 0,
-          "primaryKey": false,
-          "sourceColumn": "1836233499927699458.test_ads.table_one.name"
-        },
-        {
-          "fullAlias": "(性别)sex",
-          "nullable": false,
-          "isPrimaryKey": false,
-          "remark": "性别",
-          "type": "VARCHAR",
-          "decimalDigit": 0,
-          "size": 255,
-          "autoincrement": false,
-          "name": "sex",
-          "finalAlias": "性别",
-          "order": 0,
-          "primaryKey": false,
-          "sourceColumn": "1836233499927699458.test_ads.table_one.sex"
-        },
-        {
-          "fullAlias": "(时间)time",
-          "nullable": false,
-          "isPrimaryKey": false,
-          "remark": "时间",
-          "type": "DATETIME",
-          "decimalDigit": 0,
-          "size": 19,
-          "autoincrement": false,
-          "name": "time",
-          "finalAlias": "时间",
-          "order": 0,
-          "primaryKey": false,
-          "sourceColumn": "1836233499927699458.test_ads.table_one.time"
+          "sourceColumn": "1850815597287284737..测试学生统计.姓名"
         }
       ],
       "result_table_name": "t1",
       "plugin_name": "JDBC",
-      "table_name": "",
-      "url": "jdbc:mysql://111.172.106.210:60173/test_ads?useUnicode=yes&characterEncoding=UTF-8&useSSL=false&serverTimezone=UTC",
-      "password": "XIJIAgreat2020!$",
-      "database": "test_ads",
+      "table_name": "测试学生统计",
+      "url": "jdbc:mysql://202.115.196.44:3306/csjy?useUnicode=yes&characterEncoding=UTF-8&useSSL=false&serverTimezone=UTC",
+      "password": "csdjyxt84768877",
+      "database": "csjy",
       "driver": "com.mysql.cj.jdbc.Driver",
-      "user": "root"
+      "user": "csdjyxt"
     }
   ],
   "transform": [],
   "sink": [
     {
-      "db_type": "PGSQL",
-      "dbSchema": "public",
+      "db_type": "CLICKHOUSE",
+      "dbSchema": "",
       "primary_keys": [
-        "id"
+        "字段1"
       ],
       "code_mapper": {},
-      "db_datasource_id": "1838041663289208833",
+      "db_datasource_id": "1850733688157036545",
       "source_table_name": [
         "t1"
       ],
       "plugin_name": "XJJDBC",
-      "url": "jdbc:postgresql://192.168.9.146:5432/usr_ods_db",
-      "password": "usr_ods#20231024",
-      "driver": "org.postgresql.Driver",
+      "url": "jdbc:clickhouse://172.27.254.8:9090/USR_ODS_DB?socket_timeout=60000",
+      "password": "Xjcz#qwe20200720#ods_chp",
+      "driver": "com.clickhouse.jdbc.ClickHouseDriver",
       "field_mapper": {
-        "sex": "sex",
-        "name": "name",
-        "id": "id",
-        "time": "time",
-        "age": "age"
+        "姓名": "姓名",
+        "学号": "学号"
       },
-      "user": "usr_ods",
-      "table": "t_txbdlp_csetlqd",
+      "user": "chp_usr_ods",
+      "table": "T_JY_测试学生统计",
       "pre_config": {
-        "cleanTableWhenCompleteNoDataIn": true,
+        "cleanTableWhenCompleteNoDataIn": false,
+        "clusterName": "cluster_1S_3R",
         "ignoreTstamp": true,
         "cleanTableWhenComplete": true,
         "incrementMode": "update",
-        "insertMode": "increment"
+        "insertMode": "complete"
       }
     }
   ]

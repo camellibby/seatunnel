@@ -68,7 +68,7 @@ public interface JdbcOptions {
                     .defaultValue(0)
                     .withDescription(
                             "For queries that return a large number of objects, "
-                                    + "you can configure the row fetch size used in the query to improve performance by reducing the number database hits required to satisfy the selection criteria. Zero means use jdbc default value.");
+                            + "you can configure the row fetch size used in the query to improve performance by reducing the number database hits required to satisfy the selection criteria. Zero means use jdbc default value.");
 
     Option<Integer> BATCH_INTERVAL_MS =
             Options.key("batch_interval_ms")
@@ -121,7 +121,9 @@ public interface JdbcOptions {
                     .defaultValue(false)
                     .withDescription("support upsert by query primary_key exist");
 
-    /** source config */
+    /**
+     * source config
+     */
     Option<String> PARTITION_COLUMN =
             Options.key("partition_column")
                     .stringType()
@@ -166,5 +168,10 @@ public interface JdbcOptions {
             Options.key("db_type").stringType().noDefaultValue().withDescription("数据库类型");
     Option<String> dbSchema =
             Options.key("dbSchema").stringType().noDefaultValue().withDescription("数据库Schema");
+
+    Option<Boolean> openQuality = Options.key("openQuality")
+            .booleanType()
+            .defaultValue(false)
+            .withDescription("开启质量检测数据过滤");
 
 }
