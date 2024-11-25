@@ -4,13 +4,13 @@ import com.alibaba.fastjson2.JSONWriter;
 import com.qh.myconnect.converter.CodeConverter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.api.common.JobContext;
+import org.apache.seatunnel.api.common.metrics.MetricsContext;
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.table.type.RowKind;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.constants.JobMode;
 import org.apache.seatunnel.connectors.seatunnel.common.sink.AbstractSinkWriter;
-import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
 import org.apache.velocity.app.VelocityEngine;
@@ -87,6 +87,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
     private int tstampIndex = -1;
 
     private CodeConverter converter = new CodeConverter();
+    private final Context context;
 
     public MySinkWriterUpdate(
             SeaTunnelRowType seaTunnelRowType,
@@ -100,6 +101,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
         this.jdbcSinkConfig = JdbcSinkConfig.of(config);
         this.startTime = startTime;
         this.table = this.jdbcSinkConfig.getTable();
+        this.context = context;
         this.currentTaskId = context.getIndexOfSubtask();
         this.tmpTable = "XJ$_" + this.jdbcSinkConfig.getTable();
         this.jdbcDialect = JdbcDialectFactory.getJdbcDialect(this.jdbcSinkConfig.getDbType());
@@ -302,7 +304,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
     public void write(SeaTunnelRow element) throws IOException {
         if (element.getRowKind().equals(RowKind.INSERT)) {
             this.writeCount++;
-            if(this.jdbcSinkConfig.isOpenQuality()){
+            if (this.jdbcSinkConfig.isOpenQuality()) {
 //                this.qualityCount++;
 //                return;
             }
@@ -509,19 +511,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                             .collect(Collectors.toList());
             List<ColumnMapper> columnMappers =
                     this.columnMappers.stream().filter(x -> !x.isUc()).collect(Collectors.toList());
-            String templateInsert =
-                    " #set($separator = '') "
-                    + "#set($separator2 = '') "
-                    + "update ${table} set "
-                    + "#foreach( $item in $columns )"
-                    + " $separator  $item = ?"
-                    + "#set($separator = ',') "
-                    + "#end"
-                    + " where "
-                    + "#foreach( $item in $pks )"
-                    + " $separator2  $item = ?"
-                    + "#set($separator2 = ' and  ') "
-                    + "#end";
+            String templateUpdate = this.jdbcDialect.getUpdateStatement();
             VelocityEngine ve = new VelocityEngine();
             ve.init();
             Velocity.init();
@@ -535,7 +525,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
             context.put("columns", columnMappers.stream().map(ColumnMapper::getSinkColumnName).collect(Collectors.toList()));
             context.put("pks", listUc.stream().map(ColumnMapper::getSinkColumnName).collect(Collectors.toList()));
             StringWriter writer = new StringWriter();
-            Velocity.evaluate(context, writer, "mystring2", templateInsert);
+            Velocity.evaluate(context, writer, "mystring2", templateUpdate);
             String updateSql = writer.toString();
             if (this.jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
                 updateSql = updateSql + " SETTINGS mutations_sync=0";
@@ -598,19 +588,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
                             .collect(Collectors.toList());
             List<ColumnMapper> columnMappers =
                     this.columnMappers.stream().filter(x -> !x.isUc()).collect(Collectors.toList());
-            String templateInsert =
-                    "#set($separator = '') "
-                    + "#set($separator2 = '') "
-                    + "update `${table}` set "
-                    + "#foreach( $item in $columns )"
-                    + " $separator  $item = ?"
-                    + "#set($separator = ', ') "
-                    + "#end"
-                    + " where "
-                    + "#foreach( $item in $pks )"
-                    + " $separator2  $item = ?"
-                    + "#set($separator2 = ' and  ') "
-                    + "#end";
+            String templateUpdate = this.jdbcDialect.getUpdateStatement();
             VelocityEngine ve = new VelocityEngine();
             ve.init();
             Velocity.init();
@@ -624,7 +602,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
             context.put("columns", columnMappers.stream().map(ColumnMapper::getSinkColumnName).collect(Collectors.toList()));
             context.put("pks", listUc.stream().map(ColumnMapper::getSinkColumnName).collect(Collectors.toList()));
             StringWriter writer = new StringWriter();
-            Velocity.evaluate(context, writer, "mystring1", templateInsert);
+            Velocity.evaluate(context, writer, "mystring1", templateUpdate);
             String updateSql = writer.toString();
             if (this.jdbcSinkConfig.getDbType().equalsIgnoreCase("clickhouse")) {
                 updateSql = updateSql + " SETTINGS mutations_sync=0";
@@ -855,6 +833,7 @@ public class MySinkWriterUpdate extends AbstractSinkWriter<SeaTunnelRow, Void> {
             statisticalResults(conn);
 //            jdbcSinkConfig.getPreConfig().dropUcTable(conn, jdbcSinkConfig);
             conn.close();
+            MetricsContext metricsContext = this.context.getMetricsContext();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

@@ -392,7 +392,24 @@ public class ClickHouseDialect implements JdbcDialect {
         }
         return sqlQuery;
     }
-
+    @Override
+    public String getUpdateStatement() {
+        return "#set($separator = '') "
+               + "#set($separator2 = '') "
+               + "update `${table}` set "
+               + "#foreach( $item in $columns )"
+               + " $separator  `$item` = ?"
+               + "#set($separator = ', ') "
+               + "#end"
+               + " where "
+               + "#foreach( $item in $pks )"
+               + " $separator2  `$item` = ?"
+               + "#set($separator2 = ' and  ') "
+               + "#end";
+    }
+    public String truncateTable(JdbcSinkConfig jdbcSinkConfig) {
+        return String.format("truncate  table `%s`", jdbcSinkConfig.getTable());
+    }
     public String insertTableSql(
             JdbcSinkConfig jdbcSinkConfig, List<String> columns, List<String> values) {
         String sql =

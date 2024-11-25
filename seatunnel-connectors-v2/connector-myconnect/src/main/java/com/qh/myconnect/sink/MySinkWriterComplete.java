@@ -118,7 +118,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
     @Override
     public void write(SeaTunnelRow element) throws IOException {
         this.writeCount++;
-        if(this.jdbcSinkConfig.isOpenQuality()){
+        if (this.jdbcSinkConfig.isOpenQuality()) {
 //            this.qualityCount++;
 //            return;
         }
@@ -167,10 +167,11 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
 
     public void insertToDb() {
         Long tmpInsertCount = null;
+        String sql = null;
         try {
             List<String> columns = this.columnMappers.stream().map(x -> x.getSinkColumnName()).collect(Collectors.toList());
             List<String> values = this.columnMappers.stream().map(x -> "?").collect(Collectors.toList());
-            String sql = jdbcDialect.insertTableSql(this.jdbcSinkConfig, columns, values);
+            sql = jdbcDialect.insertTableSql(this.jdbcSinkConfig, columns, values);
             PreparedStatement psUpsert = conn.prepareStatement(sql);
             tmpInsertCount = this.insertCount;
             boolean hasError = false;
@@ -201,6 +202,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
             psUpsert.close();
 
         } catch (Exception e) {
+            log.error("错误sql:" + sql);
             try {
                 conn.rollback();
                 this.insertCount = tmpInsertCount;

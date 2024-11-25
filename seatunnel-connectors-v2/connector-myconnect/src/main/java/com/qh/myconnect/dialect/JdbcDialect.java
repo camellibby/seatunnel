@@ -121,19 +121,19 @@ public interface JdbcDialect extends Serializable {
      *
      * @return the dialects {@code UPDATE} statement.
      */
-    default String getUpdateStatement(
-            String database, String tableName, String[] fieldNames, String[] conditionFields) {
-        String setClause =
-                Arrays.stream(fieldNames)
-                        .map(fieldName -> format("%s = :%s", quoteIdentifier(fieldName), fieldName))
-                        .collect(Collectors.joining(", "));
-        String conditionClause =
-                Arrays.stream(conditionFields)
-                        .map(fieldName -> format("%s = :%s", quoteIdentifier(fieldName), fieldName))
-                        .collect(Collectors.joining(" AND "));
-        return String.format(
-                "UPDATE %s SET %s WHERE %s",
-                tableIdentifier(database, tableName), setClause, conditionClause);
+    default String getUpdateStatement() {
+        return "#set($separator = '') "
+               + "#set($separator2 = '') "
+               + "update ${table} set "
+               + "#foreach( $item in $columns )"
+               + " $separator  $item = ?"
+               + "#set($separator = ', ') "
+               + "#end"
+               + " where "
+               + "#foreach( $item in $pks )"
+               + " $separator2  $item = ?"
+               + "#set($separator2 = ' and  ') "
+               + "#end";
     }
 
     /**

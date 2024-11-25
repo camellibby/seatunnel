@@ -119,9 +119,6 @@ public class PreConfig implements Serializable {
                     System.out.println(dropSql + "删除报错意味着没有表" + e.getMessage());
                 }
             }
-            System.out.println("----------------sql------------------------");
-            System.out.println(copyTableOnlyColumnSql);
-            System.out.println("----------------sql------------------------");
             PreparedStatement preparedStatement1 =
                     connection.prepareStatement(copyTableOnlyColumnSql);
             preparedStatement1.execute();
