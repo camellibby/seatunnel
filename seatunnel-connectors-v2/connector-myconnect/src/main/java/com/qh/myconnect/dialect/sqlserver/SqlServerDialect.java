@@ -42,8 +42,11 @@ public class SqlServerDialect implements JdbcDialect {
     public String copyTableOnlyColumn(
             String sourceTable, String targetTable, JdbcSinkConfig jdbcSinkConfig) {
         return format(
-                "select  %s into %s from %s where 1=2 ",
-                StringUtils.join(jdbcSinkConfig.getPrimaryKeys(), ','), targetTable, sourceTable);
+                "select  * into %s.%s from %s.%s where 1=2 ",
+                jdbcSinkConfig.getDbSchema(),
+                targetTable,
+                jdbcSinkConfig.getDbSchema(),
+                sourceTable);
     }
 
     public ResultSetMetaData getResultSetMetaData(Connection conn, JdbcSinkConfig jdbcSourceConfig)
@@ -64,6 +67,10 @@ public class SqlServerDialect implements JdbcDialect {
         return ps.getMetaData();
     }
 
+    public String quoteIdentifier(String identifier) {
+        return "[" + identifier + "]";
+    }
+
     public String insertTableSql(
             JdbcSinkConfig jdbcSinkConfig, List<String> columns, List<String> values) {
         List<String> newColumns =
@@ -75,6 +82,20 @@ public class SqlServerDialect implements JdbcDialect {
                         + jdbcSinkConfig.getTable()
                         + String.format("(%s)", StringUtils.join(newColumns, ","))
                         + String.format("values (%s)", StringUtils.join(values, ","));
+        return sql;
+    }
+
+    public String insertTmpTableSql(
+            JdbcSinkConfig jdbcSinkConfig, List<String> columns, List<String> values) {
+        List<String> newColumns =
+                columns.stream().map(x -> "\"" + x + "\"").collect(Collectors.toList());
+        String sql =
+                "insert into "
+                + jdbcSinkConfig.getDbSchema()
+                + "."
+                +"XJ$_" + jdbcSinkConfig.getTable()
+                + String.format("(%s)", StringUtils.join(newColumns, ","))
+                + String.format("values (%s)", StringUtils.join(values, ","));
         return sql;
     }
 
@@ -103,9 +124,9 @@ public class SqlServerDialect implements JdbcDialect {
     public int deleteData(
             Connection connection, String table, String ucTable, List<ColumnMapper> ucColumns) {
         String delSql =
-                "delete from  <table> a   "
+                "delete from  <table>    "
                         + " where not exists "
-                        + "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> b where <pks:{pk | a.<pk.sinkColumnName>=b.<pk.sinkColumnName> }; separator=\" and \">  ) ";
+                        + "       (select  <pks:{pk | <pk.sinkColumnName>}; separator=\" , \"> from <tmpTable> b where <pks:{pk | <table>.<pk.sinkColumnName>=b.<pk.sinkColumnName> }; separator=\" and \">  ) ";
         ST template = new ST(delSql);
         template.add("table", table);
         template.add("tmpTable", ucTable);

@@ -36,6 +36,9 @@ public class PreConfig implements Serializable {
     @OptionMark(description = "增量模式 忽略时间戳比对 ")
     private Boolean ignoreTstamp = true;
 
+    @OptionMark(description = "增量模式 忽略对比的字段 ")
+    private List<String> ignoreColumns;
+
     @OptionMark(description = "ck 集群模式下 集群的名字")
     private String clusterName;
 

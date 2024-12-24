@@ -17,6 +17,8 @@
 
 package com.qh.myconnect.dialect.pgsql;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import org.apache.commons.lang3.StringUtils;
 
 import org.stringtemplate.v4.ST;
@@ -103,6 +105,11 @@ public class PostgresDialect implements JdbcDialect {
         return statement;
     }
 
+    public String quoteIdentifier(String identifier) {
+        return "\"" + identifier + "\"";
+    }
+
+
     public ResultSetMetaData getResultSetMetaData(Connection conn, JdbcSinkConfig jdbcSourceConfig)
             throws SQLException {
         String table = jdbcSourceConfig.getTable();
@@ -167,6 +174,20 @@ public class PostgresDialect implements JdbcDialect {
         return sql;
     }
 
+    public String insertTmpTableSql(
+            JdbcSinkConfig jdbcSinkConfig, List<String> columns, List<String> values) {
+        List<String> newColumns =
+                columns.stream().map(x -> "\"" + x + "\"").collect(Collectors.toList());
+        String sql =
+                "insert into "
+                + "\"" + jdbcSinkConfig.getDbSchema() + "\""
+                + "."
+                + "\"" +"XJ$_" + jdbcSinkConfig.getTable() + "\""
+                + String.format("(%s)", StringUtils.join(newColumns, ","))
+                + String.format("values (%s)", StringUtils.join(values, ","));
+        return sql;
+    }
+
     public String truncateTable(JdbcSinkConfig jdbcSinkConfig) {
         return String.format(
                 "truncate  table \"%s\".\"%s\"", jdbcSinkConfig.getDbSchema(), jdbcSinkConfig.getTable());
@@ -183,17 +204,19 @@ public class PostgresDialect implements JdbcDialect {
                         .map(x -> "\"" + x + "\"")
                         .collect(Collectors.toList());
         return format(
-                "create  table \"%s\".\"%s\" as select  %s from \"%s\".\"%s\" where 1=2 ",
+                "create  table \"%s\".\"%s\" as select  * from \"%s\".\"%s\" where 1=2 ",
                 jdbcSinkConfig.getDbSchema(),
                 targetTable,
-                StringUtils.join(collect, ','),
+//                StringUtils.join(collect, ','),
                 jdbcSinkConfig.getDbSchema(),
                 sourceTable);
     }
 
     public int deleteData(
             Connection connection, String table, String ucTable, List<ColumnMapper> ucColumns) {
-        ucColumns.forEach(
+        String jsonString = JSON.toJSONString(ucColumns);
+        List<ColumnMapper> newColumnMappers = JSON.parseArray(jsonString, ColumnMapper.class);
+        newColumnMappers.forEach(
                 x -> {
                     x.setSinkColumnName("\"" + x.getSinkColumnName() + "\"");
                 });
@@ -204,7 +227,7 @@ public class PostgresDialect implements JdbcDialect {
         ST template = new ST(delSql);
         template.add("table", StringUtils.join(Arrays.stream(table.split("\\.")).map(x -> "\"" + x + "\"").collect(Collectors.toList()), "."));
         template.add("tmpTable", StringUtils.join(Arrays.stream(ucTable.split("\\.")).map(x -> "\"" + x + "\"").collect(Collectors.toList()), "."));
-        template.add("pks", ucColumns);
+        template.add("pks", newColumnMappers);
         PreparedStatement preparedStatement = null;
         int del = 0;
         try {

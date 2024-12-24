@@ -84,6 +84,9 @@ public class ClickHouseMapper implements JdbcDialectTypeMapper {
     private static final String CLICKHOUSE_VARBINARY = "VARBINARY";
     private static final String CLICKHOUSE_GEOMETRY = "GEOMETRY";
 
+    private static final String CLICKHOUSE_UINT64 = "UINT64";
+    private static final String CLICKHOUSE_UUID = "UUID";
+
     @SuppressWarnings("checkstyle:MagicNumber")
     @Override
     public SeaTunnelDataType<?> mapping(ResultSetMetaData metadata, int colIndex)
@@ -112,6 +115,7 @@ public class ClickHouseMapper implements JdbcDialectTypeMapper {
             case CLICKHOUSE_INT_UNSIGNED:
             case CLICKHOUSE_INTEGER_UNSIGNED:
             case CLICKHOUSE_BIGINT:
+            case CLICKHOUSE_UINT64:
                 return BasicType.LONG_TYPE;
             case CLICKHOUSE_BIGINT_UNSIGNED:
                 return new DecimalType(20, 0);
@@ -135,6 +139,7 @@ public class ClickHouseMapper implements JdbcDialectTypeMapper {
                 return BasicType.DOUBLE_TYPE;
             case CLICKHOUSE_STRING:
             case CLICKHOUSE_NULLABLE_STRING:
+            case CLICKHOUSE_UUID:
             case CLICKHOUSE_JSON:
                 return BasicType.STRING_TYPE;
             case CLICKHOUSE_DATE:
@@ -158,8 +163,7 @@ public class ClickHouseMapper implements JdbcDialectTypeMapper {
             case CLICKHOUSE_UNKNOWN:
             default:
                 final String jdbcColumnName = metadata.getColumnName(colIndex);
-                throw new JdbcConnectorException(
-                        CommonErrorCode.CONVERT_TO_SEATUNNEL_TYPE_ERROR,
+                throw new RuntimeException(
                         String.format(
                                 "Doesn't support CLickHouse type '%s' on column '%s'  yet.",
                                 mysqlType, jdbcColumnName));

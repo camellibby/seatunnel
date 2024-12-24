@@ -72,7 +72,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
     private SeaTunnelRowType sinkTableRowType;
 
     private final Util util = new Util();
-    private int batchSize = 20000;
+    private int batchSize = 1000;
 
     private Long tableCount;
 
@@ -202,7 +202,7 @@ public class MySinkWriterComplete extends AbstractSinkWriter<SeaTunnelRow, Void>
             psUpsert.close();
 
         } catch (Exception e) {
-            log.error("错误sql:" + sql);
+            log.error("错误sql:" + sql,e);
             try {
                 conn.rollback();
                 this.insertCount = tmpInsertCount;

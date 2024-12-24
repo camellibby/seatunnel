@@ -72,7 +72,7 @@ public class OracleDialect implements JdbcDialect {
 
     @Override
     public String quoteIdentifier(String identifier) {
-        return identifier;
+        return "\"" + identifier + "\"";
     }
 
     @Override
@@ -291,6 +291,20 @@ public class OracleDialect implements JdbcDialect {
         return sql;
     }
 
+    public String insertTmpTableSql(
+            JdbcSinkConfig jdbcSinkConfig, List<String> columns, List<String> values) {
+        List<String> newColumns =
+                columns.stream().map(x -> "\"" + x + "\"").collect(Collectors.toList());
+        String sql =
+                "insert into "
+                + jdbcSinkConfig.getDbSchema()
+                + "."
+                +"XJ$_" + jdbcSinkConfig.getTable()
+                + String.format("(%s)", StringUtils.join(newColumns, ","))
+                + String.format("values (%s)", StringUtils.join(values, ","));
+        return sql;
+    }
+
     public int deleteData(
             Connection connection, String table, String ucTable, List<ColumnMapper> ucColumns) {
         String delSql =
@@ -320,10 +334,10 @@ public class OracleDialect implements JdbcDialect {
                         .map(x -> "\"" + x + "\"")
                         .collect(Collectors.toList());
         return format(
-                "create  table \"%s\".\"%s\" as select  %s from \"%s\".\"%s\" where 1=2 ",
+                "create  table \"%s\".\"%s\" as select  * from \"%s\".\"%s\" where 1=2 ",
                 jdbcSinkConfig.getDbSchema(),
                 targetTable,
-                StringUtils.join(collect, ','),
+//                StringUtils.join(collect, ','),
                 jdbcSinkConfig.getDbSchema(),
                 sourceTable);
     }

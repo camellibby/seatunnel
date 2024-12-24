@@ -115,6 +115,17 @@ public class MysqlDialect implements JdbcDialect {
         return sql;
     }
 
+    public String insertTmpTableSql(
+            JdbcSinkConfig jdbcSinkConfig, List<String> columns, List<String> values) {
+        List<String> newColumns = columns.stream().map(x -> "`" + x + "`").collect(Collectors.toList());
+        String sql =
+                "insert into "
+                +"XJ$_" + jdbcSinkConfig.getTable()
+                + String.format("(%s)", StringUtils.join(newColumns, ","))
+                + String.format("values (%s)", StringUtils.join(values, ","));
+        return sql;
+    }
+
     public String getSinkQueryUpdate(
             List<ColumnMapper> columnMappers, int rowSize, JdbcSinkConfig jdbcSinkConfig) {
         List<ColumnMapper> ucColumns =
